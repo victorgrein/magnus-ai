@@ -1,0 +1,11 @@
+fastapi 
+uvicorn 
+pydantic 
+sqlalchemy 
+psycopg2
+psycopg2-binary
+google-cloud-aiplatform 
+python-dotenv 
+google-adk 
+litellm
+python-multipart
