@@ -12,6 +12,8 @@ from sqlalchemy.orm import Session
 from contextlib import AsyncExitStack
 from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LlmResponse, LlmRequest
+from google.adk.tools import load_memory
+
 from typing import Optional
 import logging
 import os
@@ -161,11 +163,10 @@ def search_knowledge_base_function_sync(query: str, history=[]):
 
 
 class AgentBuilder:
-    def __init__(self, db: Session, memory_service: InMemoryMemoryService):
+    def __init__(self, db: Session):
         self.db = db
         self.custom_tool_builder = CustomToolBuilder()
         self.mcp_service = MCPService()
-        self.memory_service = memory_service
 
     async def _create_llm_agent(
         self, agent
@@ -184,11 +185,6 @@ class AgentBuilder:
 
         # Combina todas as ferramentas
         all_tools = custom_tools + mcp_tools
-
-        # Verifica se load_memory está habilitado
-        before_model_callback_func = None
-        if agent.config.get("load_memory") == True:
-            before_model_callback_func = before_model_callback
             
         now = datetime.now()
         current_datetime = now.strftime("%d/%m/%Y %H:%M")
@@ -204,6 +200,13 @@ class AgentBuilder:
             current_time=current_time,
         )
 
+        # Verifica se load_memory está habilitado
+        # before_model_callback_func = None
+        if agent.config.get("load_memory") == True:
+            all_tools.append(load_memory)
+            # before_model_callback_func = before_model_callback
+            formatted_prompt = formatted_prompt + "\n\n<memory_instructions>ALWAYS use the load_memory tool to retrieve knowledge for your context</memory_instructions>\n\n"
+
         return (
             LlmAgent(
                 name=agent.name,
@@ -211,7 +214,7 @@ class AgentBuilder:
                 instruction=formatted_prompt,
                 description=agent.description,
                 tools=all_tools,
-                before_model_callback=before_model_callback_func,
+                # before_model_callback=before_model_callback_func,
             ),
             mcp_exit_stack,
         )

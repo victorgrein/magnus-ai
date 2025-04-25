@@ -42,7 +42,7 @@ async def run_agent(
             raise AgentNotFoundError(f"Agente com ID {agent_id} não encontrado")
 
         # Usando o AgentBuilder para criar o agente
-        agent_builder = AgentBuilder(db, memory_service)
+        agent_builder = AgentBuilder(db)
         root_agent, exit_stack = await agent_builder.build_agent(get_root_agent)
 
         logger.info("Configurando Runner")
@@ -51,6 +51,7 @@ async def run_agent(
             app_name=get_root_agent.name,
             session_service=session_service,
             artifact_service=artifacts_service,
+            memory_service=memory_service,
         )
         session_id = contact_id + "_" + agent_id
 
@@ -82,6 +83,15 @@ async def run_agent(
                 if event.is_final_response() and event.content and event.content.parts:
                     final_response_text = event.content.parts[0].text
                     logger.info(f"Resposta final recebida: {final_response_text}")
+        
+            completed_session = session_service.get_session(
+                app_name=root_agent.name,
+                user_id=contact_id,
+                session_id=session_id,
+            )
+            
+            memory_service.add_session_to_memory(completed_session)
+        
         finally:
             # Garante que o exit_stack seja fechado corretamente
             if exit_stack:
