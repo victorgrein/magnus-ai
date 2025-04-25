@@ -6,6 +6,7 @@ from google.adk.agents import SequentialAgent, ParallelAgent, LoopAgent
 from google.adk.runners import Runner
 from google.genai.types import Content, Part
 from google.adk.sessions import DatabaseSessionService
+from google.adk.memory import InMemoryMemoryService
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from src.utils.logger import setup_logger
 from src.core.exceptions import AgentNotFoundError, InternalServerError
@@ -23,6 +24,7 @@ async def run_agent(
     message: str,
     session_service: DatabaseSessionService,
     artifacts_service: InMemoryArtifactService,
+    memory_service: InMemoryMemoryService,
     db: Session,
 ):
     try:
@@ -40,7 +42,7 @@ async def run_agent(
             raise AgentNotFoundError(f"Agente com ID {agent_id} não encontrado")
 
         # Usando o AgentBuilder para criar o agente
-        agent_builder = AgentBuilder(db)
+        agent_builder = AgentBuilder(db, memory_service)
         root_agent, exit_stack = await agent_builder.build_agent(get_root_agent)
 
         logger.info("Configurando Runner")

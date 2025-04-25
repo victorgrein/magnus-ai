@@ -48,18 +48,3 @@ class Agent(AgentBase):
 
     class Config:
         from_attributes = True
-
-class MessageBase(BaseModel):
-    session_id: UUID
-    sender: str
-    content: str
-
-class MessageCreate(MessageBase):
-    pass
-
-class Message(MessageBase):
-    id: int
-    created_at: datetime
-
-    class Config:
-        from_attributes = True 

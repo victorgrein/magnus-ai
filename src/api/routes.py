@@ -9,19 +9,19 @@ from src.schemas.schemas import (
     Client, ClientCreate,
     Contact, ContactCreate,
     Agent, AgentCreate,
-    Message, MessageCreate
 )
 from src.services import (
     client_service,
     contact_service,
     agent_service,
-    message_service
 )
 from src.schemas.chat import ChatRequest, ChatResponse, ErrorResponse
 from src.services.agent_runner import run_agent
-from src.core.exceptions import AgentNotFoundError, InternalServerError
+from src.core.exceptions import AgentNotFoundError
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
 from google.adk.sessions import DatabaseSessionService
+from google.adk.memory import InMemoryMemoryService
+from google.adk.memory import InMemoryMemoryService
 from src.config.settings import settings
 
 router = APIRouter()
@@ -32,6 +32,7 @@ POSTGRES_CONNECTION_STRING = settings.POSTGRES_CONNECTION_STRING
 # Inicializar os serviços globalmente
 session_service = DatabaseSessionService(db_url=POSTGRES_CONNECTION_STRING)
 artifacts_service = InMemoryArtifactService()
+memory_service = InMemoryMemoryService()
 
 @router.post("/chat", response_model=ChatResponse, responses={
     400: {"model": ErrorResponse},
@@ -46,6 +47,7 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
             request.message, 
             session_service, 
             artifacts_service,
+            memory_service,
             db
         )
         
@@ -146,32 +148,3 @@ def delete_agent(agent_id: uuid.UUID, db: Session = Depends(get_db)):
     if not agent_service.delete_agent(db, agent_id):
         raise HTTPException(status_code=404, detail="Agent not found")
     return {"message": "Agent deleted successfully"}
-
-# Rotas para Mensagens
-@router.post("/messages/", response_model=Message)
-def create_message(message: MessageCreate, db: Session = Depends(get_db)):
-    return message_service.create_message(db, message)
-
-@router.get("/messages/{session_id}", response_model=List[Message])
-def read_messages(session_id: uuid.UUID, skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
-    return message_service.get_messages_by_session(db, session_id, skip, limit)
-
-@router.get("/message/{message_id}", response_model=Message)
-def read_message(message_id: int, db: Session = Depends(get_db)):
-    db_message = message_service.get_message(db, message_id)
-    if db_message is None:
-        raise HTTPException(status_code=404, detail="Message not found")
-    return db_message
-
-@router.put("/message/{message_id}", response_model=Message)
-def update_message(message_id: int, message: MessageCreate, db: Session = Depends(get_db)):
-    db_message = message_service.update_message(db, message_id, message)
-    if db_message is None:
-        raise HTTPException(status_code=404, detail="Message not found")
-    return db_message
-
-@router.delete("/message/{message_id}")
-def delete_message(message_id: int, db: Session = Depends(get_db)):
-    if not message_service.delete_message(db, message_id):
-        raise HTTPException(status_code=404, detail="Message not found")
-    return {"message": "Message deleted successfully"} 
