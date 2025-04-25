@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.agents import SequentialAgent, ParallelAgent, LoopAgent
 from google.adk.models.lite_llm import LiteLlm
@@ -6,7 +6,9 @@ from src.utils.logger import setup_logger
 from src.core.exceptions import AgentNotFoundError
 from src.services.agent_service import get_agent
 from src.services.custom_tools import CustomToolBuilder
+from src.services.mcp_service import MCPService
 from sqlalchemy.orm import Session
+from contextlib import AsyncExitStack
 
 logger = setup_logger(__name__)
 
@@ -14,23 +16,33 @@ class AgentBuilder:
     def __init__(self, db: Session):
         self.db = db
         self.custom_tool_builder = CustomToolBuilder()
+        self.mcp_service = MCPService()
 
-    def _create_llm_agent(self, agent) -> LlmAgent:
+    async def _create_llm_agent(self, agent) -> Tuple[LlmAgent, Optional[AsyncExitStack]]:
         """Cria um agente LLM a partir dos dados do agente."""
         # Obtém ferramentas personalizadas da configuração
         custom_tools = []
         if agent.config.get("tools"):
             custom_tools = self.custom_tool_builder.build_tools(agent.config["tools"])
 
+        # Obtém ferramentas MCP da configuração
+        mcp_tools = []
+        mcp_exit_stack = None
+        if agent.config.get("mcpServers"):
+            mcp_tools, mcp_exit_stack = await self.mcp_service.build_tools(agent.config)
+
+        # Combina todas as ferramentas
+        all_tools = custom_tools + mcp_tools
+
         return LlmAgent(
             name=agent.name,
             model=LiteLlm(model=agent.model, api_key=agent.api_key),
             instruction=agent.instruction,
             description=agent.config.get("description", ""),
-            tools=custom_tools,
-        )
+            tools=all_tools,
+        ), mcp_exit_stack
 
-    def _get_sub_agents(self, sub_agent_ids: List[str]) -> List[LlmAgent]:
+    async def _get_sub_agents(self, sub_agent_ids: List[str]) -> List[Tuple[LlmAgent, Optional[AsyncExitStack]]]:
         """Obtém e cria os sub-agentes LLM."""
         sub_agents = []
         for sub_agent_id in sub_agent_ids:
@@ -42,29 +54,32 @@ class AgentBuilder:
             if agent.type != "llm":
                 raise ValueError(f"Agente {agent.name} (ID: {agent.id}) não é um agente LLM")
             
-            sub_agents.append(self._create_llm_agent(agent))
+            sub_agent, exit_stack = await self._create_llm_agent(agent)
+            sub_agents.append((sub_agent, exit_stack))
         
         return sub_agents
 
-    def build_llm_agent(self, root_agent) -> LlmAgent:
+    async def build_llm_agent(self, root_agent) -> Tuple[LlmAgent, Optional[AsyncExitStack]]:
         """Constrói um agente LLM com seus sub-agentes."""
         logger.info("Criando agente LLM")
         
         sub_agents = []
         if root_agent.config.get("sub_agents"):
-            sub_agents = self._get_sub_agents(root_agent.config.get("sub_agents"))
+            sub_agents_with_stacks = await self._get_sub_agents(root_agent.config.get("sub_agents"))
+            sub_agents = [agent for agent, _ in sub_agents_with_stacks]
         
-        root_llm_agent = self._create_llm_agent(root_agent)
+        root_llm_agent, exit_stack = await self._create_llm_agent(root_agent)
         if sub_agents:
             root_llm_agent.sub_agents = sub_agents
         
-        return root_llm_agent
+        return root_llm_agent, exit_stack
 
-    def build_composite_agent(self, root_agent) -> SequentialAgent | ParallelAgent | LoopAgent:
+    async def build_composite_agent(self, root_agent) -> Tuple[SequentialAgent | ParallelAgent | LoopAgent, Optional[AsyncExitStack]]:
         """Constrói um agente composto (Sequential, Parallel ou Loop) com seus sub-agentes."""
         logger.info(f"Processando sub-agentes para agente {root_agent.type}")
         
-        sub_agents = self._get_sub_agents(root_agent.config.get("sub_agents", []))
+        sub_agents_with_stacks = await self._get_sub_agents(root_agent.config.get("sub_agents", []))
+        sub_agents = [agent for agent, _ in sub_agents_with_stacks]
         
         if root_agent.type == "sequential":
             logger.info("Criando SequentialAgent")
@@ -72,14 +87,14 @@ class AgentBuilder:
                 name=root_agent.name,
                 sub_agents=sub_agents,
                 description=root_agent.config.get("description", ""),
-            )
+            ), None
         elif root_agent.type == "parallel":
             logger.info("Criando ParallelAgent")
             return ParallelAgent(
                 name=root_agent.name,
                 sub_agents=sub_agents,
                 description=root_agent.config.get("description", ""),
-            )
+            ), None
         elif root_agent.type == "loop":
             logger.info("Criando LoopAgent")
             return LoopAgent(
@@ -87,13 +102,13 @@ class AgentBuilder:
                 sub_agents=sub_agents,
                 description=root_agent.config.get("description", ""),
                 max_iterations=root_agent.config.get("max_iterations", 5),
-            )
+            ), None
         else:
             raise ValueError(f"Tipo de agente inválido: {root_agent.type}")
 
-    def build_agent(self, root_agent) -> LlmAgent | SequentialAgent | ParallelAgent | LoopAgent:
+    async def build_agent(self, root_agent) -> Tuple[LlmAgent | SequentialAgent | ParallelAgent | LoopAgent, Optional[AsyncExitStack]]:
         """Constrói o agente apropriado baseado no tipo do agente root."""
         if root_agent.type == "llm":
-            return self.build_llm_agent(root_agent)
+            return await self.build_llm_agent(root_agent)
         else:
-            return self.build_composite_agent(root_agent) 
+            return await self.build_composite_agent(root_agent) 

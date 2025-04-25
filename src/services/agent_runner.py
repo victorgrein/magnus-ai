@@ -12,6 +12,7 @@ from src.core.exceptions import AgentNotFoundError, InternalServerError
 from src.services.agent_service import get_agent
 from src.services.agent_builder import AgentBuilder
 from sqlalchemy.orm import Session
+from contextlib import AsyncExitStack
 
 logger = setup_logger(__name__)
 
@@ -40,7 +41,7 @@ async def run_agent(
 
         # Usando o AgentBuilder para criar o agente
         agent_builder = AgentBuilder(db)
-        root_agent = agent_builder.build_agent(get_root_agent)
+        root_agent, exit_stack = await agent_builder.build_agent(get_root_agent)
 
         logger.info("Configurando Runner")
         agent_runner = Runner(
@@ -70,14 +71,19 @@ async def run_agent(
         logger.info("Iniciando execução do agente")
 
         final_response_text = None
-        for event in agent_runner.run(
-            user_id=contact_id,
-            session_id=session_id,
-            new_message=content,
-        ):
-            if event.is_final_response() and event.content and event.content.parts:
-                final_response_text = event.content.parts[0].text
-                logger.info(f"Resposta final recebida: {final_response_text}")
+        try:
+            for event in agent_runner.run(
+                user_id=contact_id,
+                session_id=session_id,
+                new_message=content,
+            ):
+                if event.is_final_response() and event.content and event.content.parts:
+                    final_response_text = event.content.parts[0].text
+                    logger.info(f"Resposta final recebida: {final_response_text}")
+        finally:
+            # Garante que o exit_stack seja fechado corretamente
+            if exit_stack:
+                await exit_stack.aclose()
 
         logger.info("Execução do agente concluída com sucesso")
         return final_response_text
