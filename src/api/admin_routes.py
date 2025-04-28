@@ -13,12 +13,12 @@ from src.schemas.user import UserResponse, AdminUserCreate
 
 router = APIRouter(
     prefix="/admin",
-    tags=["administração"],
-    dependencies=[Depends(verify_admin)],  # Todas as rotas requerem permissão de admin
-    responses={403: {"description": "Permissão negada"}},
+    tags=["admin"],
+    dependencies=[Depends(verify_admin)],
+    responses={403: {"description": "Permission denied"}},
 )
 
-# Rotas para auditoria
+# Audit routes
 @router.get("/audit-logs", response_model=List[AuditLogResponse])
 async def read_audit_logs(
     filters: AuditLogFilter = Depends(),
@@ -26,15 +26,15 @@ async def read_audit_logs(
     payload: dict = Depends(get_jwt_token),
 ):
     """
-    Obter logs de auditoria com filtros opcionais
+    Get audit logs with optional filters
     
     Args:
-        filters: Filtros para busca de logs
-        db: Sessão do banco de dados
-        payload: Payload do token JWT
+        filters: Filters for log search
+        db: Database session
+        payload: JWT token payload
         
     Returns:
-        List[AuditLogResponse]: Lista de logs de auditoria
+        List[AuditLogResponse]: List of audit logs
     """
     return get_audit_logs(
         db,
@@ -48,7 +48,7 @@ async def read_audit_logs(
         end_date=filters.end_date
     )
 
-# Rotas para administradores
+# Admin routes
 @router.get("/users", response_model=List[UserResponse])
 async def read_admin_users(
     skip: int = 0,
@@ -57,16 +57,16 @@ async def read_admin_users(
     payload: dict = Depends(get_jwt_token),
 ):
     """
-    Listar usuários administradores
+    List admin users
     
     Args:
-        skip: Número de registros para pular
-        limit: Número máximo de registros para retornar
-        db: Sessão do banco de dados
-        payload: Payload do token JWT
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        db: Database session
+        payload: JWT token payload
         
     Returns:
-        List[UserResponse]: Lista de usuários administradores
+        List[UserResponse]: List of admin users
     """
     return get_admin_users(db, skip, limit)
 
@@ -78,29 +78,29 @@ async def create_new_admin_user(
     payload: dict = Depends(get_jwt_token),
 ):
     """
-    Criar um novo usuário administrador
+    Create a new admin user
     
     Args:
-        user_data: Dados do usuário a ser criado
-        request: Objeto Request do FastAPI
-        db: Sessão do banco de dados
-        payload: Payload do token JWT
+        user_data: User data to be created
+        request: FastAPI Request object
+        db: Database session
+        payload: JWT token payload
         
     Returns:
-        UserResponse: Dados do usuário criado
+        UserResponse: Created user data
         
     Raises:
-        HTTPException: Se houver erro na criação
+        HTTPException: If there is an error in creation
     """
-    # Obter o ID do usuário atual
+    # Get current user ID
     user_id = payload.get("user_id")
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Não foi possível identificar o usuário logado"
+            detail="Unable to identify the logged in user"
         )
     
-    # Criar o usuário administrador
+    # Create admin user
     user, message = create_admin_user(db, user_data)
     if not user:
         raise HTTPException(
@@ -108,7 +108,7 @@ async def create_new_admin_user(
             detail=message
         )
     
-    # Registrar ação no log de auditoria
+    # Register action in audit log
     create_audit_log(
         db,
         user_id=uuid.UUID(user_id),
@@ -129,33 +129,33 @@ async def deactivate_admin_user(
     payload: dict = Depends(get_jwt_token),
 ):
     """
-    Desativar um usuário administrador (não exclui, apenas desativa)
+    Deactivate an admin user (does not delete, only deactivates)
     
     Args:
-        user_id: ID do usuário a ser desativado
-        request: Objeto Request do FastAPI
-        db: Sessão do banco de dados
-        payload: Payload do token JWT
+        user_id: ID of the user to be deactivated
+        request: FastAPI Request object
+        db: Database session
+        payload: JWT token payload
         
     Raises:
-        HTTPException: Se houver erro na desativação
+        HTTPException: If there is an error in deactivation
     """
-    # Obter o ID do usuário atual
+    # Get current user ID
     current_user_id = payload.get("user_id")
     if not current_user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Não foi possível identificar o usuário logado"
+            detail="Unable to identify the logged in user"
         )
     
-    # Não permitir desativar a si mesmo
+    # Do not allow deactivating yourself
     if str(user_id) == current_user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Não é possível desativar seu próprio usuário"
+            detail="Unable to deactivate your own user"
         )
     
-    # Desativar o usuário
+    # Deactivate user
     success, message = deactivate_user(db, user_id)
     if not success:
         raise HTTPException(
@@ -163,7 +163,7 @@ async def deactivate_admin_user(
             detail=message
         )
     
-    # Registrar ação no log de auditoria
+    # Register action in audit log
     create_audit_log(
         db,
         user_id=uuid.UUID(current_user_id),

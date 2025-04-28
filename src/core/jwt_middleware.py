@@ -5,8 +5,6 @@ from src.config.settings import settings
 from datetime import datetime
 from sqlalchemy.orm import Session
 from src.config.database import get_db
-from src.models.models import User
-from src.services.user_service import get_user_by_email
 from uuid import UUID
 import logging
 from typing import Optional
@@ -17,20 +15,20 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 async def get_jwt_token(token: str = Depends(oauth2_scheme)) -> dict:
     """
-    Extrai e valida o token JWT
+    Extracts and validates the JWT token
     
     Args:
         token: Token JWT
         
     Returns:
-        dict: Dados do payload do token
+        dict: Token payload data
         
     Raises:
-        HTTPException: Se o token for inválido
+        HTTPException: If the token is invalid
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Credenciais inválidas",
+        detail="Invalid credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     
@@ -43,18 +41,18 @@ async def get_jwt_token(token: str = Depends(oauth2_scheme)) -> dict:
         
         email: str = payload.get("sub")
         if email is None:
-            logger.warning("Token sem email (sub)")
+            logger.warning("Token without email (sub)")
             raise credentials_exception
         
         exp = payload.get("exp")
         if exp is None or datetime.fromtimestamp(exp) < datetime.utcnow():
-            logger.warning(f"Token expirado para {email}")
+            logger.warning(f"Token expired for {email}")
             raise credentials_exception
         
         return payload
         
     except JWTError as e:
-        logger.error(f"Erro ao decodificar token JWT: {str(e)}")
+        logger.error(f"Error decoding JWT token: {str(e)}")
         raise credentials_exception
 
 async def verify_user_client(
@@ -63,77 +61,77 @@ async def verify_user_client(
     required_client_id: UUID = None
 ) -> bool:
     """
-    Verifica se o usuário está associado ao cliente especificado
+    Verifies if the user is associated with the specified client
     
     Args:
-        payload: Payload do token JWT
-        db: Sessão do banco de dados
-        required_client_id: ID do cliente que deve ser verificado
+        payload: Token JWT payload
+        db: Database session
+        required_client_id: Client ID to be verified
         
     Returns:
         bool: True se verificado com sucesso
         
     Raises:
-        HTTPException: Se o usuário não tiver permissão
+        HTTPException: If the user does not have permission
     """
-    # Administradores têm acesso a todos os clientes
+    # Administrators have access to all clients
     if payload.get("is_admin", False):
         return True
     
     # Para não-admins, verificar se o client_id corresponde
     user_client_id = payload.get("client_id")
     if not user_client_id:
-        logger.warning(f"Usuário não-admin sem client_id no token: {payload.get('sub')}")
+        logger.warning(f"Non-admin user without client_id in token: {payload.get('sub')}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuário não associado a um cliente"
+            detail="User not associated with a client"
         )
     
-    # Se não foi especificado um client_id para verificar, qualquer cliente é válido
+    # If no client_id is specified to verify, any client is valid
     if not required_client_id:
         return True
     
-    # Verificar se o client_id do usuário corresponde ao required_client_id
+    # Verify if the user's client_id corresponds to the required_client_id
     if str(user_client_id) != str(required_client_id):
-        logger.warning(f"Acesso negado: Usuário {payload.get('sub')} tentou acessar recursos do cliente {required_client_id}")
+        logger.warning(f"Access denied: User {payload.get('sub')} tried to access resources of client {required_client_id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permissão negada para acessar recursos deste cliente"
+            detail="Access denied to access resources of this client"
         )
     
     return True
 
 async def verify_admin(payload: dict = Depends(get_jwt_token)) -> bool:
     """
-    Verifica se o usuário é um administrador
+    Verifies if the user is an administrator
     
     Args:
-        payload: Payload do token JWT
+        payload: Token JWT payload
         
     Returns:
-        bool: True se for administrador
+        bool: True if the user is an administrator
         
     Raises:
-        HTTPException: Se o usuário não for administrador
+        HTTPException: If the user is not an administrator
     """
     if not payload.get("is_admin", False):
-        logger.warning(f"Acesso admin negado para usuário: {payload.get('sub')}")
+        logger.warning(f"Access denied to admin: User {payload.get('sub')}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permissão negada. Acesso restrito a administradores."
+            detail="Access denied. Restricted to administrators."
         )
     
     return True
 
 def get_current_user_client_id(payload: dict = Depends(get_jwt_token)) -> Optional[UUID]:
     """
-    Obtém o ID do cliente associado ao usuário atual
+    Gets the ID of the client associated with the current user
     
     Args:
-        payload: Payload do token JWT
+        payload: Token JWT payload
         
     Returns:
-        Optional[UUID]: ID do cliente ou None se for administrador
+        Optional[UUID]: Client ID or None if the user is an administrator
     """
     if payload.get("is_admin", False):
         return None

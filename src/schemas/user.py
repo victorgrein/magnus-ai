@@ -8,7 +8,7 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     password: str
-    name: str  # Para criação do cliente associado
+    name: str  # For client creation
 
 class AdminUserCreate(UserBase):
     password: str
@@ -34,7 +34,7 @@ class TokenResponse(BaseModel):
     token_type: str
     
 class TokenData(BaseModel):
-    sub: str  # email do usuário
+    sub: str  # user email
     exp: datetime
     is_admin: bool
     client_id: Optional[UUID] = None

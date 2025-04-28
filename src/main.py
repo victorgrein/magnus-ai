@@ -2,53 +2,44 @@ import os
 import sys
 from pathlib import Path
 
-# Adiciona o diretório raiz ao PYTHONPATH
+# Add the root directory to PYTHONPATH
 root_dir = Path(__file__).parent.parent
 sys.path.append(str(root_dir))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from typing import Dict, Any
 from src.config.database import engine, Base
-from src.api.routes import router
 from src.api.auth_routes import router as auth_router
 from src.api.admin_routes import router as admin_router
+from src.api.chat_routes import router as chat_router
+from src.api.session_routes import router as session_router
+from src.api.agent_routes import router as agent_router
+from src.api.contact_routes import router as contact_router
+from src.api.mcp_server_routes import router as mcp_server_router
+from src.api.tool_routes import router as tool_router
+from src.api.client_routes import router as client_router
 from src.config.settings import settings
 from src.utils.logger import setup_logger
+from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
+from google.adk.sessions import DatabaseSessionService
+from google.adk.memory import InMemoryMemoryService
 
-# Configurar logger
+# Configure logger
 logger = setup_logger(__name__)
 
-# Inicialização do FastAPI
+
+session_service = DatabaseSessionService(db_url=settings.POSTGRES_CONNECTION_STRING)
+artifacts_service = InMemoryArtifactService()
+memory_service = InMemoryMemoryService()
+
+# FastAPI initialization
 app = FastAPI(
     title=settings.API_TITLE,
-    description=settings.API_DESCRIPTION + """
-    \n\n
-    ## Autenticação
-    Esta API utiliza autenticação JWT (JSON Web Token). Para acessar os endpoints protegidos:
-    
-    1. Registre-se em `/api/v1/auth/register` ou faça login em `/api/v1/auth/login`
-    2. Use o token recebido no header de autorização: `Authorization: Bearer {token}`
-    3. Tokens expiram após o tempo configurado (padrão: 30 minutos)
-    
-    Diferente da versão anterior que usava API Key, o sistema JWT:
-    - Identifica o usuário específico que está fazendo a requisição
-    - Limita o acesso apenas aos recursos do cliente ao qual o usuário está associado
-    - Distingue entre usuários comuns e administradores para controle de acesso
-    
-    ## Área Administrativa
-    Funcionalidades exclusivas para administradores estão disponíveis em `/api/v1/admin/*`:
-    
-    - Gerenciamento de usuários administradores
-    - Logs de auditoria para rastreamento de ações
-    - Controle de acesso privilegiado
-    
-    Essas rotas são acessíveis apenas para usuários com flag `is_admin=true`.
-    """,
+    description=settings.API_DESCRIPTION,
     version=settings.API_VERSION,
 )
 
-# Configuração de CORS
+# CORS configuration
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -57,25 +48,34 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Configuração do PostgreSQL
+# PostgreSQL configuration
 POSTGRES_CONNECTION_STRING = os.getenv(
     "POSTGRES_CONNECTION_STRING",
     "postgresql://postgres:root@localhost:5432/evo_ai"
 )
 
-# Criar as tabelas no banco de dados
+# Create database tables
 Base.metadata.create_all(bind=engine)
 
-# Incluir as rotas
-app.include_router(auth_router, prefix="/api/v1")
-app.include_router(admin_router, prefix="/api/v1")
-app.include_router(router, prefix="/api/v1")
+API_PREFIX = "/api/v1"
+
+# Include routes
+app.include_router(auth_router, prefix=API_PREFIX)
+app.include_router(admin_router, prefix=API_PREFIX)
+app.include_router(mcp_server_router, prefix=API_PREFIX)
+app.include_router(tool_router, prefix=API_PREFIX)
+app.include_router(client_router, prefix=API_PREFIX)
+app.include_router(chat_router, prefix=API_PREFIX)
+app.include_router(session_router, prefix=API_PREFIX)
+app.include_router(agent_router, prefix=API_PREFIX)
+app.include_router(contact_router, prefix=API_PREFIX)
+
 
 @app.get("/")
 def read_root():
     return {
-        "message": "Bem-vindo à API Evo AI",
+        "message": "Welcome to Evo AI API",
         "documentation": "/docs",
         "version": settings.API_VERSION,
-        "auth": "Para acessar a API, use autenticação JWT via '/api/v1/auth/login'"
+        "auth": "To access the API, use JWT authentication via '/api/v1/auth/login'"
     }

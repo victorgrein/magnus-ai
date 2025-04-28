@@ -1,11 +1,10 @@
 import logging
 import os
 import sys
-from typing import Optional
 from src.config.settings import settings
 
 class CustomFormatter(logging.Formatter):
-    """Formatação personalizada para logs"""
+    """Custom formatter for logs"""
     
     grey = "\x1b[38;20m"
     yellow = "\x1b[33;20m"
@@ -30,31 +29,31 @@ class CustomFormatter(logging.Formatter):
 
 def setup_logger(name: str) -> logging.Logger:
     """
-    Configura um logger personalizado
+    Configures a custom logger
     
     Args:
-        name: Nome do logger
+        name: Logger name
     
     Returns:
         logging.Logger: Logger configurado
     """
     logger = logging.getLogger(name)
     
-    # Remove handlers existentes para evitar duplicação
+    # Remove existing handlers to avoid duplication
     if logger.handlers:
         logger.handlers.clear()
     
-    # Configura o nível do logger baseado na variável de ambiente ou configuração
+    # Configure the logger level based on the environment variable or configuration
     log_level = getattr(logging, os.getenv("LOG_LEVEL", settings.LOG_LEVEL).upper())
     logger.setLevel(log_level)
     
-    # Handler para console
+    # Console handler
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setFormatter(CustomFormatter())
     console_handler.setLevel(log_level)
     logger.addHandler(console_handler)
     
-    # Impede que os logs sejam propagados para o logger root
+    # Prevent logs from being propagated to the root logger
     logger.propagate = False
     
     return logger 

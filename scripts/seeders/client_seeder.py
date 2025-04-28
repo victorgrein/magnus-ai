@@ -1,9 +1,9 @@
 """
-Script para criar um cliente de exemplo:
-- Nome: Cliente Demo
-- Com usuário associado:
-  - Email: demo@exemplo.com
-  - Senha: demo123 (ou definida em variável de ambiente)
+Script to create a demo client:
+- Name: Demo Client
+- With associated user:
+  - Email: demo@example.com
+  - Password: demo123 (or defined in environment variable)
   - is_admin: False
   - is_active: True
   - email_verified: True
@@ -24,42 +24,42 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 def create_demo_client_and_user():
-    """Cria um cliente e usuário de demonstração no sistema"""
+    """Create a demo client and user in the system"""
     try:
-        # Carregar variáveis de ambiente
+        # Load environment variables
         load_dotenv()
         
-        # Obter configurações do banco de dados
+        # Get database settings
         db_url = os.getenv("POSTGRES_CONNECTION_STRING")
         if not db_url:
-            logger.error("Variável de ambiente POSTGRES_CONNECTION_STRING não definida")
+            logger.error("Environment variable POSTGRES_CONNECTION_STRING not defined")
             return False
         
-        # Obter senha do usuário demo (ou usar padrão)
+        # Get demo user password (or use default)
         demo_password = os.getenv("DEMO_PASSWORD", "demo123")
         
-        # Configurações do cliente e usuário demo
-        demo_client_name = os.getenv("DEMO_CLIENT_NAME", "Cliente Demo")
-        demo_email = os.getenv("DEMO_EMAIL", "demo@exemplo.com")
+        # Demo client and user settings
+        demo_client_name = os.getenv("DEMO_CLIENT_NAME", "Demo Client")
+        demo_email = os.getenv("DEMO_EMAIL", "demo@example.com")
         
-        # Conectar ao banco de dados
+        # Connect to the database
         engine = create_engine(db_url)
         Session = sessionmaker(bind=engine)
         session = Session()
         
         try:
-            # Verificar se o usuário já existe
+            # Check if the user already exists
             existing_user = session.query(User).filter(User.email == demo_email).first()
             if existing_user:
-                logger.info(f"Usuário demo com email {demo_email} já existe")
+                logger.info(f"Demo user with email {demo_email} already exists")
                 return True
             
-            # Criar cliente demo
+            # Create demo client
             demo_client = Client(name=demo_client_name)
             session.add(demo_client)
-            session.flush()  # Obter o ID do cliente
+            session.flush()  # Get the client ID
             
-            # Criar usuário demo associado ao cliente
+            # Create demo user associated with the client
             demo_user = User(
                 email=demo_email,
                 password_hash=get_password_hash(demo_password),
@@ -69,21 +69,21 @@ def create_demo_client_and_user():
                 email_verified=True
             )
             
-            # Adicionar e comitar
+            # Add and commit
             session.add(demo_user)
             session.commit()
             
-            logger.info(f"Cliente demo '{demo_client_name}' criado com sucesso")
-            logger.info(f"Usuário demo criado com sucesso: {demo_email}")
+            logger.info(f"Demo client '{demo_client_name}' created successfully")
+            logger.info(f"Demo user created successfully: {demo_email}")
             return True
             
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Erro de banco de dados ao criar cliente/usuário demo: {str(e)}")
+            logger.error(f"Database error when creating demo client/user: {str(e)}")
             return False
         
     except Exception as e:
-        logger.error(f"Erro ao criar cliente/usuário demo: {str(e)}")
+        logger.error(f"Error when creating demo client/user: {str(e)}")
         return False
     finally:
         session.close()

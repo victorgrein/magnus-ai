@@ -7,8 +7,7 @@ from typing import Optional, List
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 
-from src.services.agent_service import get_agent, get_agents_by_client
-from src.services.contact_service import get_contact
+from src.services.agent_service import get_agents_by_client
 
 import uuid
 import logging
@@ -20,7 +19,7 @@ def get_sessions_by_client(
     db: Session,
     client_id: uuid.UUID,
 ) -> List[SessionModel]:
-    """Busca sessões de um cliente com paginação"""
+    """Search for sessions of a client with pagination"""
     try:
         agents_by_client = get_agents_by_client(db, client_id)
         sessions = []
@@ -29,10 +28,10 @@ def get_sessions_by_client(
 
         return sessions
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao buscar sessões do cliente {client_id}: {str(e)}")
+        logger.error(f"Error searching for sessions of client {client_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao buscar sessões",
+            detail="Error searching for sessions",
         )
 
 
@@ -42,38 +41,38 @@ def get_sessions_by_agent(
     skip: int = 0,
     limit: int = 100,
 ) -> List[SessionModel]:
-    """Busca sessões de um agente com paginação"""
+    """Search for sessions of an agent with pagination"""
     try:
         agent_id_str = str(agent_id)
         query = db.query(SessionModel).filter(SessionModel.app_name == agent_id_str)
 
         return query.offset(skip).limit(limit).all()
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao buscar sessões do agente {agent_id_str}: {str(e)}")
+        logger.error(f"Error searching for sessions of agent {agent_id_str}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao buscar sessões",
+            detail="Error searching for sessions",
         )
 
 
 def get_session_by_id(
     session_service: DatabaseSessionService, session_id: str
 ) -> Optional[SessionADK]:
-    """Busca uma sessão pelo ID"""
+    """Search for a session by ID"""
     try:
         if not session_id or "_" not in session_id:
-            logger.error(f"ID de sessão inválido: {session_id}")
+            logger.error(f"Invalid session ID: {session_id}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="ID de sessão inválido. Formato esperado: app_name_user_id",
+                detail="Invalid session ID. Expected format: app_name_user_id",
             )
             
         parts = session_id.split("_", 1)
         if len(parts) != 2:
-            logger.error(f"Formato de ID de sessão inválido: {session_id}")
+            logger.error(f"Invalid session ID format: {session_id}")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Formato de ID de sessão inválido. Formato esperado: app_name_user_id",
+                detail="Invalid session ID format. Expected format: app_name_user_id",
             )
             
         user_id, app_name = parts
@@ -85,28 +84,28 @@ def get_session_by_id(
         )
         
         if session is None:
-            logger.error(f"Sessão não encontrada: {session_id}")
+            logger.error(f"Session not found: {session_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Sessão não encontrada: {session_id}",
+                detail=f"Session not found: {session_id}",
             )
             
         return session
     except Exception as e:
-        logger.error(f"Erro ao buscar sessão {session_id}: {str(e)}")
+        logger.error(f"Error searching for session {session_id}: {str(e)}")
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar sessão: {str(e)}",
+            detail=f"Error searching for session: {str(e)}",
         )
 
 
 def delete_session(session_service: DatabaseSessionService, session_id: str) -> None:
-    """Deleta uma sessão pelo ID"""
+    """Deletes a session by ID"""
     try:
         session = get_session_by_id(session_service, session_id)
-        # Se chegou aqui, a sessão existe (get_session_by_id já valida)
+        # If we get here, the session exists (get_session_by_id already validates)
         
         session_service.delete_session(
             app_name=session.app_name,
@@ -115,34 +114,34 @@ def delete_session(session_service: DatabaseSessionService, session_id: str) -> 
         )
         return None
     except HTTPException:
-        # Repassa exceções HTTP do get_session_by_id
+        # Passes HTTP exceptions from get_session_by_id
         raise
     except Exception as e:
-        logger.error(f"Erro ao deletar sessão {session_id}: {str(e)}")
+        logger.error(f"Error deleting session {session_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao deletar sessão: {str(e)}",
+            detail=f"Error deleting session: {str(e)}",
         )
 
 
 def get_session_events(
     session_service: DatabaseSessionService, session_id: str
 ) -> List[Event]:
-    """Busca os eventos de uma sessão pelo ID"""
+    """Search for the events of a session by ID"""
     try:
         session = get_session_by_id(session_service, session_id)
-        # Se chegou aqui, a sessão existe (get_session_by_id já valida)
+        # If we get here, the session exists (get_session_by_id already validates)
         
         if not hasattr(session, 'events') or session.events is None:
             return []
             
         return session.events
     except HTTPException:
-        # Repassa exceções HTTP do get_session_by_id
+        # Passes HTTP exceptions from get_session_by_id
         raise
     except Exception as e:
-        logger.error(f"Erro ao buscar eventos da sessão {session_id}: {str(e)}")
+        logger.error(f"Error searching for events of session {session_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao buscar eventos da sessão: {str(e)}",
+            detail=f"Error searching for events of session: {str(e)}",
         )

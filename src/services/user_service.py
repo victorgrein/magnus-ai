@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from src.models.models import User, Client
-from src.schemas.user import UserCreate, UserResponse
+from src.schemas.user import UserCreate
 from src.utils.security import get_password_hash, verify_password, generate_token
 from src.services.email_service import send_verification_email, send_password_reset_email
 from datetime import datetime, timedelta
@@ -13,47 +13,47 @@ logger = logging.getLogger(__name__)
 
 def create_user(db: Session, user_data: UserCreate, is_admin: bool = False, client_id: Optional[uuid.UUID] = None) -> Tuple[Optional[User], str]:
     """
-    Cria um novo usuário no sistema
+    Creates a new user in the system    
     
     Args:
-        db: Sessão do banco de dados
-        user_data: Dados do usuário a ser criado
-        is_admin: Se o usuário é um administrador
-        client_id: ID do cliente associado (opcional, será criado um novo se não fornecido)
+        db: Database session
+        user_data: User data to be created
+        is_admin: If the user is an administrator
+        client_id: Associated client ID (optional, a new one will be created if not provided)
         
     Returns:
-        Tuple[Optional[User], str]: Tupla com o usuário criado (ou None em caso de erro) e mensagem de status
+        Tuple[Optional[User], str]: Tuple with the created user (or None in case of error) and status message
     """
     try:
-        # Verificar se email já existe
+        # Check if email already exists
         db_user = db.query(User).filter(User.email == user_data.email).first()
         if db_user:
-            logger.warning(f"Tentativa de cadastro com email já existente: {user_data.email}")
-            return None, "Email já cadastrado"
+            logger.warning(f"Attempt to register with existing email: {user_data.email}")
+            return None, "Email already registered"
         
-        # Criar token de verificação
+        # Create verification token
         verification_token = generate_token()
         token_expiry = datetime.utcnow() + timedelta(hours=24)
         
-        # Iniciar transação
+        # Start transaction
         user = None
         local_client_id = client_id
         
         try:
-            # Se não for admin e não tiver client_id, criar um cliente associado
+            # If not admin and no client_id, create an associated client
             if not is_admin and local_client_id is None:
                 client = Client(name=user_data.name)
                 db.add(client)
-                db.flush()  # Obter o ID do cliente
+                db.flush()  # Get the client ID
                 local_client_id = client.id
             
-            # Criar usuário
+            # Create user
             user = User(
                 email=user_data.email,
                 password_hash=get_password_hash(user_data.password),
                 client_id=local_client_id,
                 is_admin=is_admin,
-                is_active=False,  # Inativo até verificar email
+                is_active=False,  # Inactive until email is verified
                 email_verified=False,
                 verification_token=verification_token,
                 verification_token_expiry=token_expiry
@@ -61,248 +61,248 @@ def create_user(db: Session, user_data: UserCreate, is_admin: bool = False, clie
             db.add(user)
             db.commit()
             
-            # Enviar email de verificação
+            # Send verification email
             email_sent = send_verification_email(user.email, verification_token)
             if not email_sent:
-                logger.error(f"Falha ao enviar email de verificação para {user.email}")
-                # Não fazemos rollback aqui, apenas logamos o erro
+                logger.error(f"Failed to send verification email to {user.email}")
+                # We don't do rollback here, we just log the error
             
-            logger.info(f"Usuário criado com sucesso: {user.email}")
-            return user, "Usuário criado com sucesso. Verifique seu email para ativar sua conta."
+            logger.info(f"User created successfully: {user.email}")
+            return user, "User created successfully. Check your email to activate your account."
             
         except SQLAlchemyError as e:
             db.rollback()
-            logger.error(f"Erro ao criar usuário: {str(e)}")
-            return None, f"Erro ao criar usuário: {str(e)}"
+            logger.error(f"Error creating user: {str(e)}")
+            return None, f"Error creating user: {str(e)}"
             
     except Exception as e:
-        logger.error(f"Erro inesperado ao criar usuário: {str(e)}")
-        return None, f"Erro inesperado: {str(e)}"
+        logger.error(f"Unexpected error creating user: {str(e)}")
+        return None, f"Unexpected error: {str(e)}"
 
 def verify_email(db: Session, token: str) -> Tuple[bool, str]:
     """
-    Verifica o email do usuário usando o token fornecido
+    Verify the user's email using the provided token
     
     Args:
-        db: Sessão do banco de dados
-        token: Token de verificação
+        db: Database session
+        token: Verification token
         
     Returns:
-        Tuple[bool, str]: Tupla com status da verificação e mensagem
+        Tuple[bool, str]: Tuple with verification status and message
     """
     try:
-        # Buscar usuário pelo token
+        # Search for user by token
         user = db.query(User).filter(User.verification_token == token).first()
         
         if not user:
-            logger.warning(f"Tentativa de verificação com token inválido: {token}")
-            return False, "Token de verificação inválido"
+            logger.warning(f"Attempt to verify with invalid token: {token}")
+            return False, "Invalid verification token"
         
-        # Verificar se o token expirou
+        # Check if the token has expired
         now = datetime.utcnow()
         expiry = user.verification_token_expiry
         
-        # Garantir que ambas as datas sejam do mesmo tipo (aware ou naive)
+        # Ensure both dates are of the same type (aware or naive)
         if expiry.tzinfo is not None and now.tzinfo is None:
-            # Se expiry tem fuso e now não, converter now para ter fuso
+            # If expiry has timezone and now doesn't, convert now to have timezone
             now = now.replace(tzinfo=expiry.tzinfo)
         elif now.tzinfo is not None and expiry.tzinfo is None:
-            # Se now tem fuso e expiry não, converter expiry para ter fuso
+            # If now has timezone and expiry doesn't, convert expiry to have timezone
             expiry = expiry.replace(tzinfo=now.tzinfo)
             
         if expiry < now:
-            logger.warning(f"Tentativa de verificação com token expirado para usuário: {user.email}")
-            return False, "Token de verificação expirado"
+            logger.warning(f"Attempt to verify with expired token for user: {user.email}")
+            return False, "Verification token expired"
         
-        # Atualizar usuário
+        # Update user
         user.email_verified = True
         user.is_active = True
         user.verification_token = None
         user.verification_token_expiry = None
         
         db.commit()
-        logger.info(f"Email verificado com sucesso para usuário: {user.email}")
-        return True, "Email verificado com sucesso. Sua conta está ativa."
+        logger.info(f"Email verified successfully for user: {user.email}")
+        return True, "Email verified successfully. Your account is active."
         
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao verificar email: {str(e)}")
-        return False, f"Erro ao verificar email: {str(e)}"
+        logger.error(f"Error verifying email: {str(e)}")
+        return False, f"Error verifying email: {str(e)}"
     
     except Exception as e:
-        logger.error(f"Erro inesperado ao verificar email: {str(e)}")
-        return False, f"Erro inesperado: {str(e)}"
+        logger.error(f"Unexpected error verifying email: {str(e)}")
+        return False, f"Unexpected error: {str(e)}"
 
 def resend_verification(db: Session, email: str) -> Tuple[bool, str]:
     """
-    Reenvia o email de verificação
+    Resend the verification email
     
     Args:
-        db: Sessão do banco de dados
-        email: Email do usuário
+        db: Database session
+        email: User email
         
     Returns:
-        Tuple[bool, str]: Tupla com status da operação e mensagem
+        Tuple[bool, str]: Tuple with operation status and message
     """
     try:
-        # Buscar usuário pelo email
+        # Search for user by email
         user = db.query(User).filter(User.email == email).first()
         
         if not user:
-            logger.warning(f"Tentativa de reenvio de verificação para email inexistente: {email}")
-            return False, "Email não encontrado"
+            logger.warning(f"Attempt to resend verification email for non-existent email: {email}")
+            return False, "Email not found"
         
         if user.email_verified:
-            logger.info(f"Tentativa de reenvio de verificação para email já verificado: {email}")
-            return False, "Email já foi verificado"
+            logger.info(f"Attempt to resend verification email for already verified email: {email}")
+            return False, "Email already verified"
         
-        # Gerar novo token
+        # Generate new token
         verification_token = generate_token()
         token_expiry = datetime.utcnow() + timedelta(hours=24)
         
-        # Atualizar usuário
+        # Update user
         user.verification_token = verification_token
         user.verification_token_expiry = token_expiry
         
         db.commit()
         
-        # Enviar email
+        # Send email
         email_sent = send_verification_email(user.email, verification_token)
         if not email_sent:
-            logger.error(f"Falha ao reenviar email de verificação para {user.email}")
-            return False, "Falha ao enviar email de verificação"
+            logger.error(f"Failed to resend verification email to {user.email}")
+            return False, "Failed to send verification email"
         
-        logger.info(f"Email de verificação reenviado com sucesso para: {user.email}")
-        return True, "Email de verificação reenviado. Verifique sua caixa de entrada."
+        logger.info(f"Verification email resent successfully to: {user.email}")
+        return True, "Verification email resent. Check your inbox."
         
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao reenviar verificação: {str(e)}")
-        return False, f"Erro ao reenviar verificação: {str(e)}"
+        logger.error(f"Error resending verification: {str(e)}")
+        return False, f"Error resending verification: {str(e)}"
     
     except Exception as e:
-        logger.error(f"Erro inesperado ao reenviar verificação: {str(e)}")
-        return False, f"Erro inesperado: {str(e)}"
+        logger.error(f"Unexpected error resending verification: {str(e)}")
+        return False, f"Unexpected error: {str(e)}"
 
 def forgot_password(db: Session, email: str) -> Tuple[bool, str]:
     """
-    Inicia o processo de recuperação de senha
+    Initiates the password recovery process
     
     Args:
-        db: Sessão do banco de dados
-        email: Email do usuário
+        db: Database session
+        email: User email
         
     Returns:
-        Tuple[bool, str]: Tupla com status da operação e mensagem
+        Tuple[bool, str]: Tuple with operation status and message
     """
     try:
-        # Buscar usuário pelo email
+        # Search for user by email
         user = db.query(User).filter(User.email == email).first()
         
         if not user:
-            # Por segurança, não informamos se o email existe ou não
-            logger.info(f"Tentativa de recuperação de senha para email inexistente: {email}")
-            return True, "Se o email estiver cadastrado, você receberá instruções para redefinir sua senha."
+            # For security, we don't inform if the email exists or not
+            logger.info(f"Attempt to recover password for non-existent email: {email}")
+            return True, "If the email is registered, you will receive instructions to reset your password."
         
-        # Gerar token de reset
+        # Generate reset token
         reset_token = generate_token()
-        token_expiry = datetime.utcnow() + timedelta(hours=1)  # Token válido por 1 hora
+        token_expiry = datetime.utcnow() + timedelta(hours=1)  # Token valid for 1 hour
         
-        # Atualizar usuário
+        # Update user
         user.password_reset_token = reset_token
         user.password_reset_expiry = token_expiry
         
         db.commit()
         
-        # Enviar email
+        # Send email
         email_sent = send_password_reset_email(user.email, reset_token)
         if not email_sent:
-            logger.error(f"Falha ao enviar email de recuperação de senha para {user.email}")
-            return False, "Falha ao enviar email de recuperação de senha"
+            logger.error(f"Failed to send password reset email to {user.email}")
+            return False, "Failed to send password reset email"
         
-        logger.info(f"Email de recuperação de senha enviado com sucesso para: {user.email}")
-        return True, "Se o email estiver cadastrado, você receberá instruções para redefinir sua senha."
+        logger.info(f"Password reset email sent successfully to: {user.email}")
+        return True, "If the email is registered, you will receive instructions to reset your password."
         
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao processar recuperação de senha: {str(e)}")
-        return False, f"Erro ao processar recuperação de senha: {str(e)}"
+        logger.error(f"Error processing password recovery: {str(e)}")
+        return False, f"Error processing password recovery: {str(e)}"
     
     except Exception as e:
-        logger.error(f"Erro inesperado ao processar recuperação de senha: {str(e)}")
-        return False, f"Erro inesperado: {str(e)}"
+        logger.error(f"Unexpected error processing password recovery: {str(e)}")
+        return False, f"Unexpected error: {str(e)}"
 
 def reset_password(db: Session, token: str, new_password: str) -> Tuple[bool, str]:
     """
-    Redefine a senha do usuário usando o token fornecido
+    Resets the user's password using the provided token
     
     Args:
-        db: Sessão do banco de dados
-        token: Token de redefinição de senha
-        new_password: Nova senha
+        db: Database session
+        token: Password reset token
+        new_password: New password
         
     Returns:
-        Tuple[bool, str]: Tupla com status da operação e mensagem
+        Tuple[bool, str]: Tuple with operation status and message
     """
     try:
-        # Buscar usuário pelo token
+        # Search for user by token
         user = db.query(User).filter(User.password_reset_token == token).first()
         
         if not user:
-            logger.warning(f"Tentativa de redefinição de senha com token inválido: {token}")
-            return False, "Token de redefinição de senha inválido"
+            logger.warning(f"Attempt to reset password with invalid token: {token}")
+            return False, "Invalid password reset token"
         
-        # Verificar se o token expirou
+        # Check if the token has expired
         if user.password_reset_expiry < datetime.utcnow():
-            logger.warning(f"Tentativa de redefinição de senha com token expirado para usuário: {user.email}")
-            return False, "Token de redefinição de senha expirado"
+            logger.warning(f"Attempt to reset password with expired token for user: {user.email}")
+            return False, "Password reset token expired"
         
-        # Atualizar senha
+        # Update password
         user.password_hash = get_password_hash(new_password)
         user.password_reset_token = None
         user.password_reset_expiry = None
         
         db.commit()
-        logger.info(f"Senha redefinida com sucesso para usuário: {user.email}")
-        return True, "Senha redefinida com sucesso. Você já pode fazer login com sua nova senha."
+        logger.info(f"Password reset successfully for user: {user.email}")
+        return True, "Password reset successfully. You can now login with your new password."
         
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao redefinir senha: {str(e)}")
-        return False, f"Erro ao redefinir senha: {str(e)}"
+        logger.error(f"Error resetting password: {str(e)}")
+        return False, f"Error resetting password: {str(e)}"
     
     except Exception as e:
-        logger.error(f"Erro inesperado ao redefinir senha: {str(e)}")
-        return False, f"Erro inesperado: {str(e)}"
+        logger.error(f"Unexpected error resetting password: {str(e)}")
+        return False, f"Unexpected error: {str(e)}"
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     """
-    Busca um usuário pelo email
+    Searches for a user by email
     
     Args:
-        db: Sessão do banco de dados
-        email: Email do usuário
+        db: Database session
+        email: User email
         
     Returns:
-        Optional[User]: Usuário encontrado ou None
+        Optional[User]: User found or None
     """
     try:
         return db.query(User).filter(User.email == email).first()
     except Exception as e:
-        logger.error(f"Erro ao buscar usuário por email: {str(e)}")
+        logger.error(f"Error searching for user by email: {str(e)}")
         return None
 
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     """
-    Autentica um usuário com email e senha
+    Authenticates a user with email and password
     
     Args:
-        db: Sessão do banco de dados
-        email: Email do usuário
-        password: Senha do usuário
+        db: Database session
+        email: User email
+        password: User password
         
     Returns:
-        Optional[User]: Usuário autenticado ou None
+        Optional[User]: Authenticated user or None
     """
     user = get_user_by_email(db, email)
     if not user:
@@ -315,73 +315,73 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
 
 def get_admin_users(db: Session, skip: int = 0, limit: int = 100):
     """
-    Lista os usuários administradores
+    Lists the admin users
     
     Args:
-        db: Sessão do banco de dados
-        skip: Número de registros para pular
-        limit: Número máximo de registros para retornar
+        db: Database session
+        skip: Number of records to skip
+        limit: Maximum number of records to return
         
     Returns:
-        List[User]: Lista de usuários administradores
+        List[User]: List of admin users
     """
     try:
         users = db.query(User).filter(User.is_admin == True).offset(skip).limit(limit).all()
-        logger.info(f"Listagem de administradores: {len(users)} encontrados")
+        logger.info(f"List of admins: {len(users)} found")
         return users
         
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao listar administradores: {str(e)}")
+        logger.error(f"Error listing admins: {str(e)}")
         return []
     
     except Exception as e:
-        logger.error(f"Erro inesperado ao listar administradores: {str(e)}")
+        logger.error(f"Unexpected error listing admins: {str(e)}")
         return []
 
 def create_admin_user(db: Session, user_data: UserCreate) -> Tuple[Optional[User], str]:
     """
-    Cria um novo usuário administrador
+    Creates a new admin user
     
     Args:
-        db: Sessão do banco de dados
-        user_data: Dados do usuário a ser criado
+        db: Database session
+        user_data: User data to be created
         
     Returns:
-        Tuple[Optional[User], str]: Tupla com o usuário criado (ou None em caso de erro) e mensagem de status
+        Tuple[Optional[User], str]: Tuple with the created user (or None in case of error) and status message
     """
     return create_user(db, user_data, is_admin=True)
 
 def deactivate_user(db: Session, user_id: uuid.UUID) -> Tuple[bool, str]:
     """
-    Desativa um usuário (não exclui, apenas marca como inativo)
+    Deactivates a user (does not delete, only marks as inactive)
     
     Args:
-        db: Sessão do banco de dados
-        user_id: ID do usuário a ser desativado
+        db: Database session
+        user_id: ID of the user to be deactivated
         
     Returns:
-        Tuple[bool, str]: Tupla com status da operação e mensagem
+        Tuple[bool, str]: Tuple with operation status and message
     """
     try:
-        # Buscar usuário pelo ID
+        # Search for user by ID
         user = db.query(User).filter(User.id == user_id).first()
         
         if not user:
-            logger.warning(f"Tentativa de desativação de usuário inexistente: {user_id}")
-            return False, "Usuário não encontrado"
+            logger.warning(f"Attempt to deactivate non-existent user: {user_id}")
+            return False, "User not found"
         
-        # Desativar usuário
+        # Deactivate user
         user.is_active = False
         
         db.commit()
-        logger.info(f"Usuário desativado com sucesso: {user.email}")
-        return True, "Usuário desativado com sucesso"
+        logger.info(f"User deactivated successfully: {user.email}")
+        return True, "User deactivated successfully"
         
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao desativar usuário: {str(e)}")
-        return False, f"Erro ao desativar usuário: {str(e)}"
+        logger.error(f"Error deactivating user: {str(e)}")
+        return False, f"Error deactivating user: {str(e)}"
     
     except Exception as e:
-        logger.error(f"Erro inesperado ao desativar usuário: {str(e)}")
-        return False, f"Erro inesperado: {str(e)}" 
+        logger.error(f"Unexpected error deactivating user: {str(e)}")
+        return False, f"Unexpected error: {str(e)}" 

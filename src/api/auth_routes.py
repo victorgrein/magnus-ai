@@ -30,8 +30,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/auth",
-    tags=["autenticação"],
-    responses={404: {"description": "Não encontrado"}},
+    tags=["authentication"],
+    responses={404: {"description": "Not found"}},
 )
 
 
@@ -40,17 +40,17 @@ router = APIRouter(
 )
 async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     """
-    Registra um novo usuário (cliente) no sistema
+    Register a new user (client) in the system
 
     Args:
-        user_data: Dados do usuário a ser registrado
-        db: Sessão do banco de dados
+        user_data: User data to be registered
+        db: Database session
 
     Returns:
-        UserResponse: Dados do usuário criado
+        UserResponse: Created user data
 
     Raises:
-        HTTPException: Se houver erro no registro
+        HTTPException: If there is an error in registration
     """
     user, message = create_user(db, user_data, is_admin=False)
     if not user:
@@ -70,19 +70,19 @@ async def register_admin(
     current_admin: User = Depends(get_current_admin_user),
 ):
     """
-    Registra um novo administrador no sistema.
-    Apenas administradores existentes podem criar novos administradores.
+    Register a new admin in the system.
+    Only existing admins can create new admins.
 
     Args:
-        user_data: Dados do administrador a ser registrado
-        db: Sessão do banco de dados
-        current_admin: Administrador atual (autenticado)
+        user_data: Admin data to be registered
+        db: Database session
+        current_admin: Current admin (authenticated)
 
     Returns:
-        UserResponse: Dados do administrador criado
+        UserResponse: Created admin data
 
     Raises:
-        HTTPException: Se houver erro no registro
+        HTTPException: If there is an error in registration
     """
     user, message = create_user(db, user_data, is_admin=True)
     if not user:
@@ -90,7 +90,7 @@ async def register_admin(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
 
     logger.info(
-        f"Administrador registrado com sucesso: {user.email} (criado por {current_admin.email})"
+        f"Admin registered successfully: {user.email} (created by {current_admin.email})"
     )
     return user
 
@@ -98,24 +98,24 @@ async def register_admin(
 @router.get("/verify-email/{token}", response_model=MessageResponse)
 async def verify_user_email(token: str, db: Session = Depends(get_db)):
     """
-    Verifica o email de um usuário usando o token fornecido
+    Verify user email using the provided token
 
     Args:
-        token: Token de verificação
-        db: Sessão do banco de dados
+        token: Verification token
+        db: Database session
 
     Returns:
-        MessageResponse: Mensagem de sucesso
+        MessageResponse: Success message
 
     Raises:
-        HTTPException: Se o token for inválido ou expirado
+        HTTPException: If the token is invalid or expired
     """
     success, message = verify_email(db, token)
     if not success:
-        logger.warning(f"Falha na verificação de email: {message}")
+        logger.warning(f"Failed to verify email: {message}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
 
-    logger.info(f"Email verificado com sucesso usando token: {token}")
+    logger.info(f"Email verified successfully using token: {token}")
     return {"message": message}
 
 
@@ -124,55 +124,55 @@ async def resend_verification_email(
     email_data: ForgotPassword, db: Session = Depends(get_db)
 ):
     """
-    Reenvia o email de verificação para o usuário
+    Resend verification email to the user
 
     Args:
-        email_data: Email do usuário
-        db: Sessão do banco de dados
+        email_data: User email
+        db: Database session
 
     Returns:
-        MessageResponse: Mensagem de sucesso
+        MessageResponse: Success message
 
     Raises:
-        HTTPException: Se houver erro no reenvio
+        HTTPException: If there is an error in resending
     """
     success, message = resend_verification(db, email_data.email)
     if not success:
-        logger.warning(f"Falha no reenvio de verificação: {message}")
+        logger.warning(f"Failed to resend verification: {message}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
 
-    logger.info(f"Email de verificação reenviado com sucesso para: {email_data.email}")
+    logger.info(f"Verification email resent successfully to: {email_data.email}")
     return {"message": message}
 
 
 @router.post("/login", response_model=TokenResponse)
 async def login_for_access_token(form_data: UserLogin, db: Session = Depends(get_db)):
     """
-    Realiza login e retorna um token de acesso JWT
+    Perform login and return a JWT access token
 
     Args:
-        form_data: Dados de login (email e senha)
-        db: Sessão do banco de dados
+        form_data: Login data (email and password)
+        db: Database session
 
     Returns:
-        TokenResponse: Token de acesso e tipo
+        TokenResponse: Access token and type
 
     Raises:
-        HTTPException: Se as credenciais forem inválidas
+        HTTPException: If credentials are invalid
     """
     user = authenticate_user(db, form_data.email, form_data.password)
     if not user:
         logger.warning(
-            f"Tentativa de login com credenciais inválidas: {form_data.email}"
+            f"Login attempt with invalid credentials: {form_data.email}"
         )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email ou senha incorretos",
+            detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
     access_token = create_access_token(user)
-    logger.info(f"Login realizado com sucesso para usuário: {user.email}")
+    logger.info(f"Login successful for user: {user.email}")
     return {"access_token": access_token, "token_type": "bearer"}
 
 
@@ -181,46 +181,46 @@ async def forgot_user_password(
     email_data: ForgotPassword, db: Session = Depends(get_db)
 ):
     """
-    Inicia o processo de recuperação de senha
+    Initiate the password recovery process
 
     Args:
-        email_data: Email do usuário
-        db: Sessão do banco de dados
+        email_data: User email
+        db: Database session
 
     Returns:
-        MessageResponse: Mensagem de sucesso
+        MessageResponse: Success message
 
     Raises:
-        HTTPException: Se houver erro no processo
+        HTTPException: If there is an error in the process
     """
     success, message = forgot_password(db, email_data.email)
-    # Sempre retornamos a mesma mensagem por segurança
+    # Always return the same message for security
     return {
-        "message": "Se o email estiver cadastrado, você receberá instruções para redefinir sua senha."
+        "message": "If the email is registered, you will receive instructions to reset your password."
     }
 
 
 @router.post("/reset-password", response_model=MessageResponse)
 async def reset_user_password(reset_data: PasswordReset, db: Session = Depends(get_db)):
     """
-    Redefine a senha do usuário usando o token fornecido
+    Reset user password using the provided token
 
     Args:
-        reset_data: Token e nova senha
-        db: Sessão do banco de dados
+        reset_data: Token and new password
+        db: Database session
 
     Returns:
-        MessageResponse: Mensagem de sucesso
+        MessageResponse: Success message
 
     Raises:
-        HTTPException: Se o token for inválido ou expirado
+        HTTPException: If the token is invalid or expired
     """
     success, message = reset_password(db, reset_data.token, reset_data.new_password)
     if not success:
-        logger.warning(f"Falha na redefinição de senha: {message}")
+        logger.warning(f"Failed to reset password: {message}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
 
-    logger.info("Senha redefinida com sucesso")
+    logger.info("Password reset successfully")
     return {"message": message}
 
 
@@ -229,16 +229,16 @@ async def get_current_user(
     db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
-    Obtém os dados do usuário autenticado
+    Get the authenticated user's data
 
     Args:
-        db: Sessão do banco de dados
-        current_user: Usuário autenticado
+        db: Database session
+        current_user: Authenticated user
 
     Returns:
-        UserResponse: Dados do usuário autenticado
+        UserResponse: Authenticated user data
 
     Raises:
-        HTTPException: Se o usuário não estiver autenticado
+        HTTPException: If the user is not authenticated
     """
     return current_user

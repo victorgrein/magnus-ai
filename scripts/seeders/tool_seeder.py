@@ -1,10 +1,7 @@
 """
-Script para criar ferramentas padrão:
-- Pesquisa Web
-- Consulta a Documentos
-- Consulta a Base de Conhecimento
-- Integração WhatsApp/Telegram
-Cada uma com configurações básicas para demonstração
+Script to create default tools:
+-
+Each with basic configurations for demonstration
 """
 
 import os
@@ -16,38 +13,38 @@ from sqlalchemy.exc import SQLAlchemyError
 from dotenv import load_dotenv
 from src.models.models import Tool
 
-# Configurar logging
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 def create_tools():
     """Cria ferramentas padrão no sistema"""
     try:
-        # Carregar variáveis de ambiente
+        # Load environment variables
         load_dotenv()
         
-        # Obter configurações do banco de dados
+        # Get database settings
         db_url = os.getenv("POSTGRES_CONNECTION_STRING")
         if not db_url:
-            logger.error("Variável de ambiente POSTGRES_CONNECTION_STRING não definida")
+            logger.error("Environment variable POSTGRES_CONNECTION_STRING not defined")
             return False
         
-        # Conectar ao banco de dados
+        # Connect to the database
         engine = create_engine(db_url)
         Session = sessionmaker(bind=engine)
         session = Session()
         
         try:
-            # Verificar se já existem ferramentas
+            # Check if there are already tools
             existing_tools = session.query(Tool).all()
             if existing_tools:
-                logger.info(f"Já existem {len(existing_tools)} ferramentas cadastradas")
+                logger.info(f"There are already {len(existing_tools)} tools registered")
                 return True
             
-            # Definições das ferramentas
+            # Tools definitions
             tools = []
             
-            # Criar as ferramentas
+            # Create the tools
             for tool_data in tools:
                 
                 tool = Tool(
@@ -58,19 +55,19 @@ def create_tools():
                 )
                 
                 session.add(tool)
-                logger.info(f"Ferramenta '{tool_data['name']}' criada com sucesso")
+                logger.info(f"Tool '{tool_data['name']}' created successfully")
             
             session.commit()
-            logger.info("Todas as ferramentas foram criadas com sucesso")
+            logger.info("All tools were created successfully")
             return True
             
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Erro de banco de dados ao criar ferramentas: {str(e)}")
+            logger.error(f"Database error when creating tools: {str(e)}")
             return False
         
     except Exception as e:
-        logger.error(f"Erro ao criar ferramentas: {str(e)}")
+        logger.error(f"Error when creating tools: {str(e)}")
         return False
     finally:
         session.close()

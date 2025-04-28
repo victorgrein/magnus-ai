@@ -1,10 +1,10 @@
 """
-Script para criar servidores MCP padrão:
-- Servidor Anthropic Claude
-- Servidor OpenAI GPT
-- Servidor Google Gemini
-- Servidor Ollama (local)
-Cada um com configurações padrão para produção
+Script to create default MCP servers:
+- Anthropic Claude server
+- OpenAI GPT server
+- Google Gemini server
+- Ollama (local) server
+Each with default production configurations
 """
 
 import os
@@ -16,7 +16,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from dotenv import load_dotenv
 from src.models.models import MCPServer
 
-# Configurar logging
+# Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -24,32 +24,32 @@ logger = logging.getLogger(__name__)
 
 
 def create_mcp_servers():
-    """Cria servidores MCP padrão no sistema"""
+    """Create default MCP servers in the system"""
     try:
-        # Carregar variáveis de ambiente
+        # Load environment variables
         load_dotenv()
 
-        # Obter configurações do banco de dados
+        # Get database settings
         db_url = os.getenv("POSTGRES_CONNECTION_STRING")
         if not db_url:
-            logger.error("Variável de ambiente POSTGRES_CONNECTION_STRING não definida")
+            logger.error("Environment variable POSTGRES_CONNECTION_STRING not defined")
             return False
 
-        # Conectar ao banco de dados
+        # Connect to the database
         engine = create_engine(db_url)
         Session = sessionmaker(bind=engine)
         session = Session()
 
         try:
-            # Verificar se já existem servidores MCP
+            # Check if there are already MCP servers
             existing_servers = session.query(MCPServer).all()
             if existing_servers:
                 logger.info(
-                    f"Já existem {len(existing_servers)} servidores MCP cadastrados"
+                    f"There are already {len(existing_servers)} MCP servers registered"
                 )
                 return True
 
-            # Definições dos servidores MCP
+            # MCP servers definitions
             mcp_servers = [
                 {
                     "name": "Sequential Thinking",
@@ -62,7 +62,7 @@ def create_mcp_servers():
                         ],
                     },
                     "environments": {},
-                    "tools": ["sequential_thinking"],
+                    "tools": ["sequentialthinking"],
                     "type": "community",
                     "id": "4519dd69-9343-4792-af51-dc4d322fb0c9",
                     "created_at": "2025-04-28T15:14:16.901236Z",
@@ -180,7 +180,7 @@ def create_mcp_servers():
                 },
             ]
 
-            # Criar os servidores MCP
+            # Create the MCP servers
             for server_data in mcp_servers:
                 server = MCPServer(
                     name=server_data["name"],
@@ -192,19 +192,19 @@ def create_mcp_servers():
                 )
 
                 session.add(server)
-                logger.info(f"Servidor MCP '{server_data['name']}' criado com sucesso")
+                logger.info(f"MCP server '{server_data['name']}' created successfully")
 
             session.commit()
-            logger.info("Todos os servidores MCP foram criados com sucesso")
+            logger.info("All MCP servers were created successfully")
             return True
 
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Erro de banco de dados ao criar servidores MCP: {str(e)}")
+            logger.error(f"Database error when creating MCP servers: {str(e)}")
             return False
 
     except Exception as e:
-        logger.error(f"Erro ao criar servidores MCP: {str(e)}")
+        logger.error(f"Error when creating MCP servers: {str(e)}")
         return False
     finally:
         session.close()

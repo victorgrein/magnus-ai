@@ -20,19 +20,19 @@ def create_audit_log(
     request: Optional[Request] = None
 ) -> Optional[AuditLog]:
     """
-    Cria um novo registro de auditoria
+    Create a new audit log
     
     Args:
-        db: Sessão do banco de dados
-        user_id: ID do usuário que realizou a ação (ou None se anônimo)
-        action: Ação realizada (ex: "create", "update", "delete")
-        resource_type: Tipo de recurso (ex: "client", "agent", "user")
-        resource_id: ID do recurso (opcional)
-        details: Detalhes adicionais da ação (opcional)
-        request: Objeto Request do FastAPI (opcional, para obter IP e User-Agent)
+        db: Database session
+        user_id: User ID that performed the action (or None if anonymous)
+        action: Action performed (ex: "create", "update", "delete")
+        resource_type: Resource type (ex: "client", "agent", "user")
+        resource_id: Resource ID (optional)
+        details: Additional details of the action (optional)
+        request: FastAPI Request object (optional, to get IP and User-Agent)
         
     Returns:
-        Optional[AuditLog]: Registro de auditoria criado ou None em caso de erro
+        Optional[AuditLog]: Created audit log or None in case of error
     """
     try:
         ip_address = None
@@ -42,9 +42,9 @@ def create_audit_log(
             ip_address = request.client.host if hasattr(request, 'client') else None
             user_agent = request.headers.get("user-agent")
         
-        # Converter details para formato serializável
+        # Convert details to serializable format
         if details:
-            # Converter UUIDs para strings
+            # Convert UUIDs to strings
             for key, value in details.items():
                 if isinstance(value, uuid.UUID):
                     details[key] = str(value)
@@ -64,7 +64,7 @@ def create_audit_log(
         db.refresh(audit_log)
         
         logger.info(
-            f"Audit log criado: {action} em {resource_type}" +
+            f"Audit log created: {action} in {resource_type}" +
             (f" (ID: {resource_id})" if resource_id else "")
         )
         
@@ -72,10 +72,10 @@ def create_audit_log(
         
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao criar registro de auditoria: {str(e)}")
+        logger.error(f"Error creating audit log: {str(e)}")
         return None
     except Exception as e:
-        logger.error(f"Erro inesperado ao criar registro de auditoria: {str(e)}")
+        logger.error(f"Unexpected error creating audit log: {str(e)}")
         return None
 
 def get_audit_logs(
@@ -90,25 +90,25 @@ def get_audit_logs(
     end_date: Optional[datetime] = None
 ) -> List[AuditLog]:
     """
-    Obtém registros de auditoria com filtros opcionais
+    Get audit logs with optional filters
     
     Args:
-        db: Sessão do banco de dados
-        skip: Número de registros para pular
-        limit: Número máximo de registros para retornar
-        user_id: Filtrar por ID do usuário
-        action: Filtrar por ação
-        resource_type: Filtrar por tipo de recurso
-        resource_id: Filtrar por ID do recurso
-        start_date: Data inicial
-        end_date: Data final
+        db: Database session
+        skip: Number of records to skip
+        limit: Maximum number of records to return
+        user_id: Filter by user ID
+        action: Filter by action
+        resource_type: Filter by resource type
+        resource_id: Filter by resource ID
+        start_date: Start date
+        end_date: End date
         
     Returns:
-        List[AuditLog]: Lista de registros de auditoria
+        List[AuditLog]: List of audit logs
     """
     query = db.query(AuditLog)
     
-    # Aplicar filtros, se fornecidos
+    # Apply filters, if provided
     if user_id:
         query = query.filter(AuditLog.user_id == user_id)
     
@@ -127,10 +127,10 @@ def get_audit_logs(
     if end_date:
         query = query.filter(AuditLog.created_at <= end_date)
     
-    # Ordenar por data de criação (mais recentes primeiro)
+    # Order by creation date (most recent first)
     query = query.order_by(AuditLog.created_at.desc())
     
-    # Aplicar paginação
+    # Apply pagination
     query = query.offset(skip).limit(limit)
     
     return query.all() 

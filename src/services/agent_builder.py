@@ -1,7 +1,6 @@
 from typing import List, Optional, Tuple
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.agents import SequentialAgent, ParallelAgent, LoopAgent
-from google.adk.memory import InMemoryMemoryService
 from google.adk.models.lite_llm import LiteLlm
 from src.utils.logger import setup_logger
 from src.core.exceptions import AgentNotFoundError
@@ -26,25 +25,25 @@ def before_model_callback(
     callback_context: CallbackContext, llm_request: LlmRequest
 ) -> Optional[LlmResponse]:
     """
-    Callback executado antes do modelo gerar uma resposta.
-    Sempre executa a busca na base de conhecimento antes de prosseguir.
+    Callback executed before the model generates a response.
+    Always executes a search in the knowledge base before proceeding.
     """
     try:
         agent_name = callback_context.agent_name
         logger.debug(f"🔄 Before model call for agent: {agent_name}")
 
-        # Extrai a última mensagem do usuário
+        # Extract the last user message
         last_user_message = ""
         if llm_request.contents and llm_request.contents[-1].role == "user":
             if llm_request.contents[-1].parts:
                 last_user_message = llm_request.contents[-1].parts[0].text
                 logger.debug(f"📝 Última mensagem do usuário: {last_user_message}")
 
-        # Extrai e formata o histórico de mensagens
+        # Extract and format the history of messages
         history = []
         for content in llm_request.contents:
             if content.parts and content.parts[0].text:
-                # Substitui 'model' por 'assistant' no role
+                # Replace 'model' with 'assistant' in the role
                 role = "assistant" if content.role == "model" else content.role
                 history.append(
                     {
@@ -56,12 +55,12 @@ def before_model_callback(
                     }
                 )
 
-        # loga o histórico de mensagens
-        logger.debug(f"📝 Histórico de mensagens: {history}")
+        # log the history of messages
+        logger.debug(f"📝 History of messages: {history}")
 
         if last_user_message:
-            logger.info("🔍 Executando busca na base de conhecimento")
-            # Executa a busca na base de conhecimento de forma síncrona
+            logger.info("🔍 Executing knowledge base search")
+            # Execute the knowledge base search synchronously
             search_results = search_knowledge_base_function_sync(
                 last_user_message, history
             )
@@ -69,10 +68,10 @@ def before_model_callback(
             if search_results:
                 logger.info("✅ Resultados encontrados, adicionando ao contexto")
 
-                # Obtém a instrução original do sistema
+                # Get the original system instruction
                 original_instruction = llm_request.config.system_instruction or ""
 
-                # Adiciona os resultados da busca e o histórico ao contexto do sistema
+                # Add the search results and history to the system context
                 modified_text = (
                     original_instruction
                     + "\n\n<knowledge_context>\n"
@@ -84,23 +83,23 @@ def before_model_callback(
                 llm_request.config.system_instruction = modified_text
 
                 logger.debug(
-                    f"📝 Instrução do sistema atualizada com resultados da busca e histórico"
+                    f"📝 System instruction updated with search results and history"
                 )
             else:
-                logger.warning("⚠️ Nenhum resultado encontrado na busca")
+                logger.warning("⚠️ No results found in the search")
         else:
-            logger.warning("⚠️ Nenhuma mensagem do usuário encontrada")
+            logger.warning("⚠️ No user message found")
 
-        logger.info("✅ Before_model_callback finalizado")
+        logger.info("✅ before_model_callback finished")
         return None
     except Exception as e:
-        logger.error(f"❌ Erro no before_model_callback: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error in before_model_callback: {str(e)}", exc_info=True)
         return None
 
 
 def search_knowledge_base_function_sync(query: str, history=[]):
     """
-    Search knowledge base de forma síncrona.
+    Search knowledge base synchronously.
 
     Args:
         query (str): The search query, with user message and history messages, all in one string
@@ -109,21 +108,21 @@ def search_knowledge_base_function_sync(query: str, history=[]):
         dict: The search results
     """
     try:
-        logger.info("🔍 Iniciando busca na base de conhecimento")
-        logger.debug(f"Query recebida: {query}")
+        logger.info("🔍 Starting knowledge base search")
+        logger.debug(f"Received query: {query}")
 
         # url = os.getenv("KNOWLEDGE_API_URL") + "/api/v1/search"
         url = os.getenv("KNOWLEDGE_API_URL") + "/api/v1/knowledge"
         tenant_id = os.getenv("TENANT_ID")
         url = url + "?tenant_id=" + tenant_id
-        logger.debug(f"URL da API: {url}")
+        logger.debug(f"API URL: {url}")
         logger.debug(f"Tenant ID: {tenant_id}")
 
         headers = {
             "x-api-key": f"{os.getenv('KNOWLEDGE_API_KEY')}",
             "Content-Type": "application/json",
         }
-        logger.debug(f"Headers configurados: {headers}")
+        logger.debug(f"Headers configured: {headers}")
 
         payload = {
             "gemini_api_key": os.getenv("GOOGLE_API_KEY"),
@@ -134,31 +133,31 @@ def search_knowledge_base_function_sync(query: str, history=[]):
             "history": history,
         }
 
-        logger.debug(f"Payload da requisição: {payload}")
+        logger.debug(f"Request payload: {payload}")
 
-        # Usando requests para fazer a requisição síncrona com timeout
-        logger.info("🔄 Fazendo requisição síncrona para a API de conhecimento")
+        # Using requests to make a synchronous request with timeout
+        logger.info("🔄 Making synchronous request to the knowledge API")
         # response = requests.post(url, headers=headers, json=payload)
         response = requests.get(url, headers=headers, timeout=10)
 
         if response.status_code == 200:
-            logger.info("✅ Busca realizada com sucesso")
+            logger.info("✅ Search executed successfully")
             result = response.json()
-            logger.debug(f"Resultado da busca: {result}")
+            logger.debug(f"Search result: {result}")
             return result
         else:
             logger.error(
-                f"❌ Erro ao realizar busca. Status code: {response.status_code}"
+                f"❌ Error performing search. Status code: {response.status_code}"
             )
             return None
     except requests.exceptions.Timeout:
-        logger.error("❌ Timeout ao realizar busca na base de conhecimento")
+        logger.error("❌ Timeout performing search")
         return None
     except requests.exceptions.RequestException as e:
-        logger.error(f"❌ Erro na requisição: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error in request: {str(e)}", exc_info=True)
         return None
     except Exception as e:
-        logger.error(f"❌ Erro ao realizar busca: {str(e)}", exc_info=True)
+        logger.error(f"❌ Error performing search: {str(e)}", exc_info=True)
         return None
 
 
@@ -171,19 +170,19 @@ class AgentBuilder:
     async def _create_llm_agent(
         self, agent
     ) -> Tuple[LlmAgent, Optional[AsyncExitStack]]:
-        """Cria um agente LLM a partir dos dados do agente."""
-        # Obtém ferramentas personalizadas da configuração
+        """Create an LLM agent from the agent data."""
+        # Get custom tools from the configuration
         custom_tools = []
         if agent.config.get("tools"):
             custom_tools = self.custom_tool_builder.build_tools(agent.config["tools"])
 
-        # Obtém ferramentas MCP da configuração
+        # Get MCP tools from the configuration
         mcp_tools = []
         mcp_exit_stack = None
         if agent.config.get("mcp_servers"):
             mcp_tools, mcp_exit_stack = await self.mcp_service.build_tools(agent.config, self.db)
 
-        # Combina todas as ferramentas
+        # Combine all tools
         all_tools = custom_tools + mcp_tools
             
         now = datetime.now()
@@ -192,7 +191,7 @@ class AgentBuilder:
         current_date_iso = now.strftime("%Y-%m-%d")
         current_time = now.strftime("%H:%M")
 
-        # Substitui as variáveis no prompt
+        # Substitute variables in the prompt
         formatted_prompt = agent.instruction.format(
             current_datetime=current_datetime,
             current_day_of_week=current_day_of_week,
@@ -200,7 +199,7 @@ class AgentBuilder:
             current_time=current_time,
         )
 
-        # Verifica se load_memory está habilitado
+        # Check if load_memory is enabled
         # before_model_callback_func = None
         if agent.config.get("load_memory") == True:
             all_tools.append(load_memory)
@@ -222,17 +221,17 @@ class AgentBuilder:
     async def _get_sub_agents(
         self, sub_agent_ids: List[str]
     ) -> List[Tuple[LlmAgent, Optional[AsyncExitStack]]]:
-        """Obtém e cria os sub-agentes LLM."""
+        """Get and create LLM sub-agents."""
         sub_agents = []
         for sub_agent_id in sub_agent_ids:
             agent = get_agent(self.db, sub_agent_id)
 
             if agent is None:
-                raise AgentNotFoundError(f"Agente com ID {sub_agent_id} não encontrado")
+                raise AgentNotFoundError(f"Agent with ID {sub_agent_id} not found")
 
             if agent.type != "llm":
                 raise ValueError(
-                    f"Agente {agent.name} (ID: {agent.id}) não é um agente LLM"
+                    f"Agent {agent.name} (ID: {agent.id}) is not an LLM agent"
                 )
 
             sub_agent, exit_stack = await self._create_llm_agent(agent)
@@ -243,8 +242,8 @@ class AgentBuilder:
     async def build_llm_agent(
         self, root_agent
     ) -> Tuple[LlmAgent, Optional[AsyncExitStack]]:
-        """Constrói um agente LLM com seus sub-agentes."""
-        logger.info("Criando agente LLM")
+        """Build an LLM agent with its sub-agents."""
+        logger.info("Creating LLM agent")
 
         sub_agents = []
         if root_agent.config.get("sub_agents"):
@@ -262,8 +261,8 @@ class AgentBuilder:
     async def build_composite_agent(
         self, root_agent
     ) -> Tuple[SequentialAgent | ParallelAgent | LoopAgent, Optional[AsyncExitStack]]:
-        """Constrói um agente composto (Sequential, Parallel ou Loop) com seus sub-agentes."""
-        logger.info(f"Processando sub-agentes para agente {root_agent.type}")
+        """Build a composite agent (Sequential, Parallel or Loop) with its sub-agents."""
+        logger.info(f"Processing sub-agents for agent {root_agent.type}")
 
         sub_agents_with_stacks = await self._get_sub_agents(
             root_agent.config.get("sub_agents", [])
@@ -271,7 +270,7 @@ class AgentBuilder:
         sub_agents = [agent for agent, _ in sub_agents_with_stacks]
 
         if root_agent.type == "sequential":
-            logger.info("Criando SequentialAgent")
+            logger.info("Creating SequentialAgent")
             return (
                 SequentialAgent(
                     name=root_agent.name,
@@ -281,7 +280,7 @@ class AgentBuilder:
                 None,
             )
         elif root_agent.type == "parallel":
-            logger.info("Criando ParallelAgent")
+            logger.info("Creating ParallelAgent")
             return (
                 ParallelAgent(
                     name=root_agent.name,
@@ -291,7 +290,7 @@ class AgentBuilder:
                 None,
             )
         elif root_agent.type == "loop":
-            logger.info("Criando LoopAgent")
+            logger.info("Creating LoopAgent")
             return (
                 LoopAgent(
                     name=root_agent.name,
@@ -302,14 +301,14 @@ class AgentBuilder:
                 None,
             )
         else:
-            raise ValueError(f"Tipo de agente inválido: {root_agent.type}")
+            raise ValueError(f"Invalid agent type: {root_agent.type}")
 
     async def build_agent(
         self, root_agent
     ) -> Tuple[
         LlmAgent | SequentialAgent | ParallelAgent | LoopAgent, Optional[AsyncExitStack]
     ]:
-        """Constrói o agente apropriado baseado no tipo do agente root."""
+        """Build the appropriate agent based on the type of the root agent."""
         if root_agent.type == "llm":
             return await self.build_llm_agent(root_agent)
         else:

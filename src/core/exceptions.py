@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from typing import Optional, Dict, Any
 
 class BaseAPIException(HTTPException):
-    """Classe base para exceções da API"""
+    """Base class for API exceptions"""
     def __init__(
         self,
         status_code: int,
@@ -17,16 +17,16 @@ class BaseAPIException(HTTPException):
         })
 
 class AgentNotFoundError(BaseAPIException):
-    """Exceção para quando o agente não é encontrado"""
+    """Exception when the agent is not found"""
     def __init__(self, agent_id: str):
         super().__init__(
             status_code=404,
-            message=f"Agente com ID {agent_id} não encontrado",
+            message=f"Agent with ID {agent_id} not found",
             error_code="AGENT_NOT_FOUND"
         )
 
 class InvalidParameterError(BaseAPIException):
-    """Exceção para parâmetros inválidos"""
+    """Exception for invalid parameters"""
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         super().__init__(
             status_code=400,
@@ -36,7 +36,7 @@ class InvalidParameterError(BaseAPIException):
         )
 
 class InvalidRequestError(BaseAPIException):
-    """Exceção para requisições inválidas"""
+    """Exception for invalid requests"""
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
         super().__init__(
             status_code=400,
@@ -46,8 +46,8 @@ class InvalidRequestError(BaseAPIException):
         )
 
 class InternalServerError(BaseAPIException):
-    """Exceção para erros internos do servidor"""
-    def __init__(self, message: str = "Erro interno do servidor"):
+    """Exception for server errors"""
+    def __init__(self, message: str = "Server error"):
         super().__init__(
             status_code=500,
             message=message,

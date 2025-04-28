@@ -55,6 +55,14 @@ src/
 
 ## Code Standards
 
+### Language Requirements
+- **ALL code comments, docstrings, and logging messages MUST be written in English**
+- Variable names, function names, and class names must be in English
+- API error messages must be in English
+- Documentation (including inline comments) must be in English
+- Code examples in documentation must be in English
+- Commit messages must be in English
+
 ### Schemas (Pydantic)
 - Use `BaseModel` as base for all schemas
 - Define fields with explicit types

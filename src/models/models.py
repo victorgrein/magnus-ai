@@ -30,7 +30,7 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relacionamento com Client (One-to-One, opcional para administradores)
+    # Relationship with Client (One-to-One, optional for administrators)
     client = relationship("Client", backref=backref("user", uselist=False, cascade="all, delete-orphan"))
 
 class Contact(Base):
@@ -64,7 +64,7 @@ class Agent(Base):
     )
 
     def to_dict(self):
-        """Converte o objeto para dicionário, convertendo UUIDs para strings"""
+        """Converts the object to a dictionary, converting UUIDs to strings"""
         result = {}
         for key, value in self.__dict__.items():
             if key.startswith('_'):
@@ -80,7 +80,7 @@ class Agent(Base):
         return result
 
     def _convert_dict(self, d):
-        """Converte UUIDs em um dicionário para strings"""
+        """Converts UUIDs to a dictionary for strings"""
         result = {}
         for key, value in d.items():
             if isinstance(value, uuid.UUID):
@@ -123,7 +123,7 @@ class Tool(Base):
 
 class Session(Base):
     __tablename__ = "sessions"
-    # A diretiva abaixo faz com que o Alembic ignore esta tabela nas migrações
+    # The directive below makes Alembic ignore this table in migrations
     __table_args__ = {'extend_existing': True, 'info': {'skip_autogenerate': True}}
     
     id = Column(String, primary_key=True)
@@ -146,5 +146,5 @@ class AuditLog(Base):
     user_agent = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     
-    # Relacionamento com User
+    # Relationship with User
     user = relationship("User", backref="audit_logs")

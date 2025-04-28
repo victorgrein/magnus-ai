@@ -3,24 +3,24 @@ from pydantic import BaseModel, Field
 from uuid import UUID
 
 class ToolConfig(BaseModel):
-    """Configuração de uma ferramenta"""
+    """Configuration of a tool"""
     id: UUID
-    envs: Dict[str, str] = Field(default_factory=dict, description="Variáveis de ambiente da ferramenta")
+    envs: Dict[str, str] = Field(default_factory=dict, description="Environment variables of the tool")
 
     class Config:
         from_attributes = True
 
 class MCPServerConfig(BaseModel):
-    """Configuração de um servidor MCP"""
+    """Configuration of an MCP server"""
     id: UUID
-    envs: Dict[str, str] = Field(default_factory=dict, description="Variáveis de ambiente do servidor")
-    tools: List[str] = Field(default_factory=list, description="Lista de ferramentas do servidor")
+    envs: Dict[str, str] = Field(default_factory=dict, description="Environment variables of the server")
+    tools: List[str] = Field(default_factory=list, description="List of tools of the server")
 
     class Config:
         from_attributes = True
 
 class HTTPToolParameter(BaseModel):
-    """Parâmetro de uma ferramenta HTTP"""
+    """Parameter of an HTTP tool"""
     type: str
     required: bool
     description: str
@@ -29,7 +29,7 @@ class HTTPToolParameter(BaseModel):
         from_attributes = True
 
 class HTTPToolParameters(BaseModel):
-    """Parâmetros de uma ferramenta HTTP"""
+    """Parameters of an HTTP tool"""
     path_params: Optional[Dict[str, str]] = None
     query_params: Optional[Dict[str, Union[str, List[str]]]] = None
     body_params: Optional[Dict[str, HTTPToolParameter]] = None
@@ -38,7 +38,7 @@ class HTTPToolParameters(BaseModel):
         from_attributes = True
 
 class HTTPToolErrorHandling(BaseModel):
-    """Configuração de tratamento de erros"""
+    """Configuration of error handling"""
     timeout: int
     retry_count: int
     fallback_response: Dict[str, str]
@@ -47,7 +47,7 @@ class HTTPToolErrorHandling(BaseModel):
         from_attributes = True
 
 class HTTPTool(BaseModel):
-    """Configuração de uma ferramenta HTTP"""
+    """Configuration of an HTTP tool"""
     name: str
     method: str
     values: Dict[str, str]
@@ -61,41 +61,41 @@ class HTTPTool(BaseModel):
         from_attributes = True
 
 class CustomTools(BaseModel):
-    """Configuração de ferramentas personalizadas"""
-    http_tools: List[HTTPTool] = Field(default_factory=list, description="Lista de ferramentas HTTP")
+    """Configuration of custom tools"""
+    http_tools: List[HTTPTool] = Field(default_factory=list, description="List of HTTP tools")
 
     class Config:
         from_attributes = True
 
 class LLMConfig(BaseModel):
-    """Configuração para agentes do tipo LLM"""
-    tools: Optional[List[ToolConfig]] = Field(default=None, description="Lista de ferramentas disponíveis")
-    custom_tools: Optional[CustomTools] = Field(default=None, description="Ferramentas personalizadas")
-    mcp_servers: Optional[List[MCPServerConfig]] = Field(default=None, description="Lista de servidores MCP")
-    sub_agents: Optional[List[UUID]] = Field(default=None, description="Lista de IDs dos sub-agentes")
+    """Configuration for LLM agents"""
+    tools: Optional[List[ToolConfig]] = Field(default=None, description="List of available tools")
+    custom_tools: Optional[CustomTools] = Field(default=None, description="Custom tools")
+    mcp_servers: Optional[List[MCPServerConfig]] = Field(default=None, description="List of MCP servers")
+    sub_agents: Optional[List[UUID]] = Field(default=None, description="List of IDs of sub-agents")
 
     class Config:
         from_attributes = True
 
 class SequentialConfig(BaseModel):
-    """Configuração para agentes do tipo Sequential"""
-    sub_agents: List[UUID] = Field(..., description="Lista de IDs dos sub-agentes em ordem de execução")
+    """Configuration for sequential agents"""
+    sub_agents: List[UUID] = Field(..., description="List of IDs of sub-agents in execution order")
 
     class Config:
         from_attributes = True
 
 class ParallelConfig(BaseModel):
-    """Configuração para agentes do tipo Parallel"""
-    sub_agents: List[UUID] = Field(..., description="Lista de IDs dos sub-agentes para execução paralela")
+    """Configuration for parallel agents"""
+    sub_agents: List[UUID] = Field(..., description="List of IDs of sub-agents for parallel execution")
 
     class Config:
         from_attributes = True
 
 class LoopConfig(BaseModel):
-    """Configuração para agentes do tipo Loop"""
-    sub_agents: List[UUID] = Field(..., description="Lista de IDs dos sub-agentes para execução em loop")
-    max_iterations: Optional[int] = Field(default=None, description="Número máximo de iterações")
-    condition: Optional[str] = Field(default=None, description="Condição para parar o loop")
+    """Configuration for loop agents"""
+    sub_agents: List[UUID] = Field(..., description="List of IDs of sub-agents for loop execution")
+    max_iterations: Optional[int] = Field(default=None, description="Maximum number of iterations")
+    condition: Optional[str] = Field(default=None, description="Condition to stop the loop")
 
     class Config:
         from_attributes = True 

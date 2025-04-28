@@ -10,50 +10,50 @@ import logging
 logger = logging.getLogger(__name__)
 
 def get_tool(db: Session, tool_id: uuid.UUID) -> Optional[Tool]:
-    """Busca uma ferramenta pelo ID"""
+    """Search for a tool by ID"""
     try:
         tool = db.query(Tool).filter(Tool.id == tool_id).first()
         if not tool:
-            logger.warning(f"Ferramenta não encontrada: {tool_id}")
+            logger.warning(f"Tool not found: {tool_id}")
             return None
         return tool
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao buscar ferramenta {tool_id}: {str(e)}")
+        logger.error(f"Error searching for tool {tool_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao buscar ferramenta"
+            detail="Error searching for tool"
         )
 
 def get_tools(db: Session, skip: int = 0, limit: int = 100) -> List[Tool]:
-    """Busca todas as ferramentas com paginação"""
+    """Search for all tools with pagination"""
     try:
         return db.query(Tool).offset(skip).limit(limit).all()
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao buscar ferramentas: {str(e)}")
+        logger.error(f"Error searching for tools: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao buscar ferramentas"
+            detail="Error searching for tools"
         )
 
 def create_tool(db: Session, tool: ToolCreate) -> Tool:
-    """Cria uma nova ferramenta"""
+    """Creates a new tool"""
     try:
         db_tool = Tool(**tool.model_dump())
         db.add(db_tool)
         db.commit()
         db.refresh(db_tool)
-        logger.info(f"Ferramenta criada com sucesso: {db_tool.id}")
+        logger.info(f"Tool created successfully: {db_tool.id}")
         return db_tool
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao criar ferramenta: {str(e)}")
+        logger.error(f"Error creating tool: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao criar ferramenta"
+            detail="Error creating tool"
         )
 
 def update_tool(db: Session, tool_id: uuid.UUID, tool: ToolCreate) -> Optional[Tool]:
-    """Atualiza uma ferramenta existente"""
+    """Updates an existing tool"""
     try:
         db_tool = get_tool(db, tool_id)
         if not db_tool:
@@ -64,18 +64,18 @@ def update_tool(db: Session, tool_id: uuid.UUID, tool: ToolCreate) -> Optional[T
             
         db.commit()
         db.refresh(db_tool)
-        logger.info(f"Ferramenta atualizada com sucesso: {tool_id}")
+        logger.info(f"Tool updated successfully: {tool_id}")
         return db_tool
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao atualizar ferramenta {tool_id}: {str(e)}")
+        logger.error(f"Error updating tool {tool_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao atualizar ferramenta"
+            detail="Error updating tool"
         )
 
 def delete_tool(db: Session, tool_id: uuid.UUID) -> bool:
-    """Remove uma ferramenta"""
+    """Remove a tool"""
     try:
         db_tool = get_tool(db, tool_id)
         if not db_tool:
@@ -83,12 +83,12 @@ def delete_tool(db: Session, tool_id: uuid.UUID) -> bool:
             
         db.delete(db_tool)
         db.commit()
-        logger.info(f"Ferramenta removida com sucesso: {tool_id}")
+        logger.info(f"Tool removed successfully: {tool_id}")
         return True
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao remover ferramenta {tool_id}: {str(e)}")
+        logger.error(f"Error removing tool {tool_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao remover ferramenta"
+            detail="Error removing tool"
         ) 

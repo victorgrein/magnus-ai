@@ -1,63 +1,62 @@
 from sqlalchemy.orm import Session
 from src.models.models import User
 from src.schemas.user import TokenData
-from src.services.user_service import authenticate_user, get_user_by_email
+from src.services.user_service import get_user_by_email
 from src.utils.security import create_jwt_token
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from src.config.settings import settings
 from src.config.database import get_db
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-# Definir scheme de autenticação OAuth2 com password flow
+# Define OAuth2 authentication scheme with password flow
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
     """
-    Obtém o usuário atual a partir do token JWT
+    Get the current user from the JWT token
     
     Args:
-        token: Token JWT
-        db: Sessão do banco de dados
+        token: JWT token
+        db: Database session
         
     Returns:
-        User: Usuário atual
+        User: Current user
         
     Raises:
-        HTTPException: Se o token for inválido ou o usuário não for encontrado
+        HTTPException: If the token is invalid or the user is not found
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Credenciais inválidas",
+        detail="Invalid credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
     
     try:
-        # Decodificar o token
+        # Decode the token
         payload = jwt.decode(
             token, 
             settings.JWT_SECRET_KEY, 
             algorithms=[settings.JWT_ALGORITHM]
         )
         
-        # Extrair dados do token
+        # Extract token data
         email: str = payload.get("sub")
         if email is None:
-            logger.warning("Token sem email (sub)")
+            logger.warning("Token without email (sub)")
             raise credentials_exception
         
-        # Verificar se o token expirou
+        # Check if the token has expired
         exp = payload.get("exp")
         if exp is None or datetime.fromtimestamp(exp) < datetime.utcnow():
-            logger.warning(f"Token expirado para {email}")
+            logger.warning(f"Token expired for {email}")
             raise credentials_exception
         
-        # Criar objeto TokenData
+        # Create TokenData object
         token_data = TokenData(
             sub=email,
             exp=datetime.fromtimestamp(exp),
@@ -66,85 +65,85 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         )
         
     except JWTError as e:
-        logger.error(f"Erro ao decodificar token JWT: {str(e)}")
+        logger.error(f"Error decoding JWT token: {str(e)}")
         raise credentials_exception
     
-    # Buscar usuário no banco de dados
+    # Search for user in the database
     user = get_user_by_email(db, email=token_data.sub)
     if user is None:
-        logger.warning(f"Usuário não encontrado para o email: {token_data.sub}")
+        logger.warning(f"User not found for email: {token_data.sub}")
         raise credentials_exception
     
     if not user.is_active:
-        logger.warning(f"Tentativa de acesso com usuário inativo: {user.email}")
+        logger.warning(f"Attempt to access inactive user: {user.email}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuário inativo"
+            detail="Inactive user"
         )
     
     return user
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
     """
-    Verifica se o usuário atual está ativo
+    Check if the current user is active
     
     Args:
-        current_user: Usuário atual
+        current_user: Current user
         
     Returns:
-        User: Usuário atual se estiver ativo
+        User: Current user if active
         
     Raises:
-        HTTPException: Se o usuário não estiver ativo
+        HTTPException: If the user is not active
     """
     if not current_user.is_active:
-        logger.warning(f"Tentativa de acesso com usuário inativo: {current_user.email}")
+        logger.warning(f"Attempt to access inactive user: {current_user.email}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuário inativo"
+            detail="Inactive user"
         )
     return current_user
 
 async def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
     """
-    Verifica se o usuário atual é um administrador
+    Check if the current user is an administrator
     
     Args:
-        current_user: Usuário atual
+        current_user: Current user
         
     Returns:
-        User: Usuário atual se for administrador
+        User: Current user if administrator
         
     Raises:
-        HTTPException: Se o usuário não for administrador
+        HTTPException: If the user is not an administrator
     """
     if not current_user.is_admin:
-        logger.warning(f"Tentativa de acesso admin por usuário não-admin: {current_user.email}")
+        logger.warning(f"Attempt to access admin by non-admin user: {current_user.email}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Permissão negada. Acesso restrito a administradores."
+            detail="Access denied. Restricted to administrators."
         )
     return current_user
 
 def create_access_token(user: User) -> str:
     """
-    Cria um token de acesso JWT para o usuário
+    Create a JWT access token for the user
     
     Args:
-        user: Usuário para o qual criar o token
+        user: User for which to create the token
         
     Returns:
-        str: Token JWT
+        str: JWT token
     """
-    # Dados a serem incluídos no token
+    # Data to be included in the token
     token_data = {
         "sub": user.email,
         "is_admin": user.is_admin,
     }
     
-    # Incluir client_id apenas se não for administrador
+    # Include client_id only if not administrator and client_id is set
     if not user.is_admin and user.client_id:
         token_data["client_id"] = str(user.client_id)
     
-    # Criar token
+    # Create token
     return create_jwt_token(token_data) 

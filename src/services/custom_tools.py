@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from google.adk.tools import FunctionTool
 import requests
 import json
@@ -11,7 +11,7 @@ class CustomToolBuilder:
         self.tools = []
 
     def _create_http_tool(self, tool_config: Dict[str, Any]) -> FunctionTool:
-        """Cria uma ferramenta HTTP baseada na configuração fornecida."""
+        """Create an HTTP tool based on the provided configuration."""
         name = tool_config["name"]
         description = tool_config["description"]
         endpoint = tool_config["endpoint"]
@@ -23,35 +23,35 @@ class CustomToolBuilder:
 
         def http_tool(**kwargs):
             try:
-                # Combina valores padrão com valores fornecidos
+                # Combines default values with provided values
                 all_values = {**values, **kwargs}
 
-                # Substitui placeholders nos headers
+                # Substitutes placeholders in headers
                 processed_headers = {
                     k: v.format(**all_values) if isinstance(v, str) else v
                     for k, v in headers.items()
                 }
 
-                # Processa path parameters
+                # Processes path parameters
                 url = endpoint
                 for param, value in parameters.get("path_params", {}).items():
                     if param in all_values:
                         url = url.replace(f"{{{param}}}", str(all_values[param]))
 
-                # Processa query parameters
+                # Process query parameters
                 query_params = {}
                 for param, value in parameters.get("query_params", {}).items():
                     if isinstance(value, list):
-                        # Se o valor for uma lista, junta com vírgula
+                        # If the value is a list, join with comma
                         query_params[param] = ",".join(value)
                     elif param in all_values:
-                        # Se o parâmetro estiver nos valores, usa o valor fornecido
+                        # If the parameter is in the values, use the provided value
                         query_params[param] = all_values[param]
                     else:
-                        # Caso contrário, usa o valor padrão da configuração
+                        # Otherwise, use the default value from the configuration
                         query_params[param] = value
 
-                # Adiciona valores padrão aos query params se não estiverem presentes
+                # Adds default values to query params if they are not present
                 for param, value in values.items():
                     if param not in query_params and param not in parameters.get("path_params", {}):
                         query_params[param] = value
@@ -62,12 +62,12 @@ class CustomToolBuilder:
                     if param in all_values:
                         body_data[param] = all_values[param]
 
-                # Adiciona valores padrão ao body se não estiverem presentes
+                # Adds default values to body if they are not present
                 for param, value in values.items():
                     if param not in body_data and param not in query_params and param not in parameters.get("path_params", {}):
                         body_data[param] = value
 
-                # Faz a requisição HTTP
+                # Makes the HTTP request
                 response = requests.request(
                     method=method,
                     url=url,
@@ -79,64 +79,64 @@ class CustomToolBuilder:
 
                 if response.status_code >= 400:
                     raise requests.exceptions.HTTPError(
-                        f"Erro na requisição: {response.status_code} - {response.text}"
+                        f"Error in the request: {response.status_code} - {response.text}"
                     )
 
-                # Sempre retorna a resposta como string
+                # Always returns the response as a string
                 return json.dumps(response.json())
 
             except Exception as e:
-                logger.error(f"Erro ao executar ferramenta {name}: {str(e)}")
+                logger.error(f"Error executing tool {name}: {str(e)}")
                 return json.dumps(error_handling.get("fallback_response", {
                     "error": "tool_execution_error",
                     "message": str(e)
                 }))
 
-        # Adiciona docstring dinâmica baseada na configuração
+        # Adds dynamic docstring based on the configuration
         param_docs = []
         
-        # Adiciona path parameters
+        # Adds path parameters
         for param, value in parameters.get("path_params", {}).items():
             param_docs.append(f"{param}: {value}")
             
-        # Adiciona query parameters
+        # Adds query parameters
         for param, value in parameters.get("query_params", {}).items():
             if isinstance(value, list):
                 param_docs.append(f"{param}: List[{', '.join(value)}]")
             else:
                 param_docs.append(f"{param}: {value}")
                 
-        # Adiciona body parameters
+        # Adds body parameters
         for param, param_config in parameters.get("body_params", {}).items():
-            required = "Obrigatório" if param_config.get("required", False) else "Opcional"
+            required = "Required" if param_config.get("required", False) else "Optional"
             param_docs.append(f"{param} ({param_config['type']}, {required}): {param_config['description']}")
                 
-        # Adiciona valores padrão
+        # Adds default values
         if values:
-            param_docs.append("\nValores padrão:")
+            param_docs.append("\nDefault values:")
             for param, value in values.items():
                 param_docs.append(f"{param}: {value}")
 
         http_tool.__doc__ = f"""
         {description}
         
-        Parâmetros:
+        Parameters:
         {chr(10).join(param_docs)}
         
-        Retorna:
-        String contendo a resposta em formato JSON
+        Returns:
+        String containing the response in JSON format
         """
 
-        # Define o nome da função para ser usado pelo ADK
+        # Defines the function name to be used by the ADK
         http_tool.__name__ = name
 
         return FunctionTool(func=http_tool)
 
     def build_tools(self, tools_config: Dict[str, Any]) -> List[FunctionTool]:
-        """Constrói uma lista de ferramentas baseada na configuração fornecida."""
+        """Builds a list of tools based on the provided configuration."""
         self.tools = []
 
-        # Processa ferramentas HTTP
+        # Processes HTTP tools
         for http_tool_config in tools_config.get("http_tools", []):
             self.tools.append(self._create_http_tool(http_tool_config))
 

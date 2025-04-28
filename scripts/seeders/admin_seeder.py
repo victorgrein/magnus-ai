@@ -1,7 +1,7 @@
 """
-Script para criar um usuário administrador inicial:
+Script to create an initial admin user:
 - Email: admin@evoai.com
-- Senha: definida nas variáveis de ambiente ADMIN_INITIAL_PASSWORD
+- Password: defined in the ADMIN_INITIAL_PASSWORD environment variable
 - is_admin: True
 - is_active: True
 - email_verified: True
@@ -21,27 +21,27 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 def create_admin_user():
-    """Cria um usuário administrador inicial no sistema"""
+    """Create an initial admin user in the system"""
     try:
-        # Carregar variáveis de ambiente
+        # Load environment variables
         load_dotenv()
         
-        # Obter configurações do banco de dados
+        # Get database settings
         db_url = os.getenv("POSTGRES_CONNECTION_STRING")
         if not db_url:
-            logger.error("Variável de ambiente POSTGRES_CONNECTION_STRING não definida")
+            logger.error("Environment variable POSTGRES_CONNECTION_STRING not defined")
             return False
         
-        # Obter senha do administrador
+        # Get admin password
         admin_password = os.getenv("ADMIN_INITIAL_PASSWORD")
         if not admin_password:
-            logger.error("Variável de ambiente ADMIN_INITIAL_PASSWORD não definida")
+            logger.error("Environment variable ADMIN_INITIAL_PASSWORD not defined")
             return False
             
-        # Configuração do email do admin
+        # Admin email configuration
         admin_email = os.getenv("ADMIN_EMAIL", "admin@evoai.com")
         
-        # Conectar ao banco de dados
+        # Connect to the database
         engine = create_engine(db_url)
         Session = sessionmaker(bind=engine)
         session = Session()
@@ -49,10 +49,10 @@ def create_admin_user():
         # Verificar se o administrador já existe
         existing_admin = session.query(User).filter(User.email == admin_email).first()
         if existing_admin:
-            logger.info(f"Administrador com email {admin_email} já existe")
+            logger.info(f"Admin with email {admin_email} already exists")
             return True
         
-        # Criar administrador
+        # Create admin
         admin_user = User(
             email=admin_email,
             password_hash=get_password_hash(admin_password),
@@ -61,15 +61,15 @@ def create_admin_user():
             email_verified=True
         )
         
-        # Adicionar e comitar
+        # Add and commit
         session.add(admin_user)
         session.commit()
         
-        logger.info(f"Administrador criado com sucesso: {admin_email}")
+        logger.info(f"Admin created successfully: {admin_email}")
         return True
         
     except Exception as e:
-        logger.error(f"Erro ao criar administrador: {str(e)}")
+        logger.error(f"Error creating admin: {str(e)}")
         return False
     finally:
         session.close()

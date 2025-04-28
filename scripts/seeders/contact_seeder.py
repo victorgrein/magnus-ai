@@ -1,8 +1,8 @@
 """
-Script para criar contatos de exemplo para o cliente demo:
-- Contatos com histórico de conversas
-- Diferentes perfis de cliente
-- Dados fictícios para demonstração
+Script to create example contacts for the demo client:
+- Contacts with conversation history
+- Different client profiles
+- Fake data for demonstration
 """
 
 import os
@@ -15,7 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from dotenv import load_dotenv
 from src.models.models import Contact, User, Client
 
-# Configurar logging
+# Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
@@ -23,46 +23,46 @@ logger = logging.getLogger(__name__)
 
 
 def create_demo_contacts():
-    """Cria contatos de exemplo para o cliente demo"""
+    """Create example contacts for the demo client"""
     try:
-        # Carregar variáveis de ambiente
+        # Load environment variables
         load_dotenv()
 
-        # Obter configurações do banco de dados
+        # Get database settings
         db_url = os.getenv("POSTGRES_CONNECTION_STRING")
         if not db_url:
-            logger.error("Variável de ambiente POSTGRES_CONNECTION_STRING não definida")
+            logger.error("Environment variable POSTGRES_CONNECTION_STRING not defined")
             return False
 
-        # Conectar ao banco de dados
+        # Connect to the database
         engine = create_engine(db_url)
         Session = sessionmaker(bind=engine)
         session = Session()
 
         try:
-            # Obter o cliente demo pelo email do usuário
-            demo_email = os.getenv("DEMO_EMAIL", "demo@exemplo.com")
+            # Get demo client by user email
+            demo_email = os.getenv("DEMO_EMAIL", "demo@example.com")
             demo_user = session.query(User).filter(User.email == demo_email).first()
 
             if not demo_user or not demo_user.client_id:
                 logger.error(
-                    f"Usuário demo não encontrado ou não associado a um cliente: {demo_email}"
+                    f"Demo user not found or not associated with a client: {demo_email}"
                 )
                 return False
 
             client_id = demo_user.client_id
 
-            # Verificar se já existem contatos para este cliente
+            # Check if there are already contacts for this client
             existing_contacts = (
                 session.query(Contact).filter(Contact.client_id == client_id).all()
             )
             if existing_contacts:
                 logger.info(
-                    f"Já existem {len(existing_contacts)} contatos para o cliente {client_id}"
+                    f"There are already {len(existing_contacts)} contacts for the client {client_id}"
                 )
                 return True
 
-            # Definições dos contatos de exemplo
+            # Example contact definitions
             contacts = [
                 {
                     "name": "Maria Silva",
@@ -145,7 +145,7 @@ def create_demo_contacts():
                 },
             ]
 
-            # Criar os contatos
+            # Create the contacts
             for contact_data in contacts:
                 contact = Contact(
                     client_id=client_id,
@@ -156,24 +156,24 @@ def create_demo_contacts():
 
                 session.add(contact)
                 logger.info(
-                    f"Contato '{contact_data['name']}' criado para o cliente {client_id}"
+                    f"Contact '{contact_data['name']}' created for the client {client_id}"
                 )
 
             session.commit()
             logger.info(
-                f"Todos os contatos de exemplo foram criados com sucesso para o cliente {client_id}"
+                f"All example contacts were created successfully for the client {client_id}"
             )
             return True
 
         except SQLAlchemyError as e:
             session.rollback()
             logger.error(
-                f"Erro de banco de dados ao criar contatos de exemplo: {str(e)}"
+                f"Database error when creating example contacts: {str(e)}"
             )
             return False
 
     except Exception as e:
-        logger.error(f"Erro ao criar contatos de exemplo: {str(e)}")
+        logger.error(f"Error when creating example contacts: {str(e)}")
         return False
     finally:
         session.close()

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
-# Corrigir erro do bcrypt com passlib
+# Fix bcrypt error with passlib
 if not hasattr(bcrypt, '__about__'):
     @dataclass
     class BcryptAbout:
@@ -18,19 +18,19 @@ if not hasattr(bcrypt, '__about__'):
     
     setattr(bcrypt, "__about__", BcryptAbout())
 
-# Contexto para hash de senhas usando bcrypt
+# Context for password hashing using bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def get_password_hash(password: str) -> str:
-    """Cria um hash da senha fornecida"""
+    """Creates a password hash"""
     return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verifica se a senha fornecida corresponde ao hash armazenado"""
+    """Verifies if the provided password matches the stored hash"""
     return pwd_context.verify(plain_password, hashed_password)
 
 def create_jwt_token(data: dict, expires_delta: timedelta = None) -> str:
-    """Cria um token JWT"""
+    """Creates a JWT token"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -45,7 +45,7 @@ def create_jwt_token(data: dict, expires_delta: timedelta = None) -> str:
     return encoded_jwt
 
 def generate_token(length: int = 32) -> str:
-    """Gera um token seguro para verificação de email ou reset de senha"""
+    """Generates a secure token for email verification or password reset"""
     alphabet = string.ascii_letters + string.digits
     token = ''.join(secrets.choice(alphabet) for _ in range(length))
     return token 

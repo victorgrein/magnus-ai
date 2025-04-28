@@ -1,9 +1,9 @@
 """
-Script para criar agentes de exemplo para o cliente demo:
-- Agente Atendimento: configurado para responder perguntas gerais
-- Agente Vendas: configurado para responder sobre produtos
-- Agente FAQ: configurado para responder perguntas frequentes
-Cada agente com instruções e configurações pré-definidas
+Script to create example agents for the demo client:
+- Agent Support: configured to answer general questions
+- Agent Sales: configured to answer about products
+- Agent FAQ: configured to answer frequently asked questions
+Each agent with pre-defined instructions and configurations
 """
 
 import os
@@ -21,18 +21,18 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 def create_demo_agents():
-    """Cria agentes de exemplo para o cliente demo"""
+    """Create example agents for the demo client"""
     try:
-        # Carregar variáveis de ambiente
+        # Load environment variables
         load_dotenv()
         
-        # Obter configurações do banco de dados
+        # Get database settings
         db_url = os.getenv("POSTGRES_CONNECTION_STRING")
         if not db_url:
-            logger.error("Variável de ambiente POSTGRES_CONNECTION_STRING não definida")
+            logger.error("Environment variable POSTGRES_CONNECTION_STRING not defined")
             return False
         
-        # Conectar ao banco de dados
+        # Connect to the database
         engine = create_engine(db_url)
         Session = sessionmaker(bind=engine)
         session = Session()
@@ -43,7 +43,7 @@ def create_demo_agents():
             demo_user = session.query(User).filter(User.email == demo_email).first()
             
             if not demo_user or not demo_user.client_id:
-                logger.error(f"Usuário demo não encontrado ou não associado a um cliente: {demo_email}")
+                logger.error(f"Demo user not found or not associated with a client: {demo_email}")
                 return False
                 
             client_id = demo_user.client_id
@@ -51,79 +51,75 @@ def create_demo_agents():
             # Verificar se já existem agentes para este cliente
             existing_agents = session.query(Agent).filter(Agent.client_id == client_id).all()
             if existing_agents:
-                logger.info(f"Já existem {len(existing_agents)} agentes para o cliente {client_id}")
+                logger.info(f"There are already {len(existing_agents)} agents for the client {client_id}")
                 return True
             
-            # Definições dos agentes de exemplo
+            # Example agent definitions
             agents = [
                 {
-                    "name": "Atendimento_Geral",
-                    "description": "Agente para atendimento geral e dúvidas básicas",
+                    "name": "Support_Agent",
+                    "description": "Agent for general support and basic questions",
                     "type": "llm",
-                    "model": "gpt-3.5-turbo",
-                    "api_key": "${OPENAI_API_KEY}",  # Será substituído pela variável de ambiente
+                    "model": "gpt-4.1-nano",
+                    "api_key": "your-api-key-here",
                     "instruction": """
-                        Você é um assistente de atendimento ao cliente da empresa. 
-                        Seja cordial, objetivo e eficiente. Responda às dúvidas dos clientes
-                        de forma clara e sucinta. Se não souber a resposta, informe que irá
-                        consultar um especialista e retornará em breve.
+                        You are a customer support agent. 
+                        Be friendly, objective and efficient. Answer customer questions
+                        in a clear and concise manner. If you don't know the answer,
+                        inform that you will consult a specialist and return soon.
                     """,
                     "config": {
-                        "temperature": 0.7,
-                        "max_tokens": 500,
-                        "tools": []
+                        "tools": [],
+                        "mcp_servers": [],
+                        "custom_tools": [],
+                        "sub_agents": []
                     }
                 },
                 {
-                    "name": "Vendas_Produtos",
-                    "description": "Agente especializado em vendas e informações sobre produtos",
+                    "name": "Sales_Products",
+                    "description": "Specialized agent in sales and information about products",
                     "type": "llm",
-                    "model": "claude-3-sonnet-20240229",
-                    "api_key": "${ANTHROPIC_API_KEY}",  # Será substituído pela variável de ambiente
+                    "model": "gpt-4.1-nano",
+                    "api_key": "your-api-key-here",
                     "instruction": """
-                        Você é um especialista em vendas da empresa. 
-                        Seu objetivo é fornecer informações detalhadas sobre produtos,
-                        comparar diferentes opções, destacar benefícios e vantagens competitivas.
-                        Use uma linguagem persuasiva mas honesta, e sempre busque entender
-                        as necessidades do cliente antes de recomendar um produto.
+                        You are a sales specialist. 
+                        Your goal is to provide detailed information about products,
+                        compare different options, highlight benefits and competitive advantages.
+                        Use a persuasive but honest language, and always seek to understand
+                        the customer's needs before recommending a product.
                     """,
                     "config": {
-                        "temperature": 0.8,
-                        "max_tokens": 800,
-                        "tools": ["web_search"]
+                        "tools": [],
+                        "mcp_servers": [],
+                        "custom_tools": [],
+                        "sub_agents": []
                     }
                 },
                 {
                     "name": "FAQ_Bot",
-                    "description": "Agente para responder perguntas frequentes",
+                    "description": "Agent for answering frequently asked questions",
                     "type": "llm",
-                    "model": "gemini-pro",
-                    "api_key": "${GOOGLE_API_KEY}",  # Será substituído pela variável de ambiente
+                    "model": "gpt-4.1-nano",
+                    "api_key": "your-api-key-here",
                     "instruction": """
-                        Você é um assistente especializado em responder perguntas frequentes.
-                        Suas respostas devem ser diretas, objetivas e baseadas nas informações
-                        da empresa. Utilize uma linguagem simples e acessível. Se a pergunta
-                        não estiver relacionada às FAQs disponíveis, direcione o cliente para
-                        o canal de atendimento adequado.
+                        You are a specialized agent for answering frequently asked questions.
+                        Your answers should be direct, objective and based on the information
+                        of the company. Use a simple and accessible language. If the question
+                        is not related to the available FAQs, redirect the client to the
+                        appropriate support channel.
                     """,
                     "config": {
-                        "temperature": 0.5,
-                        "max_tokens": 400,
-                        "tools": []
+                        "tools": [],
+                        "mcp_servers": [],
+                        "custom_tools": [],
+                        "sub_agents": []
                     }
                 }
             ]
             
-            # Criar os agentes
+            # Create the agents
             for agent_data in agents:
-                # Substituir placeholders de API Keys por variáveis de ambiente quando disponíveis
-                if "${OPENAI_API_KEY}" in agent_data["api_key"]:
-                    agent_data["api_key"] = os.getenv("OPENAI_API_KEY", "")
-                elif "${ANTHROPIC_API_KEY}" in agent_data["api_key"]:
-                    agent_data["api_key"] = os.getenv("ANTHROPIC_API_KEY", "")
-                elif "${GOOGLE_API_KEY}" in agent_data["api_key"]:
-                    agent_data["api_key"] = os.getenv("GOOGLE_API_KEY", "")
-                
+                # Create the agent
                 agent = Agent(
                     client_id=client_id,
                     name=agent_data["name"],
@@ -136,19 +132,19 @@ def create_demo_agents():
                 )
                 
                 session.add(agent)
-                logger.info(f"Agente '{agent_data['name']}' criado para o cliente {client_id}")
+                logger.info(f"Agent '{agent_data['name']}' created for the client {client_id}")
             
             session.commit()
-            logger.info(f"Todos os agentes de exemplo foram criados com sucesso para o cliente {client_id}")
+            logger.info(f"All example agents were created successfully for the client {client_id}")
             return True
             
         except SQLAlchemyError as e:
             session.rollback()
-            logger.error(f"Erro de banco de dados ao criar agentes de exemplo: {str(e)}")
+            logger.error(f"Database error when creating example agents: {str(e)}")
             return False
         
     except Exception as e:
-        logger.error(f"Erro ao criar agentes de exemplo: {str(e)}")
+        logger.error(f"Error when creating example agents: {str(e)}")
         return False
     finally:
         session.close()

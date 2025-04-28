@@ -3,12 +3,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 from src.models.models import Agent
 from src.schemas.schemas import AgentCreate
-from src.schemas.agent_config import (
-    LLMConfig,
-    SequentialConfig,
-    ParallelConfig,
-    LoopConfig,
-)
 from typing import List, Optional, Dict, Any
 from src.services.mcp_server_service import get_mcp_server
 import uuid
@@ -18,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def validate_sub_agents(db: Session, sub_agents: List[uuid.UUID]) -> bool:
-    """Valida se todos os sub-agentes existem"""
+    """Validate if all sub-agents exist"""
     for agent_id in sub_agents:
         agent = get_agent(db, agent_id)
         if not agent:
@@ -27,18 +21,18 @@ def validate_sub_agents(db: Session, sub_agents: List[uuid.UUID]) -> bool:
 
 
 def get_agent(db: Session, agent_id: uuid.UUID) -> Optional[Agent]:
-    """Busca um agente pelo ID"""
+    """Search for an agent by ID"""
     try:
         agent = db.query(Agent).filter(Agent.id == agent_id).first()
         if not agent:
-            logger.warning(f"Agente não encontrado: {agent_id}")
+            logger.warning(f"Agent not found: {agent_id}")
             return None
         return agent
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao buscar agente {agent_id}: {str(e)}")
+        logger.error(f"Error searching for agent {agent_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao buscar agente",
+            detail="Error searching for agent",
         )
 
 
@@ -49,72 +43,72 @@ def get_agents_by_client(
     limit: int = 100,
     active_only: bool = True,
 ) -> List[Agent]:
-    """Busca agentes de um cliente com paginação"""
+    """Search for agents by client with pagination"""
     try:
         query = db.query(Agent).filter(Agent.client_id == client_id)
 
         return query.offset(skip).limit(limit).all()
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao buscar agentes do cliente {client_id}: {str(e)}")
+        logger.error(f"Error searching for client agents {client_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao buscar agentes",
+            detail="Error searching for agents",
         )
 
 
 def create_agent(db: Session, agent: AgentCreate) -> Agent:
-    """Cria um novo agente"""
+    """Create a new agent"""
     try:
-        # Validação adicional de sub-agentes
+        # Additional sub-agent validation
         if agent.type != "llm":
             if not isinstance(agent.config, dict):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Configuração inválida: deve ser um objeto com sub_agents",
+                    detail="Invalid configuration: must be an object with sub_agents",
                 )
 
             if "sub_agents" not in agent.config:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Configuração inválida: sub_agents é obrigatório para agentes do tipo sequential, parallel ou loop",
+                    detail="Invalid configuration: sub_agents is required for sequential, parallel or loop agents",
                 )
 
             if not agent.config["sub_agents"]:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Configuração inválida: sub_agents não pode estar vazio",
+                    detail="Invalid configuration: sub_agents cannot be empty",
                 )
 
             if not validate_sub_agents(db, agent.config["sub_agents"]):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Um ou mais sub-agentes não existem",
+                    detail="One or more sub-agents do not exist",
                 )
 
-        # Processa a configuração antes de criar o agente
+        # Process the configuration before creating the agent
         config = agent.config
         if isinstance(config, dict):
-            # Processa servidores MCP
+            # Process MCP servers
             if "mcp_servers" in config:
                 processed_servers = []
                 for server in config["mcp_servers"]:
-                    # Busca o servidor MCP no banco
+                    # Search for MCP server in the database
                     mcp_server = get_mcp_server(db, server["id"])
                     if not mcp_server:
                         raise HTTPException(
                             status_code=400,
-                            detail=f"Servidor MCP não encontrado: {server['id']}",
+                            detail=f"MCP server not found: {server['id']}",
                         )
 
-                    # Verifica se todas as variáveis de ambiente necessárias estão preenchidas
+                    # Check if all required environment variables are provided
                     for env_key, env_value in mcp_server.environments.items():
                         if env_key not in server.get("envs", {}):
                             raise HTTPException(
                                 status_code=400,
-                                detail=f"Variável de ambiente '{env_key}' não fornecida para o servidor MCP {mcp_server.name}",
+                                detail=f"Environment variable '{env_key}' not provided for MCP server {mcp_server.name}",
                             )
 
-                    # Adiciona o servidor processado com suas ferramentas
+                    # Add the processed server with its tools
                     processed_servers.append(
                         {
                             "id": str(server["id"]),
@@ -125,13 +119,13 @@ def create_agent(db: Session, agent: AgentCreate) -> Agent:
 
                 config["mcp_servers"] = processed_servers
 
-            # Processa sub-agentes
+            # Process sub-agents
             if "sub_agents" in config:
                 config["sub_agents"] = [
                     str(agent_id) for agent_id in config["sub_agents"]
                 ]
 
-            # Processa ferramentas
+            # Process tools
             if "tools" in config:
                 config["tools"] = [
                     {"id": str(tool["id"]), "envs": tool["envs"]}
@@ -144,51 +138,51 @@ def create_agent(db: Session, agent: AgentCreate) -> Agent:
         db.add(db_agent)
         db.commit()
         db.refresh(db_agent)
-        logger.info(f"Agente criado com sucesso: {db_agent.id}")
+        logger.info(f"Agent created successfully: {db_agent.id}")
         return db_agent
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao criar agente: {str(e)}")
+        logger.error(f"Error creating agent: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao criar agente",
+            detail="Error creating agent",
         )
 
 
 async def update_agent(
     db: Session, agent_id: uuid.UUID, agent_data: Dict[str, Any]
 ) -> Agent:
-    """Atualiza um agente existente"""
+    """Update an existing agent"""
     try:
         agent = db.query(Agent).filter(Agent.id == agent_id).first()
         if not agent:
-            raise HTTPException(status_code=404, detail="Agente não encontrado")
+            raise HTTPException(status_code=404, detail="Agent not found")
 
-        # Converte os UUIDs em strings antes de salvar
+        # Convert UUIDs to strings before saving
         if "config" in agent_data:
             config = agent_data["config"]
 
-            # Processa servidores MCP
+            # Process MCP servers
             if "mcp_servers" in config:
                 processed_servers = []
                 for server in config["mcp_servers"]:
-                    # Busca o servidor MCP no banco
+                    # Search for MCP server in the database
                     mcp_server = get_mcp_server(db, server["id"])
                     if not mcp_server:
                         raise HTTPException(
                             status_code=400,
-                            detail=f"Servidor MCP não encontrado: {server['id']}",
+                            detail=f"MCP server not found: {server['id']}",
                         )
 
-                    # Verifica se todas as variáveis de ambiente necessárias estão preenchidas
+                    # Check if all required environment variables are provided
                     for env_key, env_value in mcp_server.environments.items():
                         if env_key not in server.get("envs", {}):
                             raise HTTPException(
                                 status_code=400,
-                                detail=f"Variável de ambiente '{env_key}' não fornecida para o servidor MCP {mcp_server.name}",
+                                detail=f"Environment variable '{env_key}' not provided for MCP server {mcp_server.name}",
                             )
 
-                    # Adiciona o servidor processado
+                    # Add the processed server
                     processed_servers.append(
                         {
                             "id": str(server["id"]),
@@ -199,13 +193,13 @@ async def update_agent(
 
                 config["mcp_servers"] = processed_servers
 
-            # Processa sub-agentes
+            # Process sub-agents
             if "sub_agents" in config:
                 config["sub_agents"] = [
                     str(agent_id) for agent_id in config["sub_agents"]
                 ]
 
-            # Processa ferramentas
+            # Process tools
             if "tools" in config:
                 config["tools"] = [
                     {"id": str(tool["id"]), "envs": tool["envs"]}
@@ -223,43 +217,43 @@ async def update_agent(
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=500, detail=f"Erro ao atualizar agente: {str(e)}"
+            status_code=500, detail=f"Error updating agent: {str(e)}"
         )
 
 
 def delete_agent(db: Session, agent_id: uuid.UUID) -> bool:
-    """Remove um agente (soft delete)"""
+    """Remove an agent (soft delete)"""
     try:
         db_agent = get_agent(db, agent_id)
         if not db_agent:
             return False
 
         db.commit()
-        logger.info(f"Agente desativado com sucesso: {agent_id}")
+        logger.info(f"Agent deactivated successfully: {agent_id}")
         return True
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao desativar agente {agent_id}: {str(e)}")
+        logger.error(f"Error deactivating agent {agent_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao desativar agente",
+            detail="Error deactivating agent",
         )
 
 
 def activate_agent(db: Session, agent_id: uuid.UUID) -> bool:
-    """Reativa um agente"""
+    """Reactivate an agent"""
     try:
         db_agent = get_agent(db, agent_id)
         if not db_agent:
             return False
 
         db.commit()
-        logger.info(f"Agente reativado com sucesso: {agent_id}")
+        logger.info(f"Agent reactivated successfully: {agent_id}")
         return True
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao reativar agente {agent_id}: {str(e)}")
+        logger.error(f"Error reactivating agent {agent_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao reativar agente",
+            detail="Error reactivating agent",
         )

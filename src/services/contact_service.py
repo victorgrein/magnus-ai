@@ -10,50 +10,50 @@ import logging
 logger = logging.getLogger(__name__)
 
 def get_contact(db: Session, contact_id: uuid.UUID) -> Optional[Contact]:
-    """Busca um contato pelo ID"""
+    """Search for a contact by ID"""
     try:
         contact = db.query(Contact).filter(Contact.id == contact_id).first()
         if not contact:
-            logger.warning(f"Contato não encontrado: {contact_id}")
+            logger.warning(f"Contact not found: {contact_id}")
             return None
         return contact
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao buscar contato {contact_id}: {str(e)}")
+        logger.error(f"Error searching for contact {contact_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao buscar contato"
+            detail="Error searching for contact"
         )
 
 def get_contacts_by_client(db: Session, client_id: uuid.UUID, skip: int = 0, limit: int = 100) -> List[Contact]:
-    """Busca contatos de um cliente com paginação"""
+    """Search for contacts of a client with pagination"""
     try:
         return db.query(Contact).filter(Contact.client_id == client_id).offset(skip).limit(limit).all()
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao buscar contatos do cliente {client_id}: {str(e)}")
+        logger.error(f"Error searching for contacts of client {client_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao buscar contatos"
+            detail="Error searching for contacts"
         )
 
 def create_contact(db: Session, contact: ContactCreate) -> Contact:
-    """Cria um novo contato"""
+    """Create a new contact"""
     try:
         db_contact = Contact(**contact.model_dump())
         db.add(db_contact)
         db.commit()
         db.refresh(db_contact)
-        logger.info(f"Contato criado com sucesso: {db_contact.id}")
+        logger.info(f"Contact created successfully: {db_contact.id}")
         return db_contact
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao criar contato: {str(e)}")
+        logger.error(f"Error creating contact: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao criar contato"
+            detail="Error creating contact"
         )
 
 def update_contact(db: Session, contact_id: uuid.UUID, contact: ContactCreate) -> Optional[Contact]:
-    """Atualiza um contato existente"""
+    """Update an existing contact"""
     try:
         db_contact = get_contact(db, contact_id)
         if not db_contact:
@@ -64,18 +64,18 @@ def update_contact(db: Session, contact_id: uuid.UUID, contact: ContactCreate) -
             
         db.commit()
         db.refresh(db_contact)
-        logger.info(f"Contato atualizado com sucesso: {contact_id}")
+        logger.info(f"Contact updated successfully: {contact_id}")
         return db_contact
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao atualizar contato {contact_id}: {str(e)}")
+        logger.error(f"Error updating contact {contact_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao atualizar contato"
+            detail="Error updating contact"
         )
 
 def delete_contact(db: Session, contact_id: uuid.UUID) -> bool:
-    """Remove um contato"""
+    """Remove a contact"""
     try:
         db_contact = get_contact(db, contact_id)
         if not db_contact:
@@ -83,12 +83,12 @@ def delete_contact(db: Session, contact_id: uuid.UUID) -> bool:
             
         db.delete(db_contact)
         db.commit()
-        logger.info(f"Contato removido com sucesso: {contact_id}")
+        logger.info(f"Contact removed successfully: {contact_id}")
         return True
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao remover contato {contact_id}: {str(e)}")
+        logger.error(f"Error removing contact {contact_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao remover contato"
+            detail="Error removing contact"
         ) 

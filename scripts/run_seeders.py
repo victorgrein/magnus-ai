@@ -1,6 +1,6 @@
 """
-Script principal para executar todos os seeders em sequência.
-Verifica as dependências entre os seeders e executa na ordem correta.
+Main script to run all seeders in sequence.
+Checks dependencies between seeders and runs them in the correct order.
 """
 
 import os
@@ -9,11 +9,11 @@ import logging
 import argparse
 from dotenv import load_dotenv
 
-# Configurar logging
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Importar seeders
+# Import seeders
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scripts.seeders.admin_seeder import create_admin_user
 from scripts.seeders.client_seeder import create_demo_client_and_user
@@ -23,28 +23,28 @@ from scripts.seeders.tool_seeder import create_tools
 from scripts.seeders.contact_seeder import create_demo_contacts
 
 def setup_environment():
-    """Configura o ambiente para os seeders"""
+    """Configure the environment for seeders"""
     load_dotenv()
     
-    # Verificar se as variáveis de ambiente essenciais estão definidas
+    # Check if essential environment variables are defined
     required_vars = ["POSTGRES_CONNECTION_STRING"]
     missing_vars = [var for var in required_vars if not os.getenv(var)]
     
     if missing_vars:
-        logger.error(f"Variáveis de ambiente necessárias não definidas: {', '.join(missing_vars)}")
+        logger.error(f"Required environment variables not defined: {', '.join(missing_vars)}")
         return False
         
     return True
 
 def run_seeders(seeders):
     """
-    Executa os seeders especificados
+    Run the specified seeders
     
     Args:
-        seeders (list): Lista de seeders para executar
+        seeders (list): List of seeders to run
         
     Returns:
-        bool: True se todos os seeders foram executados com sucesso, False caso contrário
+        bool: True if all seeders were executed successfully, False otherwise
     """
     all_seeders = {
         "admin": create_admin_user,
@@ -55,58 +55,58 @@ def run_seeders(seeders):
         "contacts": create_demo_contacts
     }
     
-    # Define a ordem correta de execução (dependências)
+    # Define the correct execution order (dependencies)
     seeder_order = ["admin", "client", "mcp_servers", "tools", "agents", "contacts"]
     
-    # Se nenhum seeder for especificado, executar todos
+    # If no seeder is specified, run all
     if not seeders:
         seeders = seeder_order
     else:
-        # Verificar se todos os seeders especificados existem
+        # Check if all specified seeders exist
         invalid_seeders = [s for s in seeders if s not in all_seeders]
         if invalid_seeders:
-            logger.error(f"Seeders inválidos: {', '.join(invalid_seeders)}")
-            logger.info(f"Seeders disponíveis: {', '.join(all_seeders.keys())}")
+            logger.error(f"Invalid seeders: {', '.join(invalid_seeders)}")
+            logger.info(f"Available seeders: {', '.join(all_seeders.keys())}")
             return False
         
-        # Garantir que seeders sejam executados na ordem correta
+        # Ensure seeders are executed in the correct order
         seeders = [s for s in seeder_order if s in seeders]
     
-    # Executar seeders
+    # Run seeders
     success = True
     for seeder_name in seeders:
-        logger.info(f"Executando seeder: {seeder_name}")
+        logger.info(f"Running seeder: {seeder_name}")
         
         try:
             seeder_func = all_seeders[seeder_name]
             if not seeder_func():
-                logger.error(f"Falha ao executar seeder: {seeder_name}")
+                logger.error(f"Failed to run seeder: {seeder_name}")
                 success = False
         except Exception as e:
-            logger.error(f"Erro ao executar seeder {seeder_name}: {str(e)}")
+            logger.error(f"Error running seeder {seeder_name}: {str(e)}")
             success = False
     
     return success
 
 def main():
-    """Função principal"""
-    parser = argparse.ArgumentParser(description='Executa seeders para popular o banco de dados')
-    parser.add_argument('--seeders', nargs='+', help='Seeders para executar (admin, client, agents, mcp_servers, tools, contacts)')
+    """Main function"""
+    parser = argparse.ArgumentParser(description='Run seeders to populate the database')
+    parser.add_argument('--seeders', nargs='+', help='Seeders to run (admin, client, agents, mcp_servers, tools, contacts)')
     args = parser.parse_args()
     
-    # Configurar ambiente
+    # Configure environment
     if not setup_environment():
         sys.exit(1)
     
-    # Executar seeders
+    # Run seeders
     success = run_seeders(args.seeders)
     
-    # Saída
+    # Output
     if success:
-        logger.info("Todos os seeders foram executados com sucesso")
+        logger.info("All seeders were executed successfully")
         sys.exit(0)
     else:
-        logger.error("Houve erros ao executar os seeders")
+        logger.error("There were errors running the seeders")
         sys.exit(1)
 
 if __name__ == "__main__":
