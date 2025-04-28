@@ -78,7 +78,7 @@ async def get_session(
         )
 
     # Verify if the session's agent belongs to the user's client
-    agent_id = uuid.UUID(session.agent_id) if session.agent_id else None
+    agent_id = uuid.UUID(session.app_name) if session.app_name else None
     if agent_id:
         agent = agent_service.get_agent(db, agent_id)
         if agent:
@@ -104,7 +104,7 @@ async def get_agent_messages(
         )
 
     # Verify if the session's agent belongs to the user's client
-    agent_id = uuid.UUID(session.agent_id) if session.agent_id else None
+    agent_id = uuid.UUID(session.app_name) if session.app_name else None
     if agent_id:
         agent = agent_service.get_agent(db, agent_id)
         if agent:
@@ -130,7 +130,7 @@ async def remove_session(
         )
 
     # Verify if the session's agent belongs to the user's client
-    agent_id = uuid.UUID(session.agent_id) if session.agent_id else None
+    agent_id = uuid.UUID(session.app_name) if session.app_name else None
     if agent_id:
         agent = agent_service.get_agent(db, agent_id)
         if agent:

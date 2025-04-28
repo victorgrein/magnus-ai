@@ -5,6 +5,7 @@ Evo AI is an open-source platform for creating and managing AI agents, enabling 
 ## 🚀 Overview
 
 The Evo AI platform allows:
+
 - Creation and management of AI agents
 - Integration with different language models
 - Client and contact management
@@ -52,33 +53,40 @@ src/
 ## 🔧 Installation
 
 1. Clone the repository:
+
 ```bash
 git clone https://github.com/your-username/evo-ai.git
 cd evo-ai
 ```
 
 2. Create a virtual environment:
+
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # Linux/Mac
+make venv
+source venv/bin/activate  # Linux/Mac
 # or
-.venv\Scripts\activate  # Windows
+venv\Scripts\activate  # Windows
 ```
 
 3. Install dependencies:
+
 ```bash
-pip install -r requirements.txt
+make install      # Para instalação básica
+# ou
+make install-dev  # Para instalação com dependências de desenvolvimento
 ```
 
 4. Set up environment variables:
+
 ```bash
 cp .env.example .env
 # Edit the .env file with your settings
 ```
 
 5. Run migrations:
+
 ```bash
-make upgrade
+make alembic-upgrade
 ```
 
 ## 🔐 Authentication
@@ -92,31 +100,37 @@ The API uses JWT (JSON Web Token) authentication. To access the endpoints, you n
 ### Authentication Flow
 
 1. **User Registration**:
+
 ```http
 POST /api/v1/auth/register
 ```
 
 2. **Email Verification**:
-An email will be sent containing a verification link.
+   An email will be sent containing a verification link.
 
 3. **Login**:
+
 ```http
 POST /api/v1/auth/login
 ```
+
 Returns a JWT token to be used in requests.
 
 4. **Password Recovery (if needed)**:
+
 ```http
 POST /api/v1/auth/forgot-password
 POST /api/v1/auth/reset-password
 ```
 
 5. **Recover logged user data**:
+
 ```http
 POST /api/v1/auth/me
 ```
 
 ### Example Usage with curl:
+
 ```bash
 # Login
 curl -X POST "http://localhost:8000/api/v1/auth/login" \
@@ -129,6 +143,7 @@ curl -X GET "http://localhost:8000/api/v1/clients/" \
 ```
 
 ### Access Control
+
 - Regular users (associated with a client) only have access to their client's resources
 - Admin users have access to all resources
 - Certain operations (such as creating MCP servers) are restricted to administrators only
@@ -149,7 +164,9 @@ All email templates feature responsive design, clear call-to-action buttons, and
 ## 🚀 Running the Project
 
 ```bash
-make run
+make run         # Para desenvolvimento com reload automático
+# ou
+make run-prod    # Para produção com múltiplos workers
 ```
 
 The API will be available at `http://localhost:8000`
@@ -157,6 +174,7 @@ The API will be available at `http://localhost:8000`
 ## 📚 API Documentation
 
 The interactive API documentation is available at:
+
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
 
@@ -185,7 +203,33 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [SQLAlchemy](https://www.sqlalchemy.org/)
 - [Google ADK](https://github.com/google/adk)
 
-## Running with Docker
+## 👨‍💻 Development Commands
+
+```bash
+# Database migrations
+make init                       # Inicializar Alembic
+make alembic-revision message="description"  # Criar nova migração
+make alembic-upgrade            # Atualizar banco para última versão
+make alembic-downgrade          # Reverter última migração
+make alembic-migrate message="description"  # Criar e aplicar migração
+make alembic-reset              # Resetar banco de dados
+
+# Seeders
+make seed-admin                 # Criar administrador padrão
+make seed-client                # Criar cliente padrão
+make seed-agents                # Criar agentes de exemplo
+make seed-mcp-servers           # Criar servidores MCP de exemplo
+make seed-tools                 # Criar ferramentas de exemplo
+make seed-contacts              # Criar contatos de exemplo
+make seed-all                   # Executar todos os seeders
+
+# Verificação de código
+make lint                       # Verificar código com flake8
+make format                     # Formatar código com black
+make clear-cache                # Limpar cache do projeto
+```
+
+## 🐳 Running with Docker
 
 To facilitate deployment and execution of the application, we provide Docker and Docker Compose configurations.
 
@@ -199,26 +243,31 @@ To facilitate deployment and execution of the application, we provide Docker and
 1. Configure the necessary environment variables in the `.env` file at the root of the project (or use system environment variables)
 
 2. Build the Docker image:
+
 ```bash
 make docker-build
 ```
 
 3. Start the services (API, PostgreSQL, and Redis):
+
 ```bash
 make docker-up
 ```
 
 4. Populate the database with initial data:
+
 ```bash
 make docker-seed
 ```
 
 5. To check application logs:
+
 ```bash
 make docker-logs
 ```
 
 6. To stop the services:
+
 ```bash
 make docker-down
 ```
@@ -233,6 +282,7 @@ make docker-down
 ### Persistent Volumes
 
 Docker Compose sets up persistent volumes for:
+
 - PostgreSQL data
 - Redis data
 - Application logs directory
