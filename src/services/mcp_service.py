@@ -74,6 +74,15 @@ class MCPService:
             logger.warning(f"Removidas {removed_count} ferramentas incompatíveis.")
 
         return filtered_tools
+    
+    def _filter_tools_by_agent(self, tools: List[Any], agent_tools: List[str]) -> List[Any]:
+        """Filtra ferramentas compatíveis com o agente."""
+        filtered_tools = []
+        for tool in tools:
+            logger.info(f"Ferramenta: {tool.name}")
+            if tool.name in agent_tools:
+                filtered_tools.append(tool)
+        return filtered_tools
 
     async def build_tools(self, mcp_config: Dict[str, Any], db: Session) -> Tuple[List[Any], AsyncExitStack]:
         """Constrói uma lista de ferramentas a partir de múltiplos servidores MCP."""
@@ -109,6 +118,10 @@ class MCPService:
                 if tools and exit_stack:
                     # Filtra ferramentas incompatíveis
                     filtered_tools = self._filter_incompatible_tools(tools)
+                    
+                    # Filtra ferramentas compatíveis com o agente
+                    agent_tools = server.get('tools', [])
+                    filtered_tools = self._filter_tools_by_agent(filtered_tools, agent_tools)
                     self.tools.extend(filtered_tools)
                     
                     # Registra o exit_stack com o AsyncExitStack

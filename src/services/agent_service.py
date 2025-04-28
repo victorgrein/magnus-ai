@@ -66,29 +66,29 @@ def create_agent(db: Session, agent: AgentCreate) -> Agent:
     """Cria um novo agente"""
     try:
         # Validação adicional de sub-agentes
-        if agent.type != 'llm':
+        if agent.type != "llm":
             if not isinstance(agent.config, dict):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Configuração inválida: deve ser um objeto com sub_agents"
+                    detail="Configuração inválida: deve ser um objeto com sub_agents",
                 )
-            
-            if 'sub_agents' not in agent.config:
+
+            if "sub_agents" not in agent.config:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Configuração inválida: sub_agents é obrigatório para agentes do tipo sequential, parallel ou loop"
+                    detail="Configuração inválida: sub_agents é obrigatório para agentes do tipo sequential, parallel ou loop",
                 )
-            
-            if not agent.config['sub_agents']:
+
+            if not agent.config["sub_agents"]:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Configuração inválida: sub_agents não pode estar vazio"
+                    detail="Configuração inválida: sub_agents não pode estar vazio",
                 )
-            
-            if not validate_sub_agents(db, agent.config['sub_agents']):
+
+            if not validate_sub_agents(db, agent.config["sub_agents"]):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Um ou mais sub-agentes não existem"
+                    detail="Um ou mais sub-agentes não existem",
                 )
 
         # Processa a configuração antes de criar o agente
@@ -114,9 +114,13 @@ def create_agent(db: Session, agent: AgentCreate) -> Agent:
                                 detail=f"Variável de ambiente '{env_key}' não fornecida para o servidor MCP {mcp_server.name}",
                             )
 
-                    # Adiciona o servidor processado
+                    # Adiciona o servidor processado com suas ferramentas
                     processed_servers.append(
-                        {"id": str(server["id"]), "envs": server["envs"]}
+                        {
+                            "id": str(server["id"]),
+                            "envs": server["envs"],
+                            "tools": server["tools"],
+                        }
                     )
 
                 config["mcp_servers"] = processed_servers
@@ -147,7 +151,7 @@ def create_agent(db: Session, agent: AgentCreate) -> Agent:
         logger.error(f"Erro ao criar agente: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao criar agente"
+            detail="Erro ao criar agente",
         )
 
 
@@ -186,7 +190,11 @@ async def update_agent(
 
                     # Adiciona o servidor processado
                     processed_servers.append(
-                        {"id": str(server["id"]), "envs": server["envs"]}
+                        {
+                            "id": str(server["id"]),
+                            "envs": server["envs"],
+                            "tools": server["tools"],
+                        }
                     )
 
                 config["mcp_servers"] = processed_servers

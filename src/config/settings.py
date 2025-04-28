@@ -18,14 +18,6 @@ class Settings(BaseSettings):
         "postgresql://postgres:root@localhost:5432/evo_ai"
     )
     
-    # Configurações do OpenAI
-    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
-    
-    # Configurações da aplicação
-    APP_NAME: str = "app"
-    USER_ID: str = "user_1"
-    SESSION_ID: str = "session_001"
-    
     # Configurações de logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     LOG_DIR: str = "logs"

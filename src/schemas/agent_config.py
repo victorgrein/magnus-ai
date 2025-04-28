@@ -14,6 +14,7 @@ class MCPServerConfig(BaseModel):
     """Configuração de um servidor MCP"""
     id: UUID
     envs: Dict[str, str] = Field(default_factory=dict, description="Variáveis de ambiente do servidor")
+    tools: List[str] = Field(default_factory=list, description="Lista de ferramentas do servidor")
 
     class Config:
         from_attributes = True

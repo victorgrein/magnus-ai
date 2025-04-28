@@ -79,6 +79,7 @@ class MCPServer(Base):
     description = Column(Text, nullable=True)
     config_json = Column(JSON, nullable=False, default={})
     environments = Column(JSON, nullable=False, default={})
+    tools = Column(JSON, nullable=False, default=[])
     type = Column(String, nullable=False, default="official")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -97,3 +98,15 @@ class Tool(Base):
     environments = Column(JSON, nullable=False, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class Session(Base):
+    __tablename__ = "sessions"
+    # A diretiva abaixo faz com que o Alembic ignore esta tabela nas migrações
+    __table_args__ = {'extend_existing': True, 'info': {'skip_autogenerate': True}}
+    
+    id = Column(String, primary_key=True)
+    app_name = Column(String)
+    user_id = Column(String)
+    state = Column(JSON)
+    create_time = Column(DateTime(timezone=True))
+    update_time = Column(DateTime(timezone=True))

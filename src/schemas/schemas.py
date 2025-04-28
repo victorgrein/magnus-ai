@@ -109,6 +109,7 @@ class MCPServerBase(BaseModel):
     description: Optional[str] = None
     config_json: Dict[str, Any] = Field(default_factory=dict)
     environments: Dict[str, Any] = Field(default_factory=dict)
+    tools: List[str] = Field(default_factory=list)
     type: str = Field(default="official")
 
 class MCPServerCreate(MCPServerBase):

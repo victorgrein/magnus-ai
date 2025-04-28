@@ -48,7 +48,7 @@ async def run_agent(
         logger.info("Configurando Runner")
         agent_runner = Runner(
             agent=root_agent,
-            app_name=get_root_agent.name,
+            app_name=agent_id,
             session_service=session_service,
             artifact_service=artifacts_service,
             memory_service=memory_service,
@@ -57,7 +57,7 @@ async def run_agent(
 
         logger.info(f"Buscando sessão para contato {contact_id}")
         session = session_service.get_session(
-            app_name=root_agent.name,
+            app_name=agent_id,
             user_id=contact_id,
             session_id=session_id,
         )
@@ -65,7 +65,7 @@ async def run_agent(
         if session is None:
             logger.info(f"Criando nova sessão para contato {contact_id}")
             session = session_service.create_session(
-                app_name=root_agent.name,
+                app_name=agent_id,
                 user_id=contact_id,
                 session_id=session_id,
             )
@@ -85,7 +85,7 @@ async def run_agent(
                     logger.info(f"Resposta final recebida: {final_response_text}")
         
             completed_session = session_service.get_session(
-                app_name=root_agent.name,
+                app_name=agent_id,
                 user_id=contact_id,
                 session_id=session_id,
             )
