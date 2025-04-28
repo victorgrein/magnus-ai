@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, List
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 import secrets
@@ -36,14 +36,38 @@ class Settings(BaseSettings):
     # TTL do cache de ferramentas em segundos (1 hora)
     TOOLS_CACHE_TTL: int = int(os.getenv("TOOLS_CACHE_TTL", 3600))
     
-    # Configurações da API
-    API_KEY: str = secrets.token_urlsafe(32)  # Gera uma API Key aleatória se não for definida
-    API_KEY_HEADER: str = "X-API-Key"
+    # Configurações JWT
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
+    JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
+    JWT_EXPIRATION_TIME: int = int(os.getenv("JWT_EXPIRATION_TIME", 30))  # Em minutos
+    
+    # Configurações SendGrid
+    SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
+    EMAIL_FROM: str = os.getenv("EMAIL_FROM", "noreply@yourdomain.com")
+    APP_URL: str = os.getenv("APP_URL", "http://localhost:8000")
     
     # Configurações do Servidor
-    HOST: str = "0.0.0.0"
-    PORT: int = 8000
-    DEBUG: bool = False
+    HOST: str = os.getenv("HOST", "0.0.0.0")
+    PORT: int = int(os.getenv("PORT", 8000))
+    DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+    
+    # Configurações de CORS
+    CORS_ORIGINS: List[str] = os.getenv("CORS_ORIGINS", "*").split(",")
+    
+    # Configurações de Token
+    TOKEN_EXPIRY_HOURS: int = int(os.getenv("TOKEN_EXPIRY_HOURS", 24))  # Tokens de verificação/reset
+    
+    # Configurações de Segurança
+    PASSWORD_MIN_LENGTH: int = int(os.getenv("PASSWORD_MIN_LENGTH", 8))
+    MAX_LOGIN_ATTEMPTS: int = int(os.getenv("MAX_LOGIN_ATTEMPTS", 5))
+    LOGIN_LOCKOUT_MINUTES: int = int(os.getenv("LOGIN_LOCKOUT_MINUTES", 30))
+    
+    # Configurações de Seeders
+    ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@evoai.com")
+    ADMIN_INITIAL_PASSWORD: str = os.getenv("ADMIN_INITIAL_PASSWORD", "senhaforte123")
+    DEMO_EMAIL: str = os.getenv("DEMO_EMAIL", "demo@exemplo.com")
+    DEMO_PASSWORD: str = os.getenv("DEMO_PASSWORD", "demo123")
+    DEMO_CLIENT_NAME: str = os.getenv("DEMO_CLIENT_NAME", "Cliente Demo")
     
     class Config:
         env_file = ".env"

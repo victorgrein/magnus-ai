@@ -1,4 +1,4 @@
-.PHONY: migrate init revision upgrade downgrade run
+.PHONY: migrate init revision upgrade downgrade run seed-admin seed-client seed-agents seed-mcp-servers seed-tools seed-contacts seed-all
 
 # Comandos do Alembic
 init:
@@ -35,3 +35,25 @@ alembic-reset:
 # Comando para forçar upgrade com CASCADE
 alembic-upgrade-cascade:
 	psql -U postgres -d a2a_saas -c "DROP TABLE IF EXISTS events CASCADE; DROP TABLE IF EXISTS sessions CASCADE; DROP TABLE IF EXISTS user_states CASCADE; DROP TABLE IF EXISTS app_states CASCADE;" && alembic upgrade head
+
+# Comandos para executar seeders
+seed-admin:
+	python -m scripts.seeders.admin_seeder
+
+seed-client:
+	python -m scripts.seeders.client_seeder
+
+seed-agents:
+	python -m scripts.seeders.agent_seeder
+
+seed-mcp-servers:
+	python -m scripts.seeders.mcp_server_seeder
+
+seed-tools:
+	python -m scripts.seeders.tool_seeder
+
+seed-contacts:
+	python -m scripts.seeders.contact_seeder
+
+seed-all:
+	python -m scripts.run_seeders

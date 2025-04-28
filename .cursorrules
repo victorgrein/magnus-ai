@@ -1,105 +1,143 @@
-# A2A SaaS - Regras e Estrutura do Projeto
+# Evo AI - Project Rules and Structure
 
-## Tecnologias Principais
-- FastAPI: Framework web para construção da API
-- SQLAlchemy: ORM para interação com o banco de dados
-- Alembic: Sistema de migrações do banco de dados
-- PostgreSQL: Banco de dados principal
-- Pydantic: Validação e serialização de dados
-- Uvicorn: Servidor ASGI para execução da aplicação
-- Redis: Cache e gerenciamento de sessões
+## Main Technologies
+- FastAPI: Web framework for building the API
+- SQLAlchemy: ORM for database interaction
+- Alembic: Database migration system
+- PostgreSQL: Main database
+- Pydantic: Data validation and serialization
+- Uvicorn: ASGI server for application execution
+- Redis: Cache and session management
+- JWT: Secure token authentication
+- Bcrypt: Secure password hashing
+- SendGrid: Email service for verification
 
-## Estrutura do Projeto
+## Project Structure
 ```
 src/
 ├── api/
-│   └── routes.py          # Definição das rotas da API
+│   ├── routes.py          # API routes definition
+│   ├── auth_routes.py     # Authentication routes (login, registration, etc.)
+│   └── admin_routes.py    # Protected admin routes
 ├── config/
-│   ├── database.py        # Configuração do banco de dados
-│   └── settings.py        # Configurações gerais
+│   ├── database.py        # Database configuration
+│   └── settings.py        # General settings
 ├── core/
-│   └── middleware.py      # Middleware de autenticação
+│   ├── middleware.py      # API Key middleware (legacy)
+│   └── jwt_middleware.py  # JWT authentication middleware
 ├── models/
-│   └── models.py          # Modelos SQLAlchemy
+│   └── models.py          # SQLAlchemy models
 ├── schemas/
-│   └── schemas.py         # Schemas Pydantic
-└── services/
-    ├── agent_service.py   # Lógica de negócio para agentes
-    ├── client_service.py  # Lógica de negócio para clientes
-    ├── contact_service.py # Lógica de negócio para contatos
-    ├── mcp_server_service.py # Lógica de negócio para servidores MCP
-    └── tool_service.py    # Lógica de negócio para ferramentas
+│   ├── schemas.py         # Main Pydantic schemas
+│   ├── user.py            # User and authentication schemas
+│   └── audit.py           # Audit logs schemas
+├── services/
+│   ├── agent_service.py   # Business logic for agents
+│   ├── client_service.py  # Business logic for clients
+│   ├── contact_service.py # Business logic for contacts
+│   ├── mcp_server_service.py # Business logic for MCP servers
+│   ├── tool_service.py    # Business logic for tools
+│   ├── user_service.py    # User and authentication logic
+│   ├── auth_service.py    # JWT authentication logic
+│   ├── email_service.py   # Email sending service
+│   └── audit_service.py   # Audit logs logic
+└── utils/
+    └── security.py        # Security utilities (JWT, hash)
 ```
 
-## Padrões de Código
+## Code Standards
 
 ### Schemas (Pydantic)
-- Usar `BaseModel` como base para todos os schemas
-- Definir campos com tipos explícitos
-- Usar `Optional` para campos opcionais
-- Usar `Field` para validações e valores padrão
-- Implementar `Config` com `from_attributes = True` para modelos
+- Use `BaseModel` as base for all schemas
+- Define fields with explicit types
+- Use `Optional` for optional fields
+- Use `Field` for validations and default values
+- Implement `Config` with `from_attributes = True` for models
+- Use `EmailStr` for email validation
 
-### Serviços
-- Tratamento de erros com `SQLAlchemyError`
-- Logging consistente com mensagens em português
-- Tipagem forte com `Optional` para retornos nulos
-- Documentação com docstrings
-- Rollback em caso de erro
-- Retornos padronizados
+### Services
+- Error handling with `SQLAlchemyError`
+- Consistent logging with messages in English
+- Strong typing with `Optional` for null returns
+- Documentation with docstrings
+- Rollback in case of error
+- Standardized returns
+- Use transactions for multiple operations
 
-### Rotas
-- Status codes apropriados (201 para criação, 204 para deleção)
-- Tratamento de erros com `HTTPException`
-- Mensagens de erro em português
-- Paginação nas listagens
-- Validação de entrada com schemas
-- Autenticação via API Key em todas as rotas
+### Routes
+- Appropriate status codes (201 for creation, 204 for deletion)
+- Error handling with `HTTPException`
+- Error messages in English
+- Pagination for list endpoints
+- Input validation with schemas
+- JWT authentication for all protected routes
+- Use of asynchronous functions with `async def`
 
-### Migrações
-- Usar Alembic para gerenciamento de migrações
-- Nomes descritivos para as migrações
-- Manter histórico de alterações
-- Usar CASCADE quando necessário para remover dependências
+### Migrations
+- Use Alembic for migration management
+- Descriptive names for migrations
+- Maintain change history
+- Use CASCADE when necessary to remove dependencies
 
-### Autenticação
-- Usar API Key para autenticação
-- Gerar API Key automaticamente no primeiro acesso
-- Armazenar API Key no arquivo .env
-- Validar API Key em todas as rotas
-- Logging de tentativas de acesso inválidas
+### Authentication
+- Use JWT for authentication with OAuth2PasswordBearer
+- JWT tokens with expiration time defined in settings
+- Access token containing essential user data (is_admin, client_id, etc.)
+- Resource ownership verification based on client_id
+- Protection of administrative routes with permission verification
+- Email verification system via tokens
+- Secure password recovery with one-time tokens
 
-### Variáveis de Ambiente
-- Usar arquivo .env para configurações sensíveis
-- Manter .env.example atualizado
-- Documentar todas as variáveis de ambiente
-- Usar valores padrão seguros
-- Validar variáveis obrigatórias
+### Audit
+- Record important administrative actions
+- Automatic collection of contextual data (IP, user-agent)
+- Relationship with user who performed the action
+- Filtering and querying by different criteria
 
-## Convenções
-- Nomes de variáveis e funções em inglês
-- Mensagens de log e erro em português
-- Documentação em português
-- Indentação com 4 espaços
-- Máximo de 79 caracteres por linha
+### Environment Variables
+- Use .env file for sensitive settings
+- Keep .env.example updated
+- Document all environment variables
+- Use safe default values
+- Validate required variables
+- Clear separation between development and production configurations
 
-## Boas Práticas
-- Sempre validar entrada de dados
-- Implementar logging adequado
-- Tratar todos os erros possíveis
-- Manter consistência nos retornos
-- Documentar funções e classes
-- Seguir princípios SOLID
-- Manter testes atualizados
-- Proteger rotas com autenticação
-- Usar variáveis de ambiente para configurações sensíveis
+## Conventions
+- Variable and function names in English
+- Log and error messages in English
+- Documentation in English
+- Indentation with 4 spaces
+- Maximum of 79 characters per line
 
-## Comandos Úteis
-- `make run`: Inicia o servidor
-- `make alembic-revision message="descrição"`: Cria nova migração
-- `make alembic-upgrade`: Aplica migrações pendentes
-- `make alembic-downgrade`: Reverte última migração
-- `make alembic-migrate`: Cria e aplica nova migração
-- `make alembic-reset`: Reseta o banco de dados para o estado inicial
-- `make alembic-upgrade-cascade`: Força upgrade removendo dependências
-- `make clear-cache`: Limpa cache do projeto
+## Best Practices
+- Always validate input data
+- Implement appropriate logging
+- Handle all possible errors
+- Maintain consistency in returns
+- Document functions and classes
+- Follow SOLID principles
+- Keep tests updated
+- Protect routes with JWT authentication
+- Use environment variables for sensitive configurations
+- Implement resource ownership verification
+- Store passwords only with secure hash (bcrypt)
+- Implement appropriate expiration for tokens
+
+## Security
+- JWT tokens with limited lifetime
+- Email verification with one-time tokens
+- Secure password hashing with bcrypt and random salt
+- Audit system for administrative actions
+- Resource-based access control
+- Clear separation between regular users and administrators
+- Strict input validation with Pydantic
+
+## Useful Commands
+- `make run`: Start the server
+- `make alembic-revision message="description"`: Create new migration
+- `make alembic-upgrade`: Apply pending migrations
+- `make alembic-downgrade`: Revert last migration
+- `make alembic-migrate`: Create and apply new migration
+- `make alembic-reset`: Reset database to initial state
+- `make alembic-upgrade-cascade`: Force upgrade removing dependencies
+- `make clear-cache`: Clean project cache

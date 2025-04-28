@@ -11,3 +11,8 @@ litellm
 python-multipart
 alembic
 asyncpg
+# Novas dependências para autenticação
+python-jose[cryptography]
+passlib[bcrypt]
+sendgrid
+pydantic[email]

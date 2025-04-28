@@ -31,6 +31,17 @@ target_metadata = [Base.metadata]
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
+# Lista de tabelas a serem ignoradas na geração automática de migrações
+exclude_tables = ['sessions', 'events', 'app_states', 'user_states']
+
+def include_object(object, name, type_, reflected, compare_to):
+    """
+    Função de filtro para excluir determinadas tabelas da geração automática de migrações
+    """
+    if type_ == "table" and name in exclude_tables:
+        return False
+    return True
+
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -50,6 +61,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -87,6 +99,7 @@ def do_run_migrations(connection):
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()

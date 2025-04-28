@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, UUID, DateTime, ForeignKey, JSON, Text, BigInteger, CheckConstraint, Boolean
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship, backref
 from src.config.database import Base
 import uuid
 
@@ -10,6 +11,26 @@ class Client(Base):
     name = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=False)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=True)
+    is_active = Column(Boolean, default=False)
+    is_admin = Column(Boolean, default=False)
+    email_verified = Column(Boolean, default=False)
+    verification_token = Column(String, nullable=True)
+    verification_token_expiry = Column(DateTime(timezone=True), nullable=True)
+    password_reset_token = Column(String, nullable=True)
+    password_reset_expiry = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    # Relacionamento com Client (One-to-One, opcional para administradores)
+    client = relationship("Client", backref=backref("user", uselist=False, cascade="all, delete-orphan"))
 
 class Contact(Base):
     __tablename__ = "contacts"
@@ -110,3 +131,19 @@ class Session(Base):
     state = Column(JSON)
     create_time = Column(DateTime(timezone=True))
     update_time = Column(DateTime(timezone=True))
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    action = Column(String, nullable=False)
+    resource_type = Column(String, nullable=False)
+    resource_id = Column(String, nullable=True)
+    details = Column(JSON, nullable=True)
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relacionamento com User
+    user = relationship("User", backref="audit_logs")
