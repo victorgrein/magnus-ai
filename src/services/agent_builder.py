@@ -13,11 +13,10 @@ from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LlmResponse, LlmRequest
 from google.adk.tools import load_memory
 
-from typing import Optional
-import logging
-import os
 import requests
+import os
 from datetime import datetime
+
 logger = setup_logger(__name__)
 
 
@@ -83,7 +82,7 @@ def before_model_callback(
                 llm_request.config.system_instruction = modified_text
 
                 logger.debug(
-                    f"📝 System instruction updated with search results and history"
+                    "📝 System instruction updated with search results and history"
                 )
             else:
                 logger.warning("⚠️ No results found in the search")
@@ -180,11 +179,13 @@ class AgentBuilder:
         mcp_tools = []
         mcp_exit_stack = None
         if agent.config.get("mcp_servers"):
-            mcp_tools, mcp_exit_stack = await self.mcp_service.build_tools(agent.config, self.db)
+            mcp_tools, mcp_exit_stack = await self.mcp_service.build_tools(
+                agent.config, self.db
+            )
 
         # Combine all tools
         all_tools = custom_tools + mcp_tools
-            
+
         now = datetime.now()
         current_datetime = now.strftime("%d/%m/%Y %H:%M")
         current_day_of_week = now.strftime("%A")
@@ -201,10 +202,13 @@ class AgentBuilder:
 
         # Check if load_memory is enabled
         # before_model_callback_func = None
-        if agent.config.get("load_memory") == True:
+        if agent.config.get("load_memory"):
             all_tools.append(load_memory)
             # before_model_callback_func = before_model_callback
-            formatted_prompt = formatted_prompt + "\n\n<memory_instructions>ALWAYS use the load_memory tool to retrieve knowledge for your context</memory_instructions>\n\n"
+            formatted_prompt = (
+                formatted_prompt
+                + "\n\n<memory_instructions>ALWAYS use the load_memory tool to retrieve knowledge for your context</memory_instructions>\n\n"
+            )
 
         return (
             LlmAgent(

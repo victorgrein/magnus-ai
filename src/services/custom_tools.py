@@ -6,6 +6,7 @@ from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+
 class CustomToolBuilder:
     def __init__(self):
         self.tools = []
@@ -53,7 +54,9 @@ class CustomToolBuilder:
 
                 # Adds default values to query params if they are not present
                 for param, value in values.items():
-                    if param not in query_params and param not in parameters.get("path_params", {}):
+                    if param not in query_params and param not in parameters.get(
+                        "path_params", {}
+                    ):
                         query_params[param] = value
 
                 # Processa body parameters
@@ -64,7 +67,11 @@ class CustomToolBuilder:
 
                 # Adds default values to body if they are not present
                 for param, value in values.items():
-                    if param not in body_data and param not in query_params and param not in parameters.get("path_params", {}):
+                    if (
+                        param not in body_data
+                        and param not in query_params
+                        and param not in parameters.get("path_params", {})
+                    ):
                         body_data[param] = value
 
                 # Makes the HTTP request
@@ -74,7 +81,7 @@ class CustomToolBuilder:
                     headers=processed_headers,
                     params=query_params,
                     json=body_data if body_data else None,
-                    timeout=error_handling.get("timeout", 30)
+                    timeout=error_handling.get("timeout", 30),
                 )
 
                 if response.status_code >= 400:
@@ -87,30 +94,34 @@ class CustomToolBuilder:
 
             except Exception as e:
                 logger.error(f"Error executing tool {name}: {str(e)}")
-                return json.dumps(error_handling.get("fallback_response", {
-                    "error": "tool_execution_error",
-                    "message": str(e)
-                }))
+                return json.dumps(
+                    error_handling.get(
+                        "fallback_response",
+                        {"error": "tool_execution_error", "message": str(e)},
+                    )
+                )
 
         # Adds dynamic docstring based on the configuration
         param_docs = []
-        
+
         # Adds path parameters
         for param, value in parameters.get("path_params", {}).items():
             param_docs.append(f"{param}: {value}")
-            
+
         # Adds query parameters
         for param, value in parameters.get("query_params", {}).items():
             if isinstance(value, list):
                 param_docs.append(f"{param}: List[{', '.join(value)}]")
             else:
                 param_docs.append(f"{param}: {value}")
-                
+
         # Adds body parameters
         for param, param_config in parameters.get("body_params", {}).items():
             required = "Required" if param_config.get("required", False) else "Optional"
-            param_docs.append(f"{param} ({param_config['type']}, {required}): {param_config['description']}")
-                
+            param_docs.append(
+                f"{param} ({param_config['type']}, {required}): {param_config['description']}"
+            )
+
         # Adds default values
         if values:
             param_docs.append("\nDefault values:")
@@ -119,10 +130,10 @@ class CustomToolBuilder:
 
         http_tool.__doc__ = f"""
         {description}
-        
+
         Parameters:
         {chr(10).join(param_docs)}
-        
+
         Returns:
         String containing the response in JSON format
         """
@@ -140,4 +151,4 @@ class CustomToolBuilder:
         for http_tool_config in tools_config.get("http_tools", []):
             self.tools.append(self._create_http_tool(http_tool_config))
 
-        return self.tools 
+        return self.tools

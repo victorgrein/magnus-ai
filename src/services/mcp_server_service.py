@@ -9,6 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def get_mcp_server(db: Session, server_id: uuid.UUID) -> Optional[MCPServer]:
     """Search for an MCP server by ID"""
     try:
@@ -21,8 +22,9 @@ def get_mcp_server(db: Session, server_id: uuid.UUID) -> Optional[MCPServer]:
         logger.error(f"Error searching for MCP server {server_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error searching for MCP server"
+            detail="Error searching for MCP server",
         )
+
 
 def get_mcp_servers(db: Session, skip: int = 0, limit: int = 100) -> List[MCPServer]:
     """Search for all MCP servers with pagination"""
@@ -32,8 +34,9 @@ def get_mcp_servers(db: Session, skip: int = 0, limit: int = 100) -> List[MCPSer
         logger.error(f"Error searching for MCP servers: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error searching for MCP servers"
+            detail="Error searching for MCP servers",
         )
+
 
 def create_mcp_server(db: Session, server: MCPServerCreate) -> MCPServer:
     """Create a new MCP server"""
@@ -49,19 +52,22 @@ def create_mcp_server(db: Session, server: MCPServerCreate) -> MCPServer:
         logger.error(f"Error creating MCP server: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error creating MCP server"
+            detail="Error creating MCP server",
         )
 
-def update_mcp_server(db: Session, server_id: uuid.UUID, server: MCPServerCreate) -> Optional[MCPServer]:
+
+def update_mcp_server(
+    db: Session, server_id: uuid.UUID, server: MCPServerCreate
+) -> Optional[MCPServer]:
     """Update an existing MCP server"""
     try:
         db_server = get_mcp_server(db, server_id)
         if not db_server:
             return None
-            
+
         for key, value in server.model_dump().items():
             setattr(db_server, key, value)
-            
+
         db.commit()
         db.refresh(db_server)
         logger.info(f"MCP server updated successfully: {server_id}")
@@ -71,8 +77,9 @@ def update_mcp_server(db: Session, server_id: uuid.UUID, server: MCPServerCreate
         logger.error(f"Error updating MCP server {server_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error updating MCP server"
+            detail="Error updating MCP server",
         )
+
 
 def delete_mcp_server(db: Session, server_id: uuid.UUID) -> bool:
     """Remove an MCP server"""
@@ -80,7 +87,7 @@ def delete_mcp_server(db: Session, server_id: uuid.UUID) -> bool:
         db_server = get_mcp_server(db, server_id)
         if not db_server:
             return False
-            
+
         db.delete(db_server)
         db.commit()
         logger.info(f"MCP server removed successfully: {server_id}")
@@ -90,5 +97,5 @@ def delete_mcp_server(db: Session, server_id: uuid.UUID) -> bool:
         logger.error(f"Error removing MCP server {server_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error removing MCP server"
-        ) 
+            detail="Error removing MCP server",
+        )

@@ -1,14 +1,17 @@
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from datetime import datetime
 import uuid
 
 from src.config.database import get_db
 from src.core.jwt_middleware import get_jwt_token, verify_admin
 from src.schemas.audit import AuditLogResponse, AuditLogFilter
 from src.services.audit_service import get_audit_logs, create_audit_log
-from src.services.user_service import get_admin_users, create_admin_user, deactivate_user
+from src.services.user_service import (
+    get_admin_users,
+    create_admin_user,
+    deactivate_user,
+)
 from src.schemas.user import UserResponse, AdminUserCreate
 
 router = APIRouter(
@@ -17,6 +20,7 @@ router = APIRouter(
     dependencies=[Depends(verify_admin)],
     responses={403: {"description": "Permission denied"}},
 )
+
 
 # Audit routes
 @router.get("/audit-logs", response_model=List[AuditLogResponse])
@@ -27,12 +31,12 @@ async def read_audit_logs(
 ):
     """
     Get audit logs with optional filters
-    
+
     Args:
         filters: Filters for log search
         db: Database session
         payload: JWT token payload
-        
+
     Returns:
         List[AuditLogResponse]: List of audit logs
     """
@@ -45,8 +49,9 @@ async def read_audit_logs(
         resource_type=filters.resource_type,
         resource_id=filters.resource_id,
         start_date=filters.start_date,
-        end_date=filters.end_date
+        end_date=filters.end_date,
     )
+
 
 # Admin routes
 @router.get("/users", response_model=List[UserResponse])
@@ -58,17 +63,18 @@ async def read_admin_users(
 ):
     """
     List admin users
-    
+
     Args:
         skip: Number of records to skip
         limit: Maximum number of records to return
         db: Database session
         payload: JWT token payload
-        
+
     Returns:
         List[UserResponse]: List of admin users
     """
     return get_admin_users(db, skip, limit)
+
 
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def create_new_admin_user(
@@ -79,16 +85,16 @@ async def create_new_admin_user(
 ):
     """
     Create a new admin user
-    
+
     Args:
         user_data: User data to be created
         request: FastAPI Request object
         db: Database session
         payload: JWT token payload
-        
+
     Returns:
         UserResponse: Created user data
-        
+
     Raises:
         HTTPException: If there is an error in creation
     """
@@ -97,17 +103,14 @@ async def create_new_admin_user(
     if not user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unable to identify the logged in user"
+            detail="Unable to identify the logged in user",
         )
-    
+
     # Create admin user
     user, message = create_admin_user(db, user_data)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=message
-        )
-    
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
+
     # Register action in audit log
     create_audit_log(
         db,
@@ -116,10 +119,11 @@ async def create_new_admin_user(
         resource_type="admin_user",
         resource_id=str(user.id),
         details={"email": user.email},
-        request=request
+        request=request,
     )
-    
+
     return user
+
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def deactivate_admin_user(
@@ -130,13 +134,13 @@ async def deactivate_admin_user(
 ):
     """
     Deactivate an admin user (does not delete, only deactivates)
-    
+
     Args:
         user_id: ID of the user to be deactivated
         request: FastAPI Request object
         db: Database session
         payload: JWT token payload
-        
+
     Raises:
         HTTPException: If there is an error in deactivation
     """
@@ -145,24 +149,21 @@ async def deactivate_admin_user(
     if not current_user_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Unable to identify the logged in user"
+            detail="Unable to identify the logged in user",
         )
-    
+
     # Do not allow deactivating yourself
     if str(user_id) == current_user_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Unable to deactivate your own user"
+            detail="Unable to deactivate your own user",
         )
-    
+
     # Deactivate user
     success, message = deactivate_user(db, user_id)
     if not success:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=message
-        )
-    
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
+
     # Register action in audit log
     create_audit_log(
         db,
@@ -171,5 +172,5 @@ async def deactivate_admin_user(
         resource_type="admin_user",
         resource_id=str(user_id),
         details=None,
-        request=request
-    ) 
+        request=request,
+    )

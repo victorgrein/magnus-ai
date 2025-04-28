@@ -16,17 +16,20 @@ logger = logging.getLogger(__name__)
 # Define OAuth2 authentication scheme with password flow
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+
+async def get_current_user(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+) -> User:
     """
     Get the current user from the JWT token
-    
+
     Args:
         token: JWT token
         db: Database session
-        
+
     Returns:
         User: Current user
-        
+
     Raises:
         HTTPException: If the token is invalid or the user is not found
     """
@@ -35,103 +38,108 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         detail="Invalid credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     try:
         # Decode the token
         payload = jwt.decode(
-            token, 
-            settings.JWT_SECRET_KEY, 
-            algorithms=[settings.JWT_ALGORITHM]
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
-        
+
         # Extract token data
         email: str = payload.get("sub")
         if email is None:
             logger.warning("Token without email (sub)")
             raise credentials_exception
-        
+
         # Check if the token has expired
         exp = payload.get("exp")
         if exp is None or datetime.fromtimestamp(exp) < datetime.utcnow():
             logger.warning(f"Token expired for {email}")
             raise credentials_exception
-        
+
         # Create TokenData object
         token_data = TokenData(
             sub=email,
             exp=datetime.fromtimestamp(exp),
             is_admin=payload.get("is_admin", False),
-            client_id=payload.get("client_id")
+            client_id=payload.get("client_id"),
         )
-        
+
     except JWTError as e:
         logger.error(f"Error decoding JWT token: {str(e)}")
         raise credentials_exception
-    
+
     # Search for user in the database
     user = get_user_by_email(db, email=token_data.sub)
     if user is None:
         logger.warning(f"User not found for email: {token_data.sub}")
         raise credentials_exception
-    
+
     if not user.is_active:
         logger.warning(f"Attempt to access inactive user: {user.email}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user"
         )
-    
+
     return user
 
-async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
+
+async def get_current_active_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
     """
     Check if the current user is active
-    
+
     Args:
         current_user: Current user
-        
+
     Returns:
         User: Current user if active
-        
+
     Raises:
         HTTPException: If the user is not active
     """
     if not current_user.is_active:
         logger.warning(f"Attempt to access inactive user: {current_user.email}")
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Inactive user"
+            status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user"
         )
     return current_user
 
-async def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
+
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
     """
     Check if the current user is an administrator
-    
+
     Args:
         current_user: Current user
-        
+
     Returns:
         User: Current user if administrator
-        
+
     Raises:
         HTTPException: If the user is not an administrator
     """
     if not current_user.is_admin:
-        logger.warning(f"Attempt to access admin by non-admin user: {current_user.email}")
+        logger.warning(
+            f"Attempt to access admin by non-admin user: {current_user.email}"
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied. Restricted to administrators."
+            detail="Access denied. Restricted to administrators.",
         )
     return current_user
+
 
 def create_access_token(user: User) -> str:
     """
     Create a JWT access token for the user
-    
+
     Args:
         user: User for which to create the token
-        
+
     Returns:
         str: JWT token
     """
@@ -140,10 +148,10 @@ def create_access_token(user: User) -> str:
         "sub": user.email,
         "is_admin": user.is_admin,
     }
-    
+
     # Include client_id only if not administrator and client_id is set
     if not user.is_admin and user.client_id:
         token_data["client_id"] = str(user.client_id)
-    
+
     # Create token
-    return create_jwt_token(token_data) 
+    return create_jwt_token(token_data)

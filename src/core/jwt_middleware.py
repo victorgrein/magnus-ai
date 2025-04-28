@@ -13,16 +13,17 @@ logger = logging.getLogger(__name__)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
+
 async def get_jwt_token(token: str = Depends(oauth2_scheme)) -> dict:
     """
     Extracts and validates the JWT token
-    
+
     Args:
         token: Token JWT
-        
+
     Returns:
         dict: Token payload data
-        
+
     Raises:
         HTTPException: If the token is invalid
     """
@@ -31,86 +32,90 @@ async def get_jwt_token(token: str = Depends(oauth2_scheme)) -> dict:
         detail="Invalid credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     try:
         payload = jwt.decode(
-            token, 
-            settings.JWT_SECRET_KEY, 
-            algorithms=[settings.JWT_ALGORITHM]
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
-        
+
         email: str = payload.get("sub")
         if email is None:
             logger.warning("Token without email (sub)")
             raise credentials_exception
-        
+
         exp = payload.get("exp")
         if exp is None or datetime.fromtimestamp(exp) < datetime.utcnow():
             logger.warning(f"Token expired for {email}")
             raise credentials_exception
-        
+
         return payload
-        
+
     except JWTError as e:
         logger.error(f"Error decoding JWT token: {str(e)}")
         raise credentials_exception
 
+
 async def verify_user_client(
     payload: dict = Depends(get_jwt_token),
     db: Session = Depends(get_db),
-    required_client_id: UUID = None
+    required_client_id: UUID = None,
 ) -> bool:
     """
     Verifies if the user is associated with the specified client
-    
+
     Args:
         payload: Token JWT payload
         db: Database session
         required_client_id: Client ID to be verified
-        
+
     Returns:
         bool: True se verificado com sucesso
-        
+
     Raises:
         HTTPException: If the user does not have permission
     """
     # Administrators have access to all clients
     if payload.get("is_admin", False):
         return True
-    
+
     # Para não-admins, verificar se o client_id corresponde
     user_client_id = payload.get("client_id")
     if not user_client_id:
-        logger.warning(f"Non-admin user without client_id in token: {payload.get('sub')}")
+        logger.warning(
+            f"Non-admin user without client_id in token: {payload.get('sub')}"
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User not associated with a client"
+            detail="User not associated with a client",
         )
-    
+
     # If no client_id is specified to verify, any client is valid
     if not required_client_id:
         return True
-    
+
     # Verify if the user's client_id corresponds to the required_client_id
     if str(user_client_id) != str(required_client_id):
-        logger.warning(f"Access denied: User {payload.get('sub')} tried to access resources of client {required_client_id}")
+        logger.warning(
+            f"Access denied: User {payload.get('sub')} tried to access resources of client {required_client_id}"
+        )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied to access resources of this client"
+            detail="Access denied to access resources of this client",
         )
-    
+
     return True
+
 
 async def verify_admin(payload: dict = Depends(get_jwt_token)) -> bool:
     """
     Verifies if the user is an administrator
-    
+
     Args:
         payload: Token JWT payload
-        
+
     Returns:
         bool: True if the user is an administrator
-        
+
     Raises:
         HTTPException: If the user is not an administrator
     """
@@ -118,26 +123,29 @@ async def verify_admin(payload: dict = Depends(get_jwt_token)) -> bool:
         logger.warning(f"Access denied to admin: User {payload.get('sub')}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied. Restricted to administrators."
+            detail="Access denied. Restricted to administrators.",
         )
-    
+
     return True
 
-def get_current_user_client_id(payload: dict = Depends(get_jwt_token)) -> Optional[UUID]:
+
+def get_current_user_client_id(
+    payload: dict = Depends(get_jwt_token),
+) -> Optional[UUID]:
     """
     Gets the ID of the client associated with the current user
-    
+
     Args:
         payload: Token JWT payload
-        
+
     Returns:
         Optional[UUID]: Client ID or None if the user is an administrator
     """
     if payload.get("is_admin", False):
         return None
-    
+
     client_id = payload.get("client_id")
     if client_id:
         return UUID(client_id)
-    
-    return None 
+
+    return None

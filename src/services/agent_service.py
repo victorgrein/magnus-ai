@@ -216,9 +216,7 @@ async def update_agent(
         return agent
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=500, detail=f"Error updating agent: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error updating agent: {str(e)}")
 
 
 def delete_agent(db: Session, agent_id: uuid.UUID) -> bool:

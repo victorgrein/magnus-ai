@@ -1,35 +1,30 @@
 import os
 import sys
 from pathlib import Path
-
-# Add the root directory to PYTHONPATH
-root_dir = Path(__file__).parent.parent
-sys.path.append(str(root_dir))
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.database import engine, Base
 from src.config.settings import settings
 from src.utils.logger import setup_logger
-from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
-from google.adk.sessions import DatabaseSessionService
-from google.adk.memory import InMemoryMemoryService
 
-# Initialize service instances
-session_service = DatabaseSessionService(db_url=settings.POSTGRES_CONNECTION_STRING)
-artifacts_service = InMemoryArtifactService()
-memory_service = InMemoryMemoryService()
+# Necessary for other modules
+from src.services.service_providers import session_service  # noqa: F401
+from src.services.service_providers import artifacts_service  # noqa: F401
+from src.services.service_providers import memory_service  # noqa: F401
 
-# Import routers after service initialization to avoid circular imports
-from src.api.auth_routes import router as auth_router
-from src.api.admin_routes import router as admin_router
-from src.api.chat_routes import router as chat_router
-from src.api.session_routes import router as session_router
-from src.api.agent_routes import router as agent_router
-from src.api.contact_routes import router as contact_router
-from src.api.mcp_server_routes import router as mcp_server_router
-from src.api.tool_routes import router as tool_router
-from src.api.client_routes import router as client_router
+import src.api.auth_routes
+import src.api.admin_routes
+import src.api.chat_routes
+import src.api.session_routes
+import src.api.agent_routes
+import src.api.contact_routes
+import src.api.mcp_server_routes
+import src.api.tool_routes
+import src.api.client_routes
+
+# Add the root directory to PYTHONPATH
+root_dir = Path(__file__).parent.parent
+sys.path.append(str(root_dir))
 
 # Configure logger
 logger = setup_logger(__name__)
@@ -52,14 +47,24 @@ app.add_middleware(
 
 # PostgreSQL configuration
 POSTGRES_CONNECTION_STRING = os.getenv(
-    "POSTGRES_CONNECTION_STRING",
-    "postgresql://postgres:root@localhost:5432/evo_ai"
+    "POSTGRES_CONNECTION_STRING", "postgresql://postgres:root@localhost:5432/evo_ai"
 )
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
 API_PREFIX = "/api/v1"
+
+# Define router references
+auth_router = src.api.auth_routes.router
+admin_router = src.api.admin_routes.router
+chat_router = src.api.chat_routes.router
+session_router = src.api.session_routes.router
+agent_router = src.api.agent_routes.router
+contact_router = src.api.contact_routes.router
+mcp_server_router = src.api.mcp_server_routes.router
+tool_router = src.api.tool_routes.router
+client_router = src.api.client_routes.router
 
 # Include routes
 app.include_router(auth_router, prefix=API_PREFIX)
@@ -79,5 +84,5 @@ def read_root():
         "message": "Welcome to Evo AI API",
         "documentation": "/docs",
         "version": settings.API_VERSION,
-        "auth": "To access the API, use JWT authentication via '/api/v1/auth/login'"
+        "auth": "To access the API, use JWT authentication via '/api/v1/auth/login'",
     }

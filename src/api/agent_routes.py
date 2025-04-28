@@ -7,10 +7,6 @@ from src.core.jwt_middleware import (
     get_jwt_token,
     verify_user_client,
 )
-from src.core.jwt_middleware import (
-    get_jwt_token,
-    verify_user_client,
-)
 from src.schemas.schemas import (
     Agent,
     AgentCreate,

@@ -1,14 +1,14 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
-from src.models.models import AuditLog, User
+from src.models.models import AuditLog
 from datetime import datetime
 from fastapi import Request
 from typing import Optional, Dict, Any, List
 import uuid
 import logging
-import json
 
 logger = logging.getLogger(__name__)
+
 
 def create_audit_log(
     db: Session,
@@ -17,11 +17,11 @@ def create_audit_log(
     resource_type: str,
     resource_id: Optional[str] = None,
     details: Optional[Dict[str, Any]] = None,
-    request: Optional[Request] = None
+    request: Optional[Request] = None,
 ) -> Optional[AuditLog]:
     """
     Create a new audit log
-    
+
     Args:
         db: Database session
         user_id: User ID that performed the action (or None if anonymous)
@@ -30,25 +30,25 @@ def create_audit_log(
         resource_id: Resource ID (optional)
         details: Additional details of the action (optional)
         request: FastAPI Request object (optional, to get IP and User-Agent)
-        
+
     Returns:
         Optional[AuditLog]: Created audit log or None in case of error
     """
     try:
         ip_address = None
         user_agent = None
-        
+
         if request:
-            ip_address = request.client.host if hasattr(request, 'client') else None
+            ip_address = request.client.host if hasattr(request, "client") else None
             user_agent = request.headers.get("user-agent")
-        
+
         # Convert details to serializable format
         if details:
             # Convert UUIDs to strings
             for key, value in details.items():
                 if isinstance(value, uuid.UUID):
                     details[key] = str(value)
-        
+
         audit_log = AuditLog(
             user_id=user_id,
             action=action,
@@ -56,20 +56,20 @@ def create_audit_log(
             resource_id=str(resource_id) if resource_id else None,
             details=details,
             ip_address=ip_address,
-            user_agent=user_agent
+            user_agent=user_agent,
         )
-        
+
         db.add(audit_log)
         db.commit()
         db.refresh(audit_log)
-        
+
         logger.info(
-            f"Audit log created: {action} in {resource_type}" +
-            (f" (ID: {resource_id})" if resource_id else "")
+            f"Audit log created: {action} in {resource_type}"
+            + (f" (ID: {resource_id})" if resource_id else "")
         )
-        
+
         return audit_log
-        
+
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error creating audit log: {str(e)}")
@@ -77,6 +77,7 @@ def create_audit_log(
     except Exception as e:
         logger.error(f"Unexpected error creating audit log: {str(e)}")
         return None
+
 
 def get_audit_logs(
     db: Session,
@@ -87,11 +88,11 @@ def get_audit_logs(
     resource_type: Optional[str] = None,
     resource_id: Optional[str] = None,
     start_date: Optional[datetime] = None,
-    end_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None,
 ) -> List[AuditLog]:
     """
     Get audit logs with optional filters
-    
+
     Args:
         db: Database session
         skip: Number of records to skip
@@ -102,35 +103,35 @@ def get_audit_logs(
         resource_id: Filter by resource ID
         start_date: Start date
         end_date: End date
-        
+
     Returns:
         List[AuditLog]: List of audit logs
     """
     query = db.query(AuditLog)
-    
+
     # Apply filters, if provided
     if user_id:
         query = query.filter(AuditLog.user_id == user_id)
-    
+
     if action:
         query = query.filter(AuditLog.action == action)
-    
+
     if resource_type:
         query = query.filter(AuditLog.resource_type == resource_type)
-    
+
     if resource_id:
         query = query.filter(AuditLog.resource_id == resource_id)
-    
+
     if start_date:
         query = query.filter(AuditLog.created_at >= start_date)
-    
+
     if end_date:
         query = query.filter(AuditLog.created_at <= end_date)
-    
+
     # Order by creation date (most recent first)
     query = query.order_by(AuditLog.created_at.desc())
-    
+
     # Apply pagination
     query = query.offset(skip).limit(limit)
-    
-    return query.all() 
+
+    return query.all()

@@ -22,9 +22,7 @@ async def run_agent(
     db: Session,
 ):
     try:
-        logger.info(
-            f"Starting execution of agent {agent_id} for contact {contact_id}"
-        )
+        logger.info(f"Starting execution of agent {agent_id} for contact {contact_id}")
         logger.info(f"Received message: {message}")
 
         get_root_agent = get_agent(db, agent_id)
@@ -77,15 +75,15 @@ async def run_agent(
                 if event.is_final_response() and event.content and event.content.parts:
                     final_response_text = event.content.parts[0].text
                     logger.info(f"Final response received: {final_response_text}")
-        
+
             completed_session = session_service.get_session(
                 app_name=agent_id,
                 user_id=contact_id,
                 session_id=session_id,
             )
-            
+
             memory_service.add_session_to_memory(completed_session)
-        
+
         finally:
             # Ensure the exit_stack is closed correctly
             if exit_stack:

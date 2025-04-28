@@ -16,17 +16,18 @@ os.makedirs(templates_dir, exist_ok=True)
 # Configure Jinja2 with the templates directory
 env = Environment(
     loader=FileSystemLoader(templates_dir),
-    autoescape=select_autoescape(['html', 'xml'])
+    autoescape=select_autoescape(["html", "xml"]),
 )
+
 
 def _render_template(template_name: str, context: dict) -> str:
     """
     Render a template with the provided data
-    
+
     Args:
         template_name: Template file name
         context: Data to render in the template
-        
+
     Returns:
         str: Rendered HTML
     """
@@ -37,14 +38,15 @@ def _render_template(template_name: str, context: dict) -> str:
         logger.error(f"Error rendering template '{template_name}': {str(e)}")
         return f"<p>Could not display email content. Please access {context.get('verification_link', '') or context.get('reset_link', '')}</p>"
 
+
 def send_verification_email(email: str, token: str) -> bool:
     """
     Send a verification email to the user
-    
+
     Args:
         email: Recipient's email
         token: Email verification token
-        
+
     Returns:
         bool: True if the email was sent successfully, False otherwise
     """
@@ -53,39 +55,47 @@ def send_verification_email(email: str, token: str) -> bool:
         from_email = Email(settings.EMAIL_FROM)
         to_email = To(email)
         subject = "Email Verification - Evo AI"
-        
+
         verification_link = f"{settings.APP_URL}/auth/verify-email/{token}"
-        
-        html_content = _render_template('verification_email', {
-            'verification_link': verification_link,
-            'user_name': email.split('@')[0],  # Use part of the email as temporary name
-            'current_year': datetime.now().year
-        })
-        
+
+        html_content = _render_template(
+            "verification_email",
+            {
+                "verification_link": verification_link,
+                "user_name": email.split("@")[
+                    0
+                ],  # Use part of the email as temporary name
+                "current_year": datetime.now().year,
+            },
+        )
+
         content = Content("text/html", html_content)
-        
+
         mail = Mail(from_email, to_email, subject, content)
         response = sg.client.mail.send.post(request_body=mail.get())
-        
+
         if response.status_code >= 200 and response.status_code < 300:
             logger.info(f"Verification email sent to {email}")
             return True
         else:
-            logger.error(f"Failed to send verification email to {email}. Status: {response.status_code}")
+            logger.error(
+                f"Failed to send verification email to {email}. Status: {response.status_code}"
+            )
             return False
-            
+
     except Exception as e:
         logger.error(f"Error sending verification email to {email}: {str(e)}")
         return False
 
+
 def send_password_reset_email(email: str, token: str) -> bool:
     """
     Send a password reset email to the user
-    
+
     Args:
         email: Recipient's email
         token: Password reset token
-        
+
     Returns:
         bool: True if the email was sent successfully, False otherwise
     """
@@ -94,39 +104,47 @@ def send_password_reset_email(email: str, token: str) -> bool:
         from_email = Email(settings.EMAIL_FROM)
         to_email = To(email)
         subject = "Password Reset - Evo AI"
-        
+
         reset_link = f"{settings.APP_URL}/reset-password?token={token}"
-        
-        html_content = _render_template('password_reset', {
-            'reset_link': reset_link,
-            'user_name': email.split('@')[0],  # Use part of the email as temporary name
-            'current_year': datetime.now().year
-        })
-        
+
+        html_content = _render_template(
+            "password_reset",
+            {
+                "reset_link": reset_link,
+                "user_name": email.split("@")[
+                    0
+                ],  # Use part of the email as temporary name
+                "current_year": datetime.now().year,
+            },
+        )
+
         content = Content("text/html", html_content)
-        
+
         mail = Mail(from_email, to_email, subject, content)
         response = sg.client.mail.send.post(request_body=mail.get())
-        
+
         if response.status_code >= 200 and response.status_code < 300:
             logger.info(f"Password reset email sent to {email}")
             return True
         else:
-            logger.error(f"Failed to send password reset email to {email}. Status: {response.status_code}")
+            logger.error(
+                f"Failed to send password reset email to {email}. Status: {response.status_code}"
+            )
             return False
-            
+
     except Exception as e:
         logger.error(f"Error sending password reset email to {email}: {str(e)}")
         return False
 
+
 def send_welcome_email(email: str, user_name: str = None) -> bool:
     """
     Send a welcome email to the user after verification
-    
+
     Args:
         email: Recipient's email
         user_name: User's name (optional)
-        
+
     Returns:
         bool: True if the email was sent successfully, False otherwise
     """
@@ -135,41 +153,49 @@ def send_welcome_email(email: str, user_name: str = None) -> bool:
         from_email = Email(settings.EMAIL_FROM)
         to_email = To(email)
         subject = "Welcome to Evo AI"
-        
+
         dashboard_link = f"{settings.APP_URL}/dashboard"
-        
-        html_content = _render_template('welcome_email', {
-            'dashboard_link': dashboard_link,
-            'user_name': user_name or email.split('@')[0],
-            'current_year': datetime.now().year
-        })
-        
+
+        html_content = _render_template(
+            "welcome_email",
+            {
+                "dashboard_link": dashboard_link,
+                "user_name": user_name or email.split("@")[0],
+                "current_year": datetime.now().year,
+            },
+        )
+
         content = Content("text/html", html_content)
-        
+
         mail = Mail(from_email, to_email, subject, content)
         response = sg.client.mail.send.post(request_body=mail.get())
-        
+
         if response.status_code >= 200 and response.status_code < 300:
             logger.info(f"Welcome email sent to {email}")
             return True
         else:
-            logger.error(f"Failed to send welcome email to {email}. Status: {response.status_code}")
+            logger.error(
+                f"Failed to send welcome email to {email}. Status: {response.status_code}"
+            )
             return False
-            
+
     except Exception as e:
         logger.error(f"Error sending welcome email to {email}: {str(e)}")
         return False
 
-def send_account_locked_email(email: str, reset_token: str, failed_attempts: int, time_period: str) -> bool:
+
+def send_account_locked_email(
+    email: str, reset_token: str, failed_attempts: int, time_period: str
+) -> bool:
     """
     Send an email informing that the account has been locked after login attempts
-    
+
     Args:
         email: Recipient's email
         reset_token: Token to reset the password
         failed_attempts: Number of failed attempts
         time_period: Time period of the attempts
-        
+
     Returns:
         bool: True if the email was sent successfully, False otherwise
     """
@@ -178,29 +204,34 @@ def send_account_locked_email(email: str, reset_token: str, failed_attempts: int
         from_email = Email(settings.EMAIL_FROM)
         to_email = To(email)
         subject = "Security Alert - Account Locked"
-        
+
         reset_link = f"{settings.APP_URL}/reset-password?token={reset_token}"
-        
-        html_content = _render_template('account_locked', {
-            'reset_link': reset_link,
-            'user_name': email.split('@')[0],
-            'failed_attempts': failed_attempts,
-            'time_period': time_period,
-            'current_year': datetime.now().year
-        })
-        
+
+        html_content = _render_template(
+            "account_locked",
+            {
+                "reset_link": reset_link,
+                "user_name": email.split("@")[0],
+                "failed_attempts": failed_attempts,
+                "time_period": time_period,
+                "current_year": datetime.now().year,
+            },
+        )
+
         content = Content("text/html", html_content)
-        
+
         mail = Mail(from_email, to_email, subject, content)
         response = sg.client.mail.send.post(request_body=mail.get())
-        
+
         if response.status_code >= 200 and response.status_code < 300:
             logger.info(f"Account locked email sent to {email}")
             return True
         else:
-            logger.error(f"Failed to send account locked email to {email}. Status: {response.status_code}")
+            logger.error(
+                f"Failed to send account locked email to {email}. Status: {response.status_code}"
+            )
             return False
-            
+
     except Exception as e:
         logger.error(f"Error sending account locked email to {email}: {str(e)}")
-        return False 
+        return False

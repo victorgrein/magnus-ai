@@ -9,6 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 def get_tool(db: Session, tool_id: uuid.UUID) -> Optional[Tool]:
     """Search for a tool by ID"""
     try:
@@ -21,8 +22,9 @@ def get_tool(db: Session, tool_id: uuid.UUID) -> Optional[Tool]:
         logger.error(f"Error searching for tool {tool_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error searching for tool"
+            detail="Error searching for tool",
         )
+
 
 def get_tools(db: Session, skip: int = 0, limit: int = 100) -> List[Tool]:
     """Search for all tools with pagination"""
@@ -32,8 +34,9 @@ def get_tools(db: Session, skip: int = 0, limit: int = 100) -> List[Tool]:
         logger.error(f"Error searching for tools: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error searching for tools"
+            detail="Error searching for tools",
         )
+
 
 def create_tool(db: Session, tool: ToolCreate) -> Tool:
     """Creates a new tool"""
@@ -49,8 +52,9 @@ def create_tool(db: Session, tool: ToolCreate) -> Tool:
         logger.error(f"Error creating tool: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error creating tool"
+            detail="Error creating tool",
         )
+
 
 def update_tool(db: Session, tool_id: uuid.UUID, tool: ToolCreate) -> Optional[Tool]:
     """Updates an existing tool"""
@@ -58,10 +62,10 @@ def update_tool(db: Session, tool_id: uuid.UUID, tool: ToolCreate) -> Optional[T
         db_tool = get_tool(db, tool_id)
         if not db_tool:
             return None
-            
+
         for key, value in tool.model_dump().items():
             setattr(db_tool, key, value)
-            
+
         db.commit()
         db.refresh(db_tool)
         logger.info(f"Tool updated successfully: {tool_id}")
@@ -71,8 +75,9 @@ def update_tool(db: Session, tool_id: uuid.UUID, tool: ToolCreate) -> Optional[T
         logger.error(f"Error updating tool {tool_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error updating tool"
+            detail="Error updating tool",
         )
+
 
 def delete_tool(db: Session, tool_id: uuid.UUID) -> bool:
     """Remove a tool"""
@@ -80,7 +85,7 @@ def delete_tool(db: Session, tool_id: uuid.UUID) -> bool:
         db_tool = get_tool(db, tool_id)
         if not db_tool:
             return False
-            
+
         db.delete(db_tool)
         db.commit()
         logger.info(f"Tool removed successfully: {tool_id}")
@@ -90,5 +95,5 @@ def delete_tool(db: Session, tool_id: uuid.UUID) -> bool:
         logger.error(f"Error removing tool {tool_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error removing tool"
-        ) 
+            detail="Error removing tool",
+        )

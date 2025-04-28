@@ -162,9 +162,7 @@ async def login_for_access_token(form_data: UserLogin, db: Session = Depends(get
     """
     user = authenticate_user(db, form_data.email, form_data.password)
     if not user:
-        logger.warning(
-            f"Login attempt with invalid credentials: {form_data.email}"
-        )
+        logger.warning(f"Login attempt with invalid credentials: {form_data.email}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",

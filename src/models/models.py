@@ -1,8 +1,19 @@
-from sqlalchemy import Column, String, UUID, DateTime, ForeignKey, JSON, Text, BigInteger, CheckConstraint, Boolean
+from sqlalchemy import (
+    Column,
+    String,
+    UUID,
+    DateTime,
+    ForeignKey,
+    JSON,
+    Text,
+    CheckConstraint,
+    Boolean,
+)
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship, backref
 from src.config.database import Base
 import uuid
+
 
 class Client(Base):
     __tablename__ = "clients"
@@ -13,13 +24,16 @@ class Client(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+
 class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
-    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=True)
+    client_id = Column(
+        UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"), nullable=True
+    )
     is_active = Column(Boolean, default=False)
     is_admin = Column(Boolean, default=False)
     email_verified = Column(Boolean, default=False)
@@ -29,9 +43,12 @@ class User(Base):
     password_reset_expiry = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     # Relationship with Client (One-to-One, optional for administrators)
-    client = relationship("Client", backref=backref("user", uselist=False, cascade="all, delete-orphan"))
+    client = relationship(
+        "Client", backref=backref("user", uselist=False, cascade="all, delete-orphan")
+    )
+
 
 class Contact(Base):
     __tablename__ = "contacts"
@@ -43,6 +60,7 @@ class Contact(Base):
     meta = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
 class Agent(Base):
     __tablename__ = "agents"
@@ -60,21 +78,30 @@ class Agent(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
-        CheckConstraint("type IN ('llm', 'sequential', 'parallel', 'loop')", name='check_agent_type'),
+        CheckConstraint(
+            "type IN ('llm', 'sequential', 'parallel', 'loop')", name="check_agent_type"
+        ),
     )
 
     def to_dict(self):
         """Converts the object to a dictionary, converting UUIDs to strings"""
         result = {}
         for key, value in self.__dict__.items():
-            if key.startswith('_'):
+            if key.startswith("_"):
                 continue
             if isinstance(value, uuid.UUID):
                 result[key] = str(value)
             elif isinstance(value, dict):
                 result[key] = self._convert_dict(value)
             elif isinstance(value, list):
-                result[key] = [self._convert_dict(item) if isinstance(item, dict) else str(item) if isinstance(item, uuid.UUID) else item for item in value]
+                result[key] = [
+                    (
+                        self._convert_dict(item)
+                        if isinstance(item, dict)
+                        else str(item) if isinstance(item, uuid.UUID) else item
+                    )
+                    for item in value
+                ]
             else:
                 result[key] = value
         return result
@@ -88,10 +115,18 @@ class Agent(Base):
             elif isinstance(value, dict):
                 result[key] = self._convert_dict(value)
             elif isinstance(value, list):
-                result[key] = [self._convert_dict(item) if isinstance(item, dict) else str(item) if isinstance(item, uuid.UUID) else item for item in value]
+                result[key] = [
+                    (
+                        self._convert_dict(item)
+                        if isinstance(item, dict)
+                        else str(item) if isinstance(item, uuid.UUID) else item
+                    )
+                    for item in value
+                ]
             else:
                 result[key] = value
         return result
+
 
 class MCPServer(Base):
     __tablename__ = "mcp_servers"
@@ -105,10 +140,13 @@ class MCPServer(Base):
     type = Column(String, nullable=False, default="official")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
+
     __table_args__ = (
-        CheckConstraint("type IN ('official', 'community')", name='check_mcp_server_type'),
+        CheckConstraint(
+            "type IN ('official', 'community')", name="check_mcp_server_type"
+        ),
     )
+
 
 class Tool(Base):
     __tablename__ = "tools"
@@ -121,11 +159,12 @@ class Tool(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+
 class Session(Base):
     __tablename__ = "sessions"
     # The directive below makes Alembic ignore this table in migrations
-    __table_args__ = {'extend_existing': True, 'info': {'skip_autogenerate': True}}
-    
+    __table_args__ = {"extend_existing": True, "info": {"skip_autogenerate": True}}
+
     id = Column(String, primary_key=True)
     app_name = Column(String)
     user_id = Column(String)
@@ -133,11 +172,14 @@ class Session(Base):
     create_time = Column(DateTime(timezone=True))
     update_time = Column(DateTime(timezone=True))
 
+
 class AuditLog(Base):
     __tablename__ = "audit_logs"
-    
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     action = Column(String, nullable=False)
     resource_type = Column(String, nullable=False)
     resource_id = Column(String, nullable=True)
@@ -145,6 +187,6 @@ class AuditLog(Base):
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     # Relationship with User
     user = relationship("User", backref="audit_logs")

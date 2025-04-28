@@ -19,7 +19,7 @@ from src.services.session_service import (
     get_sessions_by_agent,
     get_sessions_by_client,
 )
-from src.main import session_service
+from src.services.service_providers import session_service
 import logging
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,7 @@ router = APIRouter(
     tags=["sessions"],
     responses={404: {"description": "Not found"}},
 )
+
 
 # Session Routes
 @router.get("/client/{client_id}", response_model=List[Adk_Session])

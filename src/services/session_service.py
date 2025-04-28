@@ -66,7 +66,7 @@ def get_session_by_id(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid session ID. Expected format: app_name_user_id",
             )
-            
+
         parts = session_id.split("_", 1)
         if len(parts) != 2:
             logger.error(f"Invalid session ID format: {session_id}")
@@ -74,22 +74,22 @@ def get_session_by_id(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid session ID format. Expected format: app_name_user_id",
             )
-            
+
         user_id, app_name = parts
-        
+
         session = session_service.get_session(
             app_name=app_name,
             user_id=user_id,
             session_id=session_id,
         )
-        
+
         if session is None:
             logger.error(f"Session not found: {session_id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Session not found: {session_id}",
             )
-            
+
         return session
     except Exception as e:
         logger.error(f"Error searching for session {session_id}: {str(e)}")
@@ -106,7 +106,7 @@ def delete_session(session_service: DatabaseSessionService, session_id: str) -> 
     try:
         session = get_session_by_id(session_service, session_id)
         # If we get here, the session exists (get_session_by_id already validates)
-        
+
         session_service.delete_session(
             app_name=session.app_name,
             user_id=session.user_id,
@@ -131,10 +131,10 @@ def get_session_events(
     try:
         session = get_session_by_id(session_service, session_id)
         # If we get here, the session exists (get_session_by_id already validates)
-        
-        if not hasattr(session, 'events') or session.events is None:
+
+        if not hasattr(session, "events") or session.events is None:
             return []
-            
+
         return session.events
     except HTTPException:
         # Passes HTTP exceptions from get_session_by_id

@@ -11,7 +11,11 @@ from src.services import (
 from src.schemas.chat import ChatRequest, ChatResponse, ErrorResponse
 from src.services.agent_runner import run_agent
 from src.core.exceptions import AgentNotFoundError
-from src.main import session_service, artifacts_service, memory_service
+from src.services.service_providers import (
+    session_service,
+    artifacts_service,
+    memory_service,
+)
 
 from datetime import datetime
 import logging
