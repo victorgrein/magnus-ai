@@ -22,7 +22,9 @@ The Evo AI platform allows:
 - **Uvicorn**: ASGI server
 - **Redis**: Cache and session management
 - **JWT**: Secure token authentication
-- **SendGrid**: Email service for verification
+- **SendGrid**: Email service for notifications
+- **Jinja2**: Template engine for email rendering
+- **Bcrypt**: Password hashing and security
 
 ## 📁 Project Structure
 
@@ -32,9 +34,11 @@ src/
 ├── core/         # Core business logic
 ├── models/       # Data models
 ├── schemas/      # Pydantic schemas for validation
+├── services/     # Business services
+├── templates/    # Email templates
+│   └── emails/   # Jinja2 email templates
 ├── utils/        # Utilities
-├── config/       # Configurations
-└── services/     # Business services
+└── config/       # Configurations
 ```
 
 ## 📋 Requirements
@@ -123,6 +127,19 @@ curl -X GET "http://localhost:8000/api/v1/clients/" \
 - Regular users (associated with a client) only have access to their client's resources
 - Admin users have access to all resources
 - Certain operations (such as creating MCP servers) are restricted to administrators only
+- Account lockout mechanism after multiple failed login attempts for enhanced security
+
+## 📧 Email Templates
+
+The platform uses Jinja2 templates for email rendering with a unified design system:
+
+- **Base Template**: All emails extend a common base template for consistent styling
+- **Verification Email**: Sent when users register to verify their email address
+- **Password Reset**: Sent when users request a password reset
+- **Welcome Email**: Sent after email verification to guide new users
+- **Account Locked**: Security alert when an account is locked due to multiple failed login attempts
+
+All email templates feature responsive design, clear call-to-action buttons, and fallback mechanisms.
 
 ## 🚀 Running the Project
 

@@ -10,7 +10,8 @@
 - Redis: Cache and session management
 - JWT: Secure token authentication
 - Bcrypt: Secure password hashing
-- SendGrid: Email service for verification
+- SendGrid: Email service for notifications
+- Jinja2: Template engine for email rendering
 
 ## Project Structure
 ```
@@ -43,8 +44,11 @@ src/
 │   └── audit_service.py   # Audit logs logic
 ├── templates/
 │   ├── emails/
-│   │   ├── verification_email.html
-│   │   └── password_reset.html
+│   │   ├── base_email.html           # Base template with common structure and styles
+│   │   ├── verification_email.html   # Email verification template
+│   │   ├── password_reset.html       # Password reset template  
+│   │   ├── welcome_email.html        # Welcome email after verification
+│   │   └── account_locked.html       # Security alert for locked accounts
 └── utils/
     └── security.py        # Security utilities (JWT, hash)
 ```
@@ -67,6 +71,15 @@ src/
 - Rollback in case of error
 - Standardized returns
 - Use transactions for multiple operations
+
+### Email Templates
+- All email templates extend a base template
+- Templates written in English
+- Use Jinja2 templating system
+- Consistent styling using a common base template
+- Responsive design for mobile compatibility
+- Clear call-to-action buttons
+- Fallback mechanisms for failed template rendering
 
 ### Routes
 - Appropriate status codes (201 for creation, 204 for deletion)
@@ -91,6 +104,7 @@ src/
 - Protection of administrative routes with permission verification
 - Email verification system via tokens
 - Secure password recovery with one-time tokens
+- Account locking after multiple failed login attempts
 
 ### Audit
 - Record important administrative actions
@@ -110,6 +124,7 @@ src/
 - Variable and function names in English
 - Log and error messages in English
 - Documentation in English
+- User-facing content (emails, responses) in English
 - Indentation with 4 spaces
 - Maximum of 79 characters per line
 
@@ -126,6 +141,7 @@ src/
 - Implement resource ownership verification
 - Store passwords only with secure hash (bcrypt)
 - Implement appropriate expiration for tokens
+- Use template inheritance for consistent email layouts
 
 ## Security
 - JWT tokens with limited lifetime
@@ -135,6 +151,7 @@ src/
 - Resource-based access control
 - Clear separation between regular users and administrators
 - Strict input validation with Pydantic
+- Account lockout after multiple failed login attempts
 
 ## Useful Commands
 - `make run`: Start the server
