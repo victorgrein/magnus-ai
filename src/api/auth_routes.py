@@ -12,6 +12,7 @@ from src.schemas.user import (
     MessageResponse,
 )
 from src.services.user_service import (
+    authenticate_user,
     create_user,
     verify_email,
     resend_verification,
@@ -19,7 +20,6 @@ from src.services.user_service import (
     reset_password,
 )
 from src.services.auth_service import (
-    authenticate_user,
     create_access_token,
     get_current_admin_user,
     get_current_user,

@@ -9,6 +9,18 @@ sys.path.append(str(root_dir))
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from src.config.database import engine, Base
+from src.config.settings import settings
+from src.utils.logger import setup_logger
+from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
+from google.adk.sessions import DatabaseSessionService
+from google.adk.memory import InMemoryMemoryService
+
+# Initialize service instances
+session_service = DatabaseSessionService(db_url=settings.POSTGRES_CONNECTION_STRING)
+artifacts_service = InMemoryArtifactService()
+memory_service = InMemoryMemoryService()
+
+# Import routers after service initialization to avoid circular imports
 from src.api.auth_routes import router as auth_router
 from src.api.admin_routes import router as admin_router
 from src.api.chat_routes import router as chat_router
@@ -18,19 +30,9 @@ from src.api.contact_routes import router as contact_router
 from src.api.mcp_server_routes import router as mcp_server_router
 from src.api.tool_routes import router as tool_router
 from src.api.client_routes import router as client_router
-from src.config.settings import settings
-from src.utils.logger import setup_logger
-from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
-from google.adk.sessions import DatabaseSessionService
-from google.adk.memory import InMemoryMemoryService
 
 # Configure logger
 logger = setup_logger(__name__)
-
-
-session_service = DatabaseSessionService(db_url=settings.POSTGRES_CONNECTION_STRING)
-artifacts_service = InMemoryArtifactService()
-memory_service = InMemoryMemoryService()
 
 # FastAPI initialization
 app = FastAPI(
