@@ -111,6 +111,11 @@ POST /api/v1/auth/forgot-password
 POST /api/v1/auth/reset-password
 ```
 
+5. **Recover logged user data**:
+```http
+POST /api/v1/auth/me
+```
+
 ### Example Usage with curl:
 ```bash
 # Login
@@ -205,6 +210,24 @@ POST /api/v1/auth/login
 
 Authenticates the user and returns a valid JWT token for use in subsequent requests.
 
+#### Recover logged user data
+```http
+POST /api/v1/auth/me
+```
+
+**Response (200 OK):**
+```json
+{
+    "email": "user@example.com",
+    "id": "777d7036-ebe7-4b79-9cc4-981fa0640d2a",
+    "client_id": "161e054a-6654-4a2e-90dd-b2499685797a",
+    "is_active": true,
+    "email_verified": true,
+    "is_admin": false,
+    "created_at": "2025-04-28T18:56:42.832905Z"
+}
+```
+
 #### Verify Email
 ```http
 GET /api/v1/auth/verify-email/{token}
@@ -293,7 +316,8 @@ POST /api/v1/clients/
 **Request Body:**
 ```json
 {
-  "name": "Company Name"
+  "name": "Company Name",
+  "email": "user@example.com"
 }
 ```
 
@@ -302,6 +326,7 @@ POST /api/v1/clients/
 {
   "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "name": "Company Name",
+  "email": "user@example.com"
   "created_at": "2023-07-10T15:00:00.000Z"
 }
 ```
@@ -323,6 +348,7 @@ GET /api/v1/clients/
   {
     "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
     "name": "Company Name",
+    "email": "user@example.com",
     "created_at": "2023-07-10T15:00:00.000Z"
   }
 ]
@@ -340,6 +366,7 @@ GET /api/v1/clients/{client_id}
 {
   "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "name": "Company Name",
+  "email": "user@example.com",
   "created_at": "2023-07-10T15:00:00.000Z"
 }
 ```
@@ -354,7 +381,8 @@ PUT /api/v1/clients/{client_id}
 **Request Body:**
 ```json
 {
-  "name": "New Company Name"
+  "name": "New Company Name",
+  "email": "user@example.com"
 }
 ```
 
@@ -363,6 +391,7 @@ PUT /api/v1/clients/{client_id}
 {
   "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "name": "New Company Name",
+  "email": "user@example.com",
   "created_at": "2023-07-10T15:00:00.000Z"
 }
 ```
@@ -1130,3 +1159,66 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [SQLAlchemy](https://www.sqlalchemy.org/)
 - [Google ADK](https://github.com/google/adk)
+
+## Executando com Docker
+
+Para facilitar a implantação e execução da aplicação, fornecemos configurações para Docker e Docker Compose.
+
+### Pré-requisitos
+
+- Docker instalado
+- Docker Compose instalado
+
+### Configuração
+
+1. Configure as variáveis de ambiente necessárias no arquivo `.env` na raiz do projeto (ou use variáveis de ambiente do sistema)
+
+2. Construa a imagem Docker:
+```bash
+make docker-build
+```
+
+3. Inicie os serviços (API, PostgreSQL e Redis):
+```bash
+make docker-up
+```
+
+4. Popule o banco de dados com dados iniciais:
+```bash
+make docker-seed
+```
+
+5. Para verificar os logs da aplicação:
+```bash
+make docker-logs
+```
+
+6. Para parar os serviços:
+```bash
+make docker-down
+```
+
+### Serviços Disponíveis
+
+- **API**: http://localhost:8000
+- **Documentação da API**: http://localhost:8000/docs
+- **PostgreSQL**: localhost:5432
+- **Redis**: localhost:6379
+
+### Volumes Persistentes
+
+O Docker Compose configura volumes persistentes para:
+- Dados do PostgreSQL
+- Dados do Redis
+- Diretório de logs da aplicação
+
+### Variáveis de Ambiente
+
+As principais variáveis de ambiente usadas pelo contêiner da API:
+
+- `POSTGRES_CONNECTION_STRING`: String de conexão com o PostgreSQL
+- `REDIS_HOST`: Host do Redis
+- `JWT_SECRET_KEY`: Chave secreta para geração de tokens JWT
+- `SENDGRID_API_KEY`: Chave da API do SendGrid para envio de emails
+- `EMAIL_FROM`: Email usado como remetente
+- `APP_URL`: URL base da aplicação

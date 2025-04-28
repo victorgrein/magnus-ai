@@ -1,4 +1,4 @@
-.PHONY: migrate init revision upgrade downgrade run seed-admin seed-client seed-agents seed-mcp-servers seed-tools seed-contacts seed-all
+.PHONY: migrate init revision upgrade downgrade run seed-admin seed-client seed-agents seed-mcp-servers seed-tools seed-contacts seed-all docker-build docker-up docker-down docker-logs
 
 # Comandos do Alembic
 init:
@@ -22,7 +22,7 @@ run:
 
 # Comando para limpar o cache em todas as pastas do projeto pastas pycache
 clear-cache:
-	find . -type d -name "__pycache__" -exec rm -r {} +
+	rm -rf ~/.cache/uv/environments-v2/* && find . -type d -name "__pycache__" -exec rm -r {} +
 
 # Comando para criar uma nova migração
 alembic-migrate:
@@ -57,3 +57,19 @@ seed-contacts:
 
 seed-all:
 	python -m scripts.run_seeders
+
+# Comandos Docker
+docker-build:
+	docker-compose build
+
+docker-up:
+	docker-compose up -d
+
+docker-down:
+	docker-compose down
+
+docker-logs:
+	docker-compose logs -f
+
+docker-seed:
+	docker-compose exec api python -m scripts.run_seeders

@@ -1,0 +1,57 @@
+# Ambiente virtual
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Arquivos específicos do Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Git
+.git
+.gitignore
+
+# Logs e dados
+logs/
+*.log
+data/
+
+# Configuração local
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# IDEs e editores
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Arquivos de teste
+tests/
+test_*
+*_test.py
+
+# Documentação
+docs/ 
