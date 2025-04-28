@@ -26,7 +26,7 @@ app = FastAPI(
 # Configuração do PostgreSQL
 POSTGRES_CONNECTION_STRING = os.getenv(
     "POSTGRES_CONNECTION_STRING",
-    "postgresql://postgres:root@localhost:5432/google-a2a-saas"
+    "postgresql://postgres:root@localhost:5432/evo_ai"
 )
 
 # Criar as tabelas no banco de dados

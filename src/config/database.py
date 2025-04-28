@@ -3,9 +3,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from src.config.settings import settings
 
-SQLALCHEMY_DATABASE_URL = settings.POSTGRES_CONNECTION_STRING
+POSTGRES_CONNECTION_STRING = settings.POSTGRES_CONNECTION_STRING
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_engine(POSTGRES_CONNECTION_STRING)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

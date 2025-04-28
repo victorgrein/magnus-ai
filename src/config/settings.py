@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     # Configurações do banco de dados
     POSTGRES_CONNECTION_STRING: str = os.getenv(
         "POSTGRES_CONNECTION_STRING",
-        "postgresql://postgres:root@localhost:5432/google-a2a-saas"
+        "postgresql://postgres:root@localhost:5432/evo_ai"
     )
     
     # Configurações do OpenAI
