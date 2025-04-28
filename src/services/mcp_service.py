@@ -8,6 +8,8 @@ from contextlib import AsyncExitStack
 import os
 import logging
 from src.utils.logger import setup_logger
+from src.services.mcp_server_service import get_mcp_server
+from sqlalchemy.orm import Session
 
 logger = setup_logger(__name__)
 
@@ -73,15 +75,35 @@ class MCPService:
 
         return filtered_tools
 
-    async def build_tools(self, mcp_config: Dict[str, Any]) -> Tuple[List[Any], AsyncExitStack]:
+    async def build_tools(self, mcp_config: Dict[str, Any], db: Session) -> Tuple[List[Any], AsyncExitStack]:
         """Constrói uma lista de ferramentas a partir de múltiplos servidores MCP."""
         self.tools = []
         self.exit_stack = AsyncExitStack()
 
         # Processa cada servidor MCP da configuração
-        for server_name, server_config in mcp_config.get("mcpServers", {}).items():
-            logger.info(f"Conectando ao servidor MCP: {server_name}")
+        for server in mcp_config.get("mcp_servers", []):
             try:
+                # Busca o servidor MCP no banco
+                mcp_server = get_mcp_server(db, server['id'])
+                if not mcp_server:
+                    logger.warning(f"Servidor MCP não encontrado: {server['id']}")
+                    continue
+
+                # Prepara a configuração do servidor
+                server_config = mcp_server.config_json.copy()
+                
+                # Substitui as variáveis de ambiente no config_json
+                if 'env' in server_config:
+                    for key, value in server_config['env'].items():
+                        if value.startswith('env@@'):
+                            env_key = value.replace('env@@', '')
+                            if env_key in server.get('envs', {}):
+                                server_config['env'][key] = server['envs'][env_key]
+                            else:
+                                logger.warning(f"Variável de ambiente '{env_key}' não fornecida para o servidor MCP {mcp_server.name}")
+                                continue
+
+                logger.info(f"Conectando ao servidor MCP: {mcp_server.name}")
                 tools, exit_stack = await self._connect_to_mcp_server(server_config)
 
                 if tools and exit_stack:
@@ -93,10 +115,10 @@ class MCPService:
                     await self.exit_stack.enter_async_context(exit_stack)
                     logger.info(f"Conectado com sucesso. Adicionadas {len(filtered_tools)} ferramentas.")
                 else:
-                    logger.warning(f"Falha na conexão ou nenhuma ferramenta disponível para {server_name}")
+                    logger.warning(f"Falha na conexão ou nenhuma ferramenta disponível para {mcp_server.name}")
 
             except Exception as e:
-                logger.error(f"Erro ao conectar ao servidor MCP {server_name}: {e}")
+                logger.error(f"Erro ao conectar ao servidor MCP {server['id']}: {e}")
                 continue
 
         logger.info(f"MCP Toolset criado com sucesso. Total de {len(self.tools)} ferramentas.")

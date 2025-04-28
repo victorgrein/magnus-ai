@@ -180,8 +180,8 @@ class AgentBuilder:
         # Obtém ferramentas MCP da configuração
         mcp_tools = []
         mcp_exit_stack = None
-        if agent.config.get("mcpServers"):
-            mcp_tools, mcp_exit_stack = await self.mcp_service.build_tools(agent.config)
+        if agent.config.get("mcp_servers"):
+            mcp_tools, mcp_exit_stack = await self.mcp_service.build_tools(agent.config, self.db)
 
         # Combina todas as ferramentas
         all_tools = custom_tools + mcp_tools

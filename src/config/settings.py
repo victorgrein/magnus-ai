@@ -1,6 +1,8 @@
 import os
 from typing import Optional
 from pydantic_settings import BaseSettings
+from functools import lru_cache
+import secrets
 
 class Settings(BaseSettings):
     """Configurações do projeto"""
@@ -42,9 +44,21 @@ class Settings(BaseSettings):
     # TTL do cache de ferramentas em segundos (1 hora)
     TOOLS_CACHE_TTL: int = int(os.getenv("TOOLS_CACHE_TTL", 3600))
     
+    # Configurações da API
+    API_KEY: str = secrets.token_urlsafe(32)  # Gera uma API Key aleatória se não for definida
+    API_KEY_HEADER: str = "X-API-Key"
+    
+    # Configurações do Servidor
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
+    DEBUG: bool = False
+    
     class Config:
         env_file = ".env"
         case_sensitive = True
 
-# Instância global das configurações
-settings = Settings() 
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
+
+settings = get_settings() 

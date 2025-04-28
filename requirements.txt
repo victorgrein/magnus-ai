@@ -10,3 +10,4 @@ google-adk
 litellm
 python-multipart
 alembic
+asyncpg

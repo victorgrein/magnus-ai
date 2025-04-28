@@ -1,0 +1,105 @@
+# A2A SaaS - Regras e Estrutura do Projeto
+
+## Tecnologias Principais
+- FastAPI: Framework web para construção da API
+- SQLAlchemy: ORM para interação com o banco de dados
+- Alembic: Sistema de migrações do banco de dados
+- PostgreSQL: Banco de dados principal
+- Pydantic: Validação e serialização de dados
+- Uvicorn: Servidor ASGI para execução da aplicação
+- Redis: Cache e gerenciamento de sessões
+
+## Estrutura do Projeto
+```
+src/
+├── api/
+│   └── routes.py          # Definição das rotas da API
+├── config/
+│   ├── database.py        # Configuração do banco de dados
+│   └── settings.py        # Configurações gerais
+├── core/
+│   └── middleware.py      # Middleware de autenticação
+├── models/
+│   └── models.py          # Modelos SQLAlchemy
+├── schemas/
+│   └── schemas.py         # Schemas Pydantic
+└── services/
+    ├── agent_service.py   # Lógica de negócio para agentes
+    ├── client_service.py  # Lógica de negócio para clientes
+    ├── contact_service.py # Lógica de negócio para contatos
+    ├── mcp_server_service.py # Lógica de negócio para servidores MCP
+    └── tool_service.py    # Lógica de negócio para ferramentas
+```
+
+## Padrões de Código
+
+### Schemas (Pydantic)
+- Usar `BaseModel` como base para todos os schemas
+- Definir campos com tipos explícitos
+- Usar `Optional` para campos opcionais
+- Usar `Field` para validações e valores padrão
+- Implementar `Config` com `from_attributes = True` para modelos
+
+### Serviços
+- Tratamento de erros com `SQLAlchemyError`
+- Logging consistente com mensagens em português
+- Tipagem forte com `Optional` para retornos nulos
+- Documentação com docstrings
+- Rollback em caso de erro
+- Retornos padronizados
+
+### Rotas
+- Status codes apropriados (201 para criação, 204 para deleção)
+- Tratamento de erros com `HTTPException`
+- Mensagens de erro em português
+- Paginação nas listagens
+- Validação de entrada com schemas
+- Autenticação via API Key em todas as rotas
+
+### Migrações
+- Usar Alembic para gerenciamento de migrações
+- Nomes descritivos para as migrações
+- Manter histórico de alterações
+- Usar CASCADE quando necessário para remover dependências
+
+### Autenticação
+- Usar API Key para autenticação
+- Gerar API Key automaticamente no primeiro acesso
+- Armazenar API Key no arquivo .env
+- Validar API Key em todas as rotas
+- Logging de tentativas de acesso inválidas
+
+### Variáveis de Ambiente
+- Usar arquivo .env para configurações sensíveis
+- Manter .env.example atualizado
+- Documentar todas as variáveis de ambiente
+- Usar valores padrão seguros
+- Validar variáveis obrigatórias
+
+## Convenções
+- Nomes de variáveis e funções em inglês
+- Mensagens de log e erro em português
+- Documentação em português
+- Indentação com 4 espaços
+- Máximo de 79 caracteres por linha
+
+## Boas Práticas
+- Sempre validar entrada de dados
+- Implementar logging adequado
+- Tratar todos os erros possíveis
+- Manter consistência nos retornos
+- Documentar funções e classes
+- Seguir princípios SOLID
+- Manter testes atualizados
+- Proteger rotas com autenticação
+- Usar variáveis de ambiente para configurações sensíveis
+
+## Comandos Úteis
+- `make run`: Inicia o servidor
+- `make alembic-revision message="descrição"`: Cria nova migração
+- `make alembic-upgrade`: Aplica migrações pendentes
+- `make alembic-downgrade`: Reverte última migração
+- `make alembic-migrate`: Cria e aplica nova migração
+- `make alembic-reset`: Reseta o banco de dados para o estado inicial
+- `make alembic-upgrade-cascade`: Força upgrade removendo dependências
+- `make clear-cache`: Limpa cache do projeto
