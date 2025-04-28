@@ -3,157 +3,204 @@ from sendgrid.helpers.mail import Mail, Email, To, Content
 from src.config.settings import settings
 import logging
 from datetime import datetime
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-def send_verification_email(email: str, token: str) -> bool:
+# Configure Jinja2 to load templates
+templates_dir = Path(__file__).parent.parent / "templates" / "emails"
+os.makedirs(templates_dir, exist_ok=True)
+
+# Configure Jinja2 with the templates directory
+env = Environment(
+    loader=FileSystemLoader(templates_dir),
+    autoescape=select_autoescape(['html', 'xml'])
+)
+
+def _render_template(template_name: str, context: dict) -> str:
     """
-    Envia um email de verificação para o usuário
+    Render a template with the provided data
     
     Args:
-        email: Email do destinatário
-        token: Token de verificação de email
+        template_name: Template file name
+        context: Data to render in the template
         
     Returns:
-        bool: True se o email foi enviado com sucesso, False caso contrário
+        str: Rendered HTML
+    """
+    try:
+        template = env.get_template(f"{template_name}.html")
+        return template.render(**context)
+    except Exception as e:
+        logger.error(f"Error rendering template '{template_name}': {str(e)}")
+        return f"<p>Could not display email content. Please access {context.get('verification_link', '') or context.get('reset_link', '')}</p>"
+
+def send_verification_email(email: str, token: str) -> bool:
+    """
+    Send a verification email to the user
+    
+    Args:
+        email: Recipient's email
+        token: Email verification token
+        
+    Returns:
+        bool: True if the email was sent successfully, False otherwise
     """
     try:
         sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
         from_email = Email(settings.EMAIL_FROM)
         to_email = To(email)
-        subject = "Verificação de Email - Evo AI"
+        subject = "Email Verification - Evo AI"
         
         verification_link = f"{settings.APP_URL}/auth/verify-email/{token}"
         
-        content = Content(
-            "text/html", 
-            f"""
-            <html>
-            <head>
-                <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background-color: #4A90E2; color: white; padding: 10px; text-align: center; }}
-                    .content {{ padding: 20px; }}
-                    .button {{ background-color: #4A90E2; color: white; padding: 10px 20px; 
-                              text-decoration: none; border-radius: 4px; display: inline-block; }}
-                    .footer {{ font-size: 12px; text-align: center; margin-top: 30px; color: #888; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>Evo AI</h1>
-                    </div>
-                    <div class="content">
-                        <h2>Bem-vindo à Plataforma Evo AI!</h2>
-                        <p>Obrigado por se cadastrar. Para verificar sua conta e começar a usar nossos serviços, 
-                           por favor clique no botão abaixo:</p>
-                        <p style="text-align: center;">
-                            <a href="{verification_link}" class="button">Verificar meu Email</a>
-                        </p>
-                        <p>Ou copie e cole o link abaixo no seu navegador:</p>
-                        <p>{verification_link}</p>
-                        <p>Este link é válido por 24 horas.</p>
-                        <p>Se você não solicitou este email, por favor ignore-o.</p>
-                    </div>
-                    <div class="footer">
-                        <p>Este é um email automático, por favor não responda.</p>
-                        <p>&copy; {datetime.now().year} Evo AI. Todos os direitos reservados.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """
-        )
+        html_content = _render_template('verification_email', {
+            'verification_link': verification_link,
+            'user_name': email.split('@')[0],  # Use part of the email as temporary name
+            'current_year': datetime.now().year
+        })
+        
+        content = Content("text/html", html_content)
         
         mail = Mail(from_email, to_email, subject, content)
         response = sg.client.mail.send.post(request_body=mail.get())
         
         if response.status_code >= 200 and response.status_code < 300:
-            logger.info(f"Email de verificação enviado para {email}")
+            logger.info(f"Verification email sent to {email}")
             return True
         else:
-            logger.error(f"Falha ao enviar email de verificação para {email}. Status: {response.status_code}")
+            logger.error(f"Failed to send verification email to {email}. Status: {response.status_code}")
             return False
             
     except Exception as e:
-        logger.error(f"Erro ao enviar email de verificação para {email}: {str(e)}")
+        logger.error(f"Error sending verification email to {email}: {str(e)}")
         return False
 
 def send_password_reset_email(email: str, token: str) -> bool:
     """
-    Envia um email de redefinição de senha para o usuário
+    Send a password reset email to the user
     
     Args:
-        email: Email do destinatário
-        token: Token de redefinição de senha
+        email: Recipient's email
+        token: Password reset token
         
     Returns:
-        bool: True se o email foi enviado com sucesso, False caso contrário
+        bool: True if the email was sent successfully, False otherwise
     """
     try:
         sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
         from_email = Email(settings.EMAIL_FROM)
         to_email = To(email)
-        subject = "Redefinição de Senha - Evo AI"
+        subject = "Password Reset - Evo AI"
         
         reset_link = f"{settings.APP_URL}/reset-password?token={token}"
         
-        content = Content(
-            "text/html", 
-            f"""
-            <html>
-            <head>
-                <style>
-                    body {{ font-family: Arial, sans-serif; line-height: 1.6; }}
-                    .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                    .header {{ background-color: #4A90E2; color: white; padding: 10px; text-align: center; }}
-                    .content {{ padding: 20px; }}
-                    .button {{ background-color: #4A90E2; color: white; padding: 10px 20px; 
-                              text-decoration: none; border-radius: 4px; display: inline-block; }}
-                    .footer {{ font-size: 12px; text-align: center; margin-top: 30px; color: #888; }}
-                    .warning {{ color: #E74C3C; }}
-                </style>
-            </head>
-            <body>
-                <div class="container">
-                    <div class="header">
-                        <h1>Evo AI</h1>
-                    </div>
-                    <div class="content">
-                        <h2>Redefinição de Senha</h2>
-                        <p>Recebemos uma solicitação para redefinir sua senha. Clique no botão abaixo 
-                           para criar uma nova senha:</p>
-                        <p style="text-align: center;">
-                            <a href="{reset_link}" class="button">Redefinir minha Senha</a>
-                        </p>
-                        <p>Ou copie e cole o link abaixo no seu navegador:</p>
-                        <p>{reset_link}</p>
-                        <p>Este link é válido por 1 hora.</p>
-                        <p class="warning">Se você não solicitou esta alteração, por favor ignore este email 
-                           e entre em contato com o suporte imediatamente.</p>
-                    </div>
-                    <div class="footer">
-                        <p>Este é um email automático, por favor não responda.</p>
-                        <p>&copy; {datetime.now().year} Evo AI. Todos os direitos reservados.</p>
-                    </div>
-                </div>
-            </body>
-            </html>
-            """
-        )
+        html_content = _render_template('password_reset', {
+            'reset_link': reset_link,
+            'user_name': email.split('@')[0],  # Use part of the email as temporary name
+            'current_year': datetime.now().year
+        })
+        
+        content = Content("text/html", html_content)
         
         mail = Mail(from_email, to_email, subject, content)
         response = sg.client.mail.send.post(request_body=mail.get())
         
         if response.status_code >= 200 and response.status_code < 300:
-            logger.info(f"Email de redefinição de senha enviado para {email}")
+            logger.info(f"Password reset email sent to {email}")
             return True
         else:
-            logger.error(f"Falha ao enviar email de redefinição de senha para {email}. Status: {response.status_code}")
+            logger.error(f"Failed to send password reset email to {email}. Status: {response.status_code}")
             return False
             
     except Exception as e:
-        logger.error(f"Erro ao enviar email de redefinição de senha para {email}: {str(e)}")
+        logger.error(f"Error sending password reset email to {email}: {str(e)}")
+        return False
+
+def send_welcome_email(email: str, user_name: str = None) -> bool:
+    """
+    Send a welcome email to the user after verification
+    
+    Args:
+        email: Recipient's email
+        user_name: User's name (optional)
+        
+    Returns:
+        bool: True if the email was sent successfully, False otherwise
+    """
+    try:
+        sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
+        from_email = Email(settings.EMAIL_FROM)
+        to_email = To(email)
+        subject = "Welcome to Evo AI"
+        
+        dashboard_link = f"{settings.APP_URL}/dashboard"
+        
+        html_content = _render_template('welcome_email', {
+            'dashboard_link': dashboard_link,
+            'user_name': user_name or email.split('@')[0],
+            'current_year': datetime.now().year
+        })
+        
+        content = Content("text/html", html_content)
+        
+        mail = Mail(from_email, to_email, subject, content)
+        response = sg.client.mail.send.post(request_body=mail.get())
+        
+        if response.status_code >= 200 and response.status_code < 300:
+            logger.info(f"Welcome email sent to {email}")
+            return True
+        else:
+            logger.error(f"Failed to send welcome email to {email}. Status: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error sending welcome email to {email}: {str(e)}")
+        return False
+
+def send_account_locked_email(email: str, reset_token: str, failed_attempts: int, time_period: str) -> bool:
+    """
+    Send an email informing that the account has been locked after login attempts
+    
+    Args:
+        email: Recipient's email
+        reset_token: Token to reset the password
+        failed_attempts: Number of failed attempts
+        time_period: Time period of the attempts
+        
+    Returns:
+        bool: True if the email was sent successfully, False otherwise
+    """
+    try:
+        sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
+        from_email = Email(settings.EMAIL_FROM)
+        to_email = To(email)
+        subject = "Security Alert - Account Locked"
+        
+        reset_link = f"{settings.APP_URL}/reset-password?token={reset_token}"
+        
+        html_content = _render_template('account_locked', {
+            'reset_link': reset_link,
+            'user_name': email.split('@')[0],
+            'failed_attempts': failed_attempts,
+            'time_period': time_period,
+            'current_year': datetime.now().year
+        })
+        
+        content = Content("text/html", html_content)
+        
+        mail = Mail(from_email, to_email, subject, content)
+        response = sg.client.mail.send.post(request_body=mail.get())
+        
+        if response.status_code >= 200 and response.status_code < 300:
+            logger.info(f"Account locked email sent to {email}")
+            return True
+        else:
+            logger.error(f"Failed to send account locked email to {email}. Status: {response.status_code}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error sending account locked email to {email}: {str(e)}")
         return False 

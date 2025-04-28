@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, EmailStr
 from typing import Optional, Dict, Any, Union, List
 from datetime import datetime
 from uuid import UUID
@@ -8,6 +8,7 @@ from .agent_config import LLMConfig, SequentialConfig, ParallelConfig, LoopConfi
 
 class ClientBase(BaseModel):
     name: str
+    email: Optional[EmailStr] = None
 
 class ClientCreate(ClientBase):
     pass

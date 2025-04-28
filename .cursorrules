@@ -41,6 +41,10 @@ src/
 │   ├── auth_service.py    # JWT authentication logic
 │   ├── email_service.py   # Email sending service
 │   └── audit_service.py   # Audit logs logic
+├── templates/
+│   ├── emails/
+│   │   ├── verification_email.html
+│   │   └── password_reset.html
 └── utils/
     └── security.py        # Security utilities (JWT, hash)
 ```

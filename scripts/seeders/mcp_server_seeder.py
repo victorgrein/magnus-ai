@@ -17,105 +17,169 @@ from dotenv import load_dotenv
 from src.models.models import MCPServer
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
 
 def create_mcp_servers():
     """Cria servidores MCP padrão no sistema"""
     try:
         # Carregar variáveis de ambiente
         load_dotenv()
-        
+
         # Obter configurações do banco de dados
         db_url = os.getenv("POSTGRES_CONNECTION_STRING")
         if not db_url:
             logger.error("Variável de ambiente POSTGRES_CONNECTION_STRING não definida")
             return False
-        
+
         # Conectar ao banco de dados
         engine = create_engine(db_url)
         Session = sessionmaker(bind=engine)
         session = Session()
-        
+
         try:
             # Verificar se já existem servidores MCP
             existing_servers = session.query(MCPServer).all()
             if existing_servers:
-                logger.info(f"Já existem {len(existing_servers)} servidores MCP cadastrados")
+                logger.info(
+                    f"Já existem {len(existing_servers)} servidores MCP cadastrados"
+                )
                 return True
-            
+
             # Definições dos servidores MCP
             mcp_servers = [
                 {
-                    "name": "Anthropic Claude",
-                    "description": "Servidor para modelos Claude da Anthropic",
+                    "name": "Sequential Thinking",
+                    "description": "Sequential Thinking helps users organize their thoughts and break down complex problems through a structured workflow. By guiding users through defined cognitive stages like Problem Definition, Research, Analysis, Synthesis, and Conclusion, it provides a framework for progressive thinking. The server tracks the progression of your thinking process, identifies connections between similar thoughts, monitors progress, and generates summaries, making it easier to approach challenges methodically and reach well-reasoned conclusions.",
                     "config_json": {
-                        "provider": "anthropic",
-                        "models": ["claude-3-sonnet-20240229", "claude-3-opus-20240229", "claude-3-haiku-20240307"],
-                        "api_base": "https://api.anthropic.com/v1",
-                        "api_key_env": "ANTHROPIC_API_KEY"
+                        "command": "npx",
+                        "args": [
+                            "-y",
+                            "@modelcontextprotocol/server-sequential-thinking",
+                        ],
                     },
-                    "environments": {
-                        "production": True,
-                        "development": True,
-                        "staging": True
-                    },
-                    "tools": ["function_calling", "web_search"],
-                    "type": "official"
+                    "environments": {},
+                    "tools": ["sequential_thinking"],
+                    "type": "community",
+                    "id": "4519dd69-9343-4792-af51-dc4d322fb0c9",
+                    "created_at": "2025-04-28T15:14:16.901236Z",
+                    "updated_at": "2025-04-28T15:43:42.755205Z",
                 },
                 {
-                    "name": "OpenAI GPT",
-                    "description": "Servidor para modelos GPT da OpenAI",
+                    "name": "CloudFlare",
+                    "description": "Model Context Protocol (MCP) is a new, standardized protocol for managing context between large language models (LLMs) and external systems. In this repository, we provide an installer as well as an MCP Server for Cloudflare's API.\r\n\r\nThis lets you use Claude Desktop, or any MCP Client, to use natural language to accomplish things on your Cloudflare account, e.g.:\r\n\r\nList all the Cloudflare workers on my <some-email>@gmail.com account.\r\nCan you tell me about any potential issues on this particular worker '...'?",
                     "config_json": {
-                        "provider": "openai",
-                        "models": ["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
-                        "api_base": "https://api.openai.com/v1",
-                        "api_key_env": "OPENAI_API_KEY"
+                        "url": "https://observability.mcp.cloudflare.com/sse"
                     },
-                    "environments": {
-                        "production": True,
-                        "development": True,
-                        "staging": True
-                    },
-                    "tools": ["function_calling", "web_search", "image_generation"],
-                    "type": "official"
+                    "environments": {},
+                    "tools": [
+                        "worker_list",
+                        "worker_get",
+                        "worker_put",
+                        "worker_delete",
+                        "worker_get_worker",
+                        "worker_logs_by_worker_name",
+                        "worker_logs_by_ray_id",
+                        "worker_logs_keys",
+                        "get_kvs",
+                        "kv_get",
+                        "kv_put",
+                        "kv_list",
+                        "kv_delete",
+                        "r2_list_buckets",
+                        "r2_create_bucket",
+                        "r2_delete_bucket",
+                        "r2_list_objects",
+                        "r2_get_object",
+                        "r2_put_object",
+                        "r2_delete_object",
+                        "d1_list_databases",
+                        "d1_create_database",
+                        "d1_delete_database",
+                        "d1_query",
+                        "durable_objects_list",
+                        "durable_objects_create",
+                        "durable_objects_delete",
+                        "durable_objects_list_instances",
+                        "durable_objects_get_instance",
+                        "durable_objects_delete_instance",
+                        "queues_list",
+                        "queues_create",
+                        "queues_delete",
+                        "queues_get",
+                        "queues_send_message",
+                        "queues_get_messages",
+                        "queues_update_consumer",
+                        "workers_ai_list_models",
+                        "workers_ai_get_model",
+                        "workers_ai_run_inference",
+                        "workers_ai_list_tasks",
+                        "workflows_list",
+                        "workflows_create",
+                        "workflows_delete",
+                        "workflows_get",
+                        "workflows_update",
+                        "workflows_execute",
+                        "templates_list",
+                        "templates_get",
+                        "templates_create_from_template",
+                        "w4p_list_dispatchers",
+                        "w4p_create_dispatcher",
+                        "w4p_delete_dispatcher",
+                        "w4p_get_dispatcher",
+                        "w4p_update_dispatcher",
+                        "bindings_list",
+                        "bindings_create",
+                        "bindings_update",
+                        "bindings_delete",
+                        "routing_list_routes",
+                        "routing_create_route",
+                        "routing_update_route",
+                        "routing_delete_route",
+                        "cron_list",
+                        "cron_create",
+                        "cron_update",
+                        "cron_delete",
+                        "zones_list",
+                        "zones_create",
+                        "zones_delete",
+                        "zones_get",
+                        "zones_check_activation",
+                        "secrets_list",
+                        "secrets_put",
+                        "secrets_delete",
+                        "versions_list",
+                        "versions_get",
+                        "versions_rollback",
+                        "wrangler_get_config",
+                        "wrangler_update_config",
+                        "analytics_get",
+                    ],
+                    "type": "official",
+                    "id": "9138d1a2-24e6-4a75-87b0-bfa4932273e8",
+                    "created_at": "2025-04-28T15:16:53.350824Z",
+                    "updated_at": "2025-04-28T15:48:04.821766Z",
                 },
                 {
-                    "name": "Google Gemini",
-                    "description": "Servidor para modelos Gemini do Google",
+                    "name": "Brave Search",
+                    "description": "Brave Search allows you to seamlessly integrate Brave Search functionality into AI assistants like Claude. By implementing a Model Context Protocol (MCP) server, it enables the AI to leverage Brave Search's web search and local business search capabilities. It provides tools for both general web searches and specific local searches, enhancing the AI assistant's ability to provide relevant and up-to-date information.",
                     "config_json": {
-                        "provider": "google",
-                        "models": ["gemini-pro", "gemini-ultra"],
-                        "api_base": "https://generativelanguage.googleapis.com/v1",
-                        "api_key_env": "GOOGLE_API_KEY"
+                        "command": "npx",
+                        "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+                        "env": {"BRAVE_API_KEY": "env@@BRAVE_API_KEY"},
                     },
-                    "environments": {
-                        "production": True,
-                        "development": True,
-                        "staging": True
-                    },
-                    "tools": ["function_calling", "web_search"],
-                    "type": "official"
+                    "environments": {"BRAVE_API_KEY": "env@@BRAVE_API_KEY"},
+                    "tools": ["brave_web_search", "brave_local_search"],
+                    "type": "official",
+                    "id": "416c94d7-77f5-43f4-8181-aeb87934ecbf",
+                    "created_at": "2025-04-28T15:20:07.647225Z",
+                    "updated_at": "2025-04-28T15:49:17.434428Z",
                 },
-                {
-                    "name": "Ollama Local",
-                    "description": "Servidor para modelos locais via Ollama",
-                    "config_json": {
-                        "provider": "ollama",
-                        "models": ["llama3", "mistral", "mixtral"],
-                        "api_base": "http://localhost:11434",
-                        "api_key_env": None
-                    },
-                    "environments": {
-                        "production": False,
-                        "development": True,
-                        "staging": False
-                    },
-                    "tools": [],
-                    "type": "community"
-                }
             ]
-            
+
             # Criar os servidores MCP
             for server_data in mcp_servers:
                 server = MCPServer(
@@ -124,27 +188,28 @@ def create_mcp_servers():
                     config_json=server_data["config_json"],
                     environments=server_data["environments"],
                     tools=server_data["tools"],
-                    type=server_data["type"]
+                    type=server_data["type"],
                 )
-                
+
                 session.add(server)
                 logger.info(f"Servidor MCP '{server_data['name']}' criado com sucesso")
-            
+
             session.commit()
             logger.info("Todos os servidores MCP foram criados com sucesso")
             return True
-            
+
         except SQLAlchemyError as e:
             session.rollback()
             logger.error(f"Erro de banco de dados ao criar servidores MCP: {str(e)}")
             return False
-        
+
     except Exception as e:
         logger.error(f"Erro ao criar servidores MCP: {str(e)}")
         return False
     finally:
         session.close()
 
+
 if __name__ == "__main__":
     success = create_mcp_servers()
-    sys.exit(0 if success else 1) 
+    sys.exit(0 if success else 1)

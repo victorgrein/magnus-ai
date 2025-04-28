@@ -16,3 +16,7 @@ python-jose[cryptography]
 passlib[bcrypt]
 sendgrid
 pydantic[email]
+pydantic-settings
+fastapi_utils
+bcrypt
+jinja2

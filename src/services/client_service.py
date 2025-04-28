@@ -3,7 +3,9 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 from src.models.models import Client
 from src.schemas.schemas import ClientCreate
-from typing import List, Optional
+from src.schemas.user import UserCreate
+from src.services.user_service import create_user
+from typing import List, Optional, Tuple
 import uuid
 import logging
 
@@ -91,4 +93,46 @@ def delete_client(db: Session, client_id: uuid.UUID) -> bool:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Erro ao remover cliente"
-        ) 
+        )
+
+def create_client_with_user(db: Session, client_data: ClientCreate, user_data: UserCreate) -> Tuple[Optional[Client], str]:
+    """
+    Cria um novo cliente com um usuário associado
+    
+    Args:
+        db: Sessão do banco de dados
+        client_data: Dados do cliente a ser criado
+        user_data: Dados do usuário a ser criado
+        
+    Returns:
+        Tuple[Optional[Client], str]: Tupla com o cliente criado (ou None em caso de erro) e mensagem de status
+    """
+    try:
+        # Iniciar transação - primeiro cria o cliente
+        client = Client(**client_data.model_dump())
+        db.add(client)
+        db.flush()  # Obter o ID do cliente sem confirmar a transação
+        
+        # Usar o ID do cliente para criar o usuário associado
+        user, message = create_user(db, user_data, is_admin=False, client_id=client.id)
+        
+        if not user:
+            # Se houve erro na criação do usuário, fazer rollback
+            db.rollback()
+            logger.error(f"Erro ao criar usuário para o cliente: {message}")
+            return None, f"Erro ao criar usuário: {message}"
+        
+        # Se tudo correu bem, confirmar a transação
+        db.commit()
+        logger.info(f"Cliente e usuário criados com sucesso: {client.id}")
+        return client, "Cliente e usuário criados com sucesso"
+        
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Erro ao criar cliente com usuário: {str(e)}")
+        return None, f"Erro ao criar cliente com usuário: {str(e)}"
+    
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Erro inesperado ao criar cliente com usuário: {str(e)}")
+        return None, f"Erro inesperado: {str(e)}" 

@@ -5,8 +5,18 @@ import string
 from jose import jwt
 from src.config.settings import settings
 import logging
+import bcrypt
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+# Corrigir erro do bcrypt com passlib
+if not hasattr(bcrypt, '__about__'):
+    @dataclass
+    class BcryptAbout:
+        __version__: str = getattr(bcrypt, "__version__")
+    
+    setattr(bcrypt, "__about__", BcryptAbout())
 
 # Contexto para hash de senhas usando bcrypt
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

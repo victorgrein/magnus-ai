@@ -10,6 +10,10 @@ class UserCreate(UserBase):
     password: str
     name: str  # Para criação do cliente associado
 
+class AdminUserCreate(UserBase):
+    password: str
+    name: str
+
 class UserLogin(BaseModel):
     email: EmailStr
     password: str

@@ -11,7 +11,7 @@ from typing import Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
-def create_user(db: Session, user_data: UserCreate, is_admin: bool = False) -> Tuple[Optional[User], str]:
+def create_user(db: Session, user_data: UserCreate, is_admin: bool = False, client_id: Optional[uuid.UUID] = None) -> Tuple[Optional[User], str]:
     """
     Cria um novo usuário no sistema
     
@@ -19,6 +19,7 @@ def create_user(db: Session, user_data: UserCreate, is_admin: bool = False) -> T
         db: Sessão do banco de dados
         user_data: Dados do usuário a ser criado
         is_admin: Se o usuário é um administrador
+        client_id: ID do cliente associado (opcional, será criado um novo se não fornecido)
         
     Returns:
         Tuple[Optional[User], str]: Tupla com o usuário criado (ou None em caso de erro) e mensagem de status
@@ -36,21 +37,21 @@ def create_user(db: Session, user_data: UserCreate, is_admin: bool = False) -> T
         
         # Iniciar transação
         user = None
-        client_id = None
+        local_client_id = client_id
         
         try:
-            # Se não for admin, criar um cliente associado
-            if not is_admin:
+            # Se não for admin e não tiver client_id, criar um cliente associado
+            if not is_admin and local_client_id is None:
                 client = Client(name=user_data.name)
                 db.add(client)
                 db.flush()  # Obter o ID do cliente
-                client_id = client.id
+                local_client_id = client.id
             
             # Criar usuário
             user = User(
                 email=user_data.email,
                 password_hash=get_password_hash(user_data.password),
-                client_id=client_id,
+                client_id=local_client_id,
                 is_admin=is_admin,
                 is_active=False,  # Inativo até verificar email
                 email_verified=False,
@@ -80,14 +81,14 @@ def create_user(db: Session, user_data: UserCreate, is_admin: bool = False) -> T
 
 def verify_email(db: Session, token: str) -> Tuple[bool, str]:
     """
-    Verifica o email de um usuário usando o token fornecido
+    Verifica o email do usuário usando o token fornecido
     
     Args:
         db: Sessão do banco de dados
         token: Token de verificação
         
     Returns:
-        Tuple[bool, str]: Tupla com status da operação e mensagem
+        Tuple[bool, str]: Tupla com status da verificação e mensagem
     """
     try:
         # Buscar usuário pelo token
@@ -98,7 +99,18 @@ def verify_email(db: Session, token: str) -> Tuple[bool, str]:
             return False, "Token de verificação inválido"
         
         # Verificar se o token expirou
-        if user.verification_token_expiry < datetime.utcnow():
+        now = datetime.utcnow()
+        expiry = user.verification_token_expiry
+        
+        # Garantir que ambas as datas sejam do mesmo tipo (aware ou naive)
+        if expiry.tzinfo is not None and now.tzinfo is None:
+            # Se expiry tem fuso e now não, converter now para ter fuso
+            now = now.replace(tzinfo=expiry.tzinfo)
+        elif now.tzinfo is not None and expiry.tzinfo is None:
+            # Se now tem fuso e expiry não, converter expiry para ter fuso
+            expiry = expiry.replace(tzinfo=now.tzinfo)
+            
+        if expiry < now:
             logger.warning(f"Tentativa de verificação com token expirado para usuário: {user.email}")
             return False, "Token de verificação expirado"
         
@@ -299,4 +311,77 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
         return None
     if not user.is_active:
         return None
-    return user 
+    return user
+
+def get_admin_users(db: Session, skip: int = 0, limit: int = 100):
+    """
+    Lista os usuários administradores
+    
+    Args:
+        db: Sessão do banco de dados
+        skip: Número de registros para pular
+        limit: Número máximo de registros para retornar
+        
+    Returns:
+        List[User]: Lista de usuários administradores
+    """
+    try:
+        users = db.query(User).filter(User.is_admin == True).offset(skip).limit(limit).all()
+        logger.info(f"Listagem de administradores: {len(users)} encontrados")
+        return users
+        
+    except SQLAlchemyError as e:
+        logger.error(f"Erro ao listar administradores: {str(e)}")
+        return []
+    
+    except Exception as e:
+        logger.error(f"Erro inesperado ao listar administradores: {str(e)}")
+        return []
+
+def create_admin_user(db: Session, user_data: UserCreate) -> Tuple[Optional[User], str]:
+    """
+    Cria um novo usuário administrador
+    
+    Args:
+        db: Sessão do banco de dados
+        user_data: Dados do usuário a ser criado
+        
+    Returns:
+        Tuple[Optional[User], str]: Tupla com o usuário criado (ou None em caso de erro) e mensagem de status
+    """
+    return create_user(db, user_data, is_admin=True)
+
+def deactivate_user(db: Session, user_id: uuid.UUID) -> Tuple[bool, str]:
+    """
+    Desativa um usuário (não exclui, apenas marca como inativo)
+    
+    Args:
+        db: Sessão do banco de dados
+        user_id: ID do usuário a ser desativado
+        
+    Returns:
+        Tuple[bool, str]: Tupla com status da operação e mensagem
+    """
+    try:
+        # Buscar usuário pelo ID
+        user = db.query(User).filter(User.id == user_id).first()
+        
+        if not user:
+            logger.warning(f"Tentativa de desativação de usuário inexistente: {user_id}")
+            return False, "Usuário não encontrado"
+        
+        # Desativar usuário
+        user.is_active = False
+        
+        db.commit()
+        logger.info(f"Usuário desativado com sucesso: {user.email}")
+        return True, "Usuário desativado com sucesso"
+        
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Erro ao desativar usuário: {str(e)}")
+        return False, f"Erro ao desativar usuário: {str(e)}"
+    
+    except Exception as e:
+        logger.error(f"Erro inesperado ao desativar usuário: {str(e)}")
+        return False, f"Erro inesperado: {str(e)}" 

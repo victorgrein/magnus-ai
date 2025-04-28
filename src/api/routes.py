@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any
 import uuid
 from datetime import datetime
+from pydantic import BaseModel, EmailStr
 
 from src.config.database import get_db
-from src.core.jwt_middleware import get_jwt_token, verify_user_client, verify_admin, get_current_user_client_id
+from src.core.jwt_middleware import (
+    get_jwt_token,
+    verify_user_client,
+    verify_admin,
+    get_current_user_client_id,
+)
 from src.schemas.schemas import (
     Client,
     ClientCreate,
@@ -18,6 +24,7 @@ from src.schemas.schemas import (
     Tool,
     ToolCreate,
 )
+from src.schemas.user import UserCreate
 from src.services import (
     client_service,
     contact_service,
@@ -52,6 +59,12 @@ session_service = DatabaseSessionService(db_url=POSTGRES_CONNECTION_STRING)
 artifacts_service = InMemoryArtifactService()
 memory_service = InMemoryMemoryService()
 
+# Definindo um novo schema para registro combinado de cliente e usuário
+class ClientRegistration(BaseModel):
+    name: str
+    email: EmailStr
+    password: str
+
 
 @router.post(
     "/chat",
@@ -71,13 +84,12 @@ async def chat(
     agent = agent_service.get_agent(db, request.agent_id)
     if not agent:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Agente não encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Agente não encontrado"
         )
-    
+
     # Verificar se o usuário tem acesso ao agente (via cliente)
     await verify_user_client(payload, db, agent.client_id)
-    
+
     try:
         final_response_text = await run_agent(
             request.agent_id,
@@ -127,13 +139,12 @@ async def get_agent_sessions(
     agent = agent_service.get_agent(db, agent_id)
     if not agent:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Agente não encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Agente não encontrado"
         )
-    
+
     # Verificar se o usuário tem acesso ao agente (via cliente)
     await verify_user_client(payload, db, agent.client_id)
-    
+
     return get_sessions_by_agent(db, agent_id, skip, limit)
 
 
@@ -147,17 +158,16 @@ async def get_session(
     session = get_session_by_id(session_service, session_id)
     if not session:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Sessão não encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Sessão não encontrada"
         )
-    
+
     # Verificar se o agente da sessão pertence ao cliente do usuário
     agent_id = uuid.UUID(session.agent_id) if session.agent_id else None
     if agent_id:
         agent = agent_service.get_agent(db, agent_id)
         if agent:
             await verify_user_client(payload, db, agent.client_id)
-    
+
     return session
 
 
@@ -174,17 +184,16 @@ async def get_agent_messages(
     session = get_session_by_id(session_service, session_id)
     if not session:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Sessão não encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Sessão não encontrada"
         )
-    
+
     # Verificar se o agente da sessão pertence ao cliente do usuário
     agent_id = uuid.UUID(session.agent_id) if session.agent_id else None
     if agent_id:
         agent = agent_service.get_agent(db, agent_id)
         if agent:
             await verify_user_client(payload, db, agent.client_id)
-    
+
     return get_session_events(session_service, session_id)
 
 
@@ -201,30 +210,52 @@ async def remove_session(
     session = get_session_by_id(session_service, session_id)
     if not session:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
-            detail="Sessão não encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Sessão não encontrada"
         )
-    
+
     # Verificar se o agente da sessão pertence ao cliente do usuário
     agent_id = uuid.UUID(session.agent_id) if session.agent_id else None
     if agent_id:
         agent = agent_service.get_agent(db, agent_id)
         if agent:
             await verify_user_client(payload, db, agent.client_id)
-    
+
     return delete_session(session_service, session_id)
 
 
 # Rotas para Clientes
+
+
 @router.post("/clients/", response_model=Client, status_code=status.HTTP_201_CREATED)
-async def create_client(
-    client: ClientCreate,
+async def create_user(
+    registration: ClientRegistration,
     db: Session = Depends(get_db),
     payload: dict = Depends(get_jwt_token),
 ):
+    """
+    Cria um cliente e um usuário associado a ele
+
+    Args:
+        registration: Dados do cliente e usuário a serem criados
+        db: Sessão do banco de dados
+        payload: Payload do token JWT
+
+    Returns:
+        Client: Cliente criado
+    """
     # Apenas administradores podem criar clientes
     await verify_admin(payload)
-    return client_service.create_client(db, client)
+
+    # Criar objetos ClientCreate e UserCreate a partir do ClientRegistration
+    client = ClientCreate(name=registration.name, email=registration.email)
+    user = UserCreate(email=registration.email, password=registration.password, name=registration.name)
+
+    # Criar cliente com usuário
+    client_obj, message = client_service.create_client_with_user(db, client, user)
+    if not client_obj:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
+
+    return client_obj
 
 
 @router.get("/clients/", response_model=List[Client])
@@ -237,7 +268,7 @@ async def read_clients(
     # Se for administrador, pode ver todos os clientes
     # Se for usuário comum, só vê o próprio cliente
     client_id = get_current_user_client_id(payload)
-    
+
     if client_id:
         # Usuário comum - retorna apenas seu próprio cliente
         client = client_service.get_client(db, client_id)
@@ -255,7 +286,7 @@ async def read_client(
 ):
     # Verificar se o usuário tem acesso aos dados deste cliente
     await verify_user_client(payload, db, client_id)
-    
+
     db_client = client_service.get_client(db, client_id)
     if db_client is None:
         raise HTTPException(
@@ -273,7 +304,7 @@ async def update_client(
 ):
     # Verificar se o usuário tem acesso aos dados deste cliente
     await verify_user_client(payload, db, client_id)
-    
+
     db_client = client_service.update_client(db, client_id, client)
     if db_client is None:
         raise HTTPException(
@@ -290,7 +321,7 @@ async def delete_client(
 ):
     # Apenas administradores podem excluir clientes
     await verify_admin(payload)
-    
+
     if not client_service.delete_client(db, client_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Cliente não encontrado"
@@ -306,7 +337,7 @@ async def create_contact(
 ):
     # Verificar se o usuário tem acesso ao cliente do contato
     await verify_user_client(payload, db, contact.client_id)
-    
+
     return contact_service.create_contact(db, contact)
 
 
@@ -320,7 +351,7 @@ async def read_contacts(
 ):
     # Verificar se o usuário tem acesso aos dados deste cliente
     await verify_user_client(payload, db, client_id)
-    
+
     return contact_service.get_contacts_by_client(db, client_id, skip, limit)
 
 
@@ -335,10 +366,10 @@ async def read_contact(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Contato não encontrado"
         )
-    
+
     # Verificar se o usuário tem acesso ao cliente do contato
     await verify_user_client(payload, db, db_contact.client_id)
-    
+
     return db_contact
 
 
@@ -355,15 +386,15 @@ async def update_contact(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Contato não encontrado"
         )
-    
+
     # Verificar se o usuário tem acesso ao cliente do contato
     await verify_user_client(payload, db, db_current_contact.client_id)
-    
+
     # Verificar se está tentando mudar o cliente
     if contact.client_id != db_current_contact.client_id:
         # Verificar se o usuário tem acesso ao novo cliente também
         await verify_user_client(payload, db, contact.client_id)
-    
+
     db_contact = contact_service.update_contact(db, contact_id, contact)
     if db_contact is None:
         raise HTTPException(
@@ -384,10 +415,10 @@ async def delete_contact(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Contato não encontrado"
         )
-    
+
     # Verificar se o usuário tem acesso ao cliente do contato
     await verify_user_client(payload, db, db_contact.client_id)
-    
+
     if not contact_service.delete_contact(db, contact_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Contato não encontrado"
@@ -403,7 +434,7 @@ async def create_agent(
 ):
     # Verificar se o usuário tem acesso ao cliente do agente
     await verify_user_client(payload, db, agent.client_id)
-    
+
     return agent_service.create_agent(db, agent)
 
 
@@ -417,7 +448,7 @@ async def read_agents(
 ):
     # Verificar se o usuário tem acesso aos dados deste cliente
     await verify_user_client(payload, db, client_id)
-    
+
     return agent_service.get_agents_by_client(db, client_id, skip, limit)
 
 
@@ -432,16 +463,16 @@ async def read_agent(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Agente não encontrado"
         )
-    
+
     # Verificar se o usuário tem acesso ao cliente do agente
     await verify_user_client(payload, db, db_agent.client_id)
-    
+
     return db_agent
 
 
 @router.put("/agent/{agent_id}", response_model=Agent)
 async def update_agent(
-    agent_id: uuid.UUID, 
+    agent_id: uuid.UUID,
     agent_data: Dict[str, Any],
     db: Session = Depends(get_db),
     payload: dict = Depends(get_jwt_token),
@@ -452,15 +483,15 @@ async def update_agent(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Agente não encontrado"
         )
-    
+
     # Verificar se o usuário tem acesso ao cliente do agente
     await verify_user_client(payload, db, db_agent.client_id)
-    
+
     # Se estiver tentando mudar o client_id, verificar permissão para o novo cliente também
-    if 'client_id' in agent_data and agent_data['client_id'] != str(db_agent.client_id):
-        new_client_id = uuid.UUID(agent_data['client_id'])
+    if "client_id" in agent_data and agent_data["client_id"] != str(db_agent.client_id):
+        new_client_id = uuid.UUID(agent_data["client_id"])
         await verify_user_client(payload, db, new_client_id)
-    
+
     return await agent_service.update_agent(db, agent_id, agent_data)
 
 
@@ -476,10 +507,10 @@ async def delete_agent(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Agente não encontrado"
         )
-    
+
     # Verificar se o usuário tem acesso ao cliente do agente
     await verify_user_client(payload, db, db_agent.client_id)
-    
+
     if not agent_service.delete_agent(db, agent_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Agente não encontrado"
@@ -497,7 +528,7 @@ async def create_mcp_server(
 ):
     # Apenas administradores podem criar servidores MCP
     await verify_admin(payload)
-    
+
     return mcp_server_service.create_mcp_server(db, server)
 
 
@@ -536,7 +567,7 @@ async def update_mcp_server(
 ):
     # Apenas administradores podem atualizar servidores MCP
     await verify_admin(payload)
-    
+
     db_server = mcp_server_service.update_mcp_server(db, server_id, server)
     if db_server is None:
         raise HTTPException(
@@ -553,7 +584,7 @@ async def delete_mcp_server(
 ):
     # Apenas administradores podem excluir servidores MCP
     await verify_admin(payload)
-    
+
     if not mcp_server_service.delete_mcp_server(db, server_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Servidor MCP não encontrado"
@@ -569,7 +600,7 @@ async def create_tool(
 ):
     # Apenas administradores podem criar ferramentas
     await verify_admin(payload)
-    
+
     return tool_service.create_tool(db, tool)
 
 
@@ -608,7 +639,7 @@ async def update_tool(
 ):
     # Apenas administradores podem atualizar ferramentas
     await verify_admin(payload)
-    
+
     db_tool = tool_service.update_tool(db, tool_id, tool)
     if db_tool is None:
         raise HTTPException(
@@ -625,7 +656,7 @@ async def delete_tool(
 ):
     # Apenas administradores podem excluir ferramentas
     await verify_admin(payload)
-    
+
     if not tool_service.delete_tool(db, tool_id):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Ferramenta não encontrada"

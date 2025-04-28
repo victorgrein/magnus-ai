@@ -7,6 +7,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from src.config.settings import settings
+from src.config.database import get_db
 from datetime import datetime, timedelta
 import logging
 from typing import Optional
@@ -146,7 +147,4 @@ def create_access_token(user: User) -> str:
         token_data["client_id"] = str(user.client_id)
     
     # Criar token
-    return create_jwt_token(token_data)
-
-# Dependência para obter a sessão do banco de dados
-from src.config.database import get_db 
+    return create_jwt_token(token_data) 
