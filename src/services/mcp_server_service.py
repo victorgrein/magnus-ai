@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 from src.models.models import MCPServer
-from src.schemas.schemas import MCPServerCreate
+from src.schemas.schemas import MCPServerCreate, ToolConfig
 from typing import List, Optional
 import uuid
 import logging
@@ -41,7 +41,11 @@ def get_mcp_servers(db: Session, skip: int = 0, limit: int = 100) -> List[MCPSer
 def create_mcp_server(db: Session, server: MCPServerCreate) -> MCPServer:
     """Create a new MCP server"""
     try:
-        db_server = MCPServer(**server.model_dump())
+        # Convert tools to JSON serializable format
+        server_data = server.model_dump()
+        server_data["tools"] = [tool.model_dump() for tool in server.tools]
+
+        db_server = MCPServer(**server_data)
         db.add(db_server)
         db.commit()
         db.refresh(db_server)
@@ -65,7 +69,11 @@ def update_mcp_server(
         if not db_server:
             return None
 
-        for key, value in server.model_dump().items():
+        # Convert tools to JSON serializable format
+        server_data = server.model_dump()
+        server_data["tools"] = [tool.model_dump() for tool in server.tools]
+
+        for key, value in server_data.items():
             setattr(db_server, key, value)
 
         db.commit()

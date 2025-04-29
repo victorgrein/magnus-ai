@@ -1,3 +1,4 @@
+import os
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
@@ -27,6 +28,7 @@ def get_agent(db: Session, agent_id: uuid.UUID) -> Optional[Agent]:
         if not agent:
             logger.warning(f"Agent not found: {agent_id}")
             return None
+
         return agent
     except SQLAlchemyError as e:
         logger.error(f"Error searching for agent {agent_id}: {str(e)}")
@@ -47,7 +49,11 @@ def get_agents_by_client(
     try:
         query = db.query(Agent).filter(Agent.client_id == client_id)
 
-        return query.offset(skip).limit(limit).all()
+        agents = query.offset(skip).limit(limit).all()
+
+        # A propriedade virtual agent_card_url será automaticamente incluída
+        # quando os agentes forem serializados para JSON
+        return agents
     except SQLAlchemyError as e:
         logger.error(f"Error searching for client agents {client_id}: {str(e)}")
         raise HTTPException(
@@ -139,6 +145,9 @@ def create_agent(db: Session, agent: AgentCreate) -> Agent:
         db.commit()
         db.refresh(db_agent)
         logger.info(f"Agent created successfully: {db_agent.id}")
+
+        # A propriedade virtual agent_card_url será automaticamente incluída
+        # quando o agente for serializado para JSON
         return db_agent
     except SQLAlchemyError as e:
         db.rollback()

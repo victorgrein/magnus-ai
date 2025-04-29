@@ -1,8 +1,11 @@
 import os
 from typing import Optional, List
 from pydantic_settings import BaseSettings
-from functools import lru_cache
 import secrets
+from dotenv import load_dotenv
+
+# Carrega as variáveis do .env
+load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -12,6 +15,13 @@ class Settings(BaseSettings):
     API_TITLE: str = os.getenv("API_TITLE", "Evo AI API")
     API_DESCRIPTION: str = os.getenv("API_DESCRIPTION", "API for executing AI agents")
     API_VERSION: str = os.getenv("API_VERSION", "1.0.0")
+    API_URL: str = os.getenv("API_URL", "http://localhost:8000")
+
+    # Organization settings
+    ORGANIZATION_NAME: str = os.getenv("ORGANIZATION_NAME", "Evo AI")
+    ORGANIZATION_URL: str = os.getenv(
+        "ORGANIZATION_URL", "https://evoai.evoapicloud.com"
+    )
 
     # Database settings
     POSTGRES_CONNECTION_STRING: str = os.getenv(
@@ -75,10 +85,10 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        env_file_encoding = "utf-8"
         case_sensitive = True
 
 
-@lru_cache()
 def get_settings() -> Settings:
     return Settings()
 

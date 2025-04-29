@@ -126,4 +126,6 @@ celerybeat-schedule
 *.swo
 
 # OS
-Thumbs.db 
+Thumbs.db
+
+uv.lock

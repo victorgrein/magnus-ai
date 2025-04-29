@@ -1,3 +1,4 @@
+import os
 from sqlalchemy import (
     Column,
     String,
@@ -83,6 +84,13 @@ class Agent(Base):
         ),
     )
 
+    @property
+    def agent_card_url(self) -> str:
+        """URL virtual para o agent card que não é rastrada no banco de dados"""
+        return (
+            f"{os.getenv('API_URL', '')}/api/v1/agents/{self.id}/.well-known/agent.json"
+        )
+
     def to_dict(self):
         """Converts the object to a dictionary, converting UUIDs to strings"""
         result = {}
@@ -104,6 +112,8 @@ class Agent(Base):
                 ]
             else:
                 result[key] = value
+        # Adiciona a propriedade virtual ao dicionário
+        result["agent_card_url"] = self.agent_card_url
         return result
 
     def _convert_dict(self, d):

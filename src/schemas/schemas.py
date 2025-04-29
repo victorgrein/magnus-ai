@@ -9,7 +9,16 @@ from src.schemas.agent_config import LLMConfig
 
 class ClientBase(BaseModel):
     name: str
-    email: Optional[EmailStr] = None
+    email: Optional[str] = None
+
+    @validator("email")
+    def validate_email(cls, v):
+        if v is None:
+            return v
+        email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not re.match(email_regex, v):
+            raise ValueError("Invalid email format")
+        return v
 
 
 class ClientCreate(ClientBase):
@@ -120,9 +129,20 @@ class Agent(AgentBase):
     client_id: UUID
     created_at: datetime
     updated_at: Optional[datetime] = None
+    agent_card_url: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class ToolConfig(BaseModel):
+    id: str
+    name: str
+    description: str
+    tags: List[str] = Field(default_factory=list)
+    examples: List[str] = Field(default_factory=list)
+    inputModes: List[str] = Field(default_factory=list)
+    outputModes: List[str] = Field(default_factory=list)
 
 
 class MCPServerBase(BaseModel):
@@ -130,7 +150,7 @@ class MCPServerBase(BaseModel):
     description: Optional[str] = None
     config_json: Dict[str, Any] = Field(default_factory=dict)
     environments: Dict[str, Any] = Field(default_factory=dict)
-    tools: List[str] = Field(default_factory=list)
+    tools: List[ToolConfig] = Field(default_factory=list)
     type: str = Field(default="official")
 
 

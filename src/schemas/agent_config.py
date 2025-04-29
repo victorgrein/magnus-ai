@@ -1,6 +1,8 @@
 from typing import List, Optional, Dict, Union
 from pydantic import BaseModel, Field
 from uuid import UUID
+import secrets
+import string
 
 
 class ToolConfig(BaseModel):
@@ -90,8 +92,19 @@ class CustomTools(BaseModel):
         from_attributes = True
 
 
+def generate_api_key(length: int = 32) -> str:
+    """Generate a secure API key."""
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
 class LLMConfig(BaseModel):
     """Configuration for LLM agents"""
+
+    api_key: str = Field(
+        default_factory=generate_api_key,
+        description="API key for the LLM. If not provided, a secure key will be generated automatically.",
+    )
 
     tools: Optional[List[ToolConfig]] = Field(
         default=None, description="List of available tools"

@@ -17,43 +17,52 @@ from dotenv import load_dotenv
 from src.models.models import Agent, Client, User
 
 # Configurar logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 logger = logging.getLogger(__name__)
+
 
 def create_demo_agents():
     """Create example agents for the demo client"""
     try:
         # Load environment variables
         load_dotenv()
-        
+
         # Get database settings
         db_url = os.getenv("POSTGRES_CONNECTION_STRING")
         if not db_url:
             logger.error("Environment variable POSTGRES_CONNECTION_STRING not defined")
             return False
-        
+
         # Connect to the database
         engine = create_engine(db_url)
         Session = sessionmaker(bind=engine)
         session = Session()
-        
+
         try:
             # Obter o cliente demo pelo email do usuário
             demo_email = os.getenv("DEMO_EMAIL", "demo@exemplo.com")
             demo_user = session.query(User).filter(User.email == demo_email).first()
-            
+
             if not demo_user or not demo_user.client_id:
-                logger.error(f"Demo user not found or not associated with a client: {demo_email}")
+                logger.error(
+                    f"Demo user not found or not associated with a client: {demo_email}"
+                )
                 return False
-                
+
             client_id = demo_user.client_id
-            
+
             # Verificar se já existem agentes para este cliente
-            existing_agents = session.query(Agent).filter(Agent.client_id == client_id).all()
+            existing_agents = (
+                session.query(Agent).filter(Agent.client_id == client_id).all()
+            )
             if existing_agents:
-                logger.info(f"There are already {len(existing_agents)} agents for the client {client_id}")
+                logger.info(
+                    f"There are already {len(existing_agents)} agents for the client {client_id}"
+                )
                 return True
-            
+
             # Example agent definitions
             agents = [
                 {
@@ -69,11 +78,12 @@ def create_demo_agents():
                         inform that you will consult a specialist and return soon.
                     """,
                     "config": {
+                        "api_key": uuid.uuid4(),
                         "tools": [],
                         "mcp_servers": [],
                         "custom_tools": [],
-                        "sub_agents": []
-                    }
+                        "sub_agents": [],
+                    },
                 },
                 {
                     "name": "Sales_Products",
@@ -89,11 +99,12 @@ def create_demo_agents():
                         the customer's needs before recommending a product.
                     """,
                     "config": {
+                        "api_key": uuid.uuid4(),
                         "tools": [],
                         "mcp_servers": [],
                         "custom_tools": [],
-                        "sub_agents": []
-                    }
+                        "sub_agents": [],
+                    },
                 },
                 {
                     "name": "FAQ_Bot",
@@ -109,14 +120,15 @@ def create_demo_agents():
                         appropriate support channel.
                     """,
                     "config": {
+                        "api_key": uuid.uuid4(),
                         "tools": [],
                         "mcp_servers": [],
                         "custom_tools": [],
-                        "sub_agents": []
-                    }
-                }
+                        "sub_agents": [],
+                    },
+                },
             ]
-            
+
             # Create the agents
             for agent_data in agents:
                 # Create the agent
@@ -128,27 +140,32 @@ def create_demo_agents():
                     model=agent_data["model"],
                     api_key=agent_data["api_key"],
                     instruction=agent_data["instruction"].strip(),
-                    config=agent_data["config"]
+                    config=agent_data["config"],
                 )
-                
+
                 session.add(agent)
-                logger.info(f"Agent '{agent_data['name']}' created for the client {client_id}")
-            
+                logger.info(
+                    f"Agent '{agent_data['name']}' created for the client {client_id}"
+                )
+
             session.commit()
-            logger.info(f"All example agents were created successfully for the client {client_id}")
+            logger.info(
+                f"All example agents were created successfully for the client {client_id}"
+            )
             return True
-            
+
         except SQLAlchemyError as e:
             session.rollback()
             logger.error(f"Database error when creating example agents: {str(e)}")
             return False
-        
+
     except Exception as e:
         logger.error(f"Error when creating example agents: {str(e)}")
         return False
     finally:
         session.close()
 
+
 if __name__ == "__main__":
     success = create_demo_agents()
-    sys.exit(0 if success else 1) 
+    sys.exit(0 if success else 1)

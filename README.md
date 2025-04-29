@@ -12,6 +12,7 @@ The Evo AI platform allows:
 - MCP server configuration
 - Custom tools management
 - JWT authentication with email verification
+- **Agent 2 Agent (A2A) Protocol Support**: Interoperability between AI agents following Google's A2A specification
 
 ## 🛠️ Technologies
 
@@ -26,6 +27,59 @@ The Evo AI platform allows:
 - **SendGrid**: Email service for notifications
 - **Jinja2**: Template engine for email rendering
 - **Bcrypt**: Password hashing and security
+
+## 🤖 Agent 2 Agent (A2A) Protocol Support
+
+Evo AI implements the Google's Agent 2 Agent (A2A) protocol, enabling seamless communication and interoperability between AI agents. This implementation includes:
+
+### Key Features
+
+- **Standardized Communication**: Agents can communicate using a common protocol regardless of their underlying implementation
+- **Interoperability**: Support for agents built with different frameworks and technologies
+- **Well-Known Endpoints**: Standardized endpoints for agent discovery and interaction
+- **Task Management**: Support for task-based interactions between agents
+- **State Management**: Tracking of agent states and conversation history
+- **Authentication**: Secure API key-based authentication for agent interactions
+
+### Implementation Details
+
+- **Agent Card**: Each agent exposes a `.well-known/agent.json` endpoint with its capabilities and configuration
+- **Task Handling**: Support for task creation, execution, and status tracking
+- **Message Format**: Standardized message format for agent communication
+- **History Tracking**: Maintains conversation history between agents
+- **Artifact Management**: Support for handling different types of artifacts (text, files, etc.)
+
+### Example Usage
+
+```json
+// Agent Card Example
+{
+  "name": "My Agent",
+  "description": "A helpful AI assistant",
+  "url": "https://api.example.com/agents/123",
+  "capabilities": {
+    "streaming": false,
+    "pushNotifications": false,
+    "stateTransitionHistory": true
+  },
+  "authentication": {
+    "schemes": ["apiKey"],
+    "credentials": {
+      "in": "header",
+      "name": "x-api-key"
+    }
+  },
+  "skills": [
+    {
+      "id": "search",
+      "name": "Web Search",
+      "description": "Search the web for information"
+    }
+  ]
+}
+```
+
+For more information about the A2A protocol, visit [Google's A2A Protocol Documentation](https://google.github.io/A2A/).
 
 ## 📁 Project Structure
 

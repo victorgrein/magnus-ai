@@ -8,6 +8,7 @@ from src.core.exceptions import AgentNotFoundError, InternalServerError
 from src.services.agent_service import get_agent
 from src.services.agent_builder import AgentBuilder
 from sqlalchemy.orm import Session
+from typing import Optional
 
 logger = setup_logger(__name__)
 
@@ -20,6 +21,7 @@ async def run_agent(
     artifacts_service: InMemoryArtifactService,
     memory_service: InMemoryMemoryService,
     db: Session,
+    session_id: Optional[str] = None,
 ):
     try:
         logger.info(f"Starting execution of agent {agent_id} for contact {contact_id}")
@@ -45,13 +47,15 @@ async def run_agent(
             artifact_service=artifacts_service,
             memory_service=memory_service,
         )
-        session_id = contact_id + "_" + agent_id
+        adk_session_id = contact_id + "_" + agent_id
+        if session_id is None:
+            session_id = adk_session_id
 
         logger.info(f"Searching session for contact {contact_id}")
         session = session_service.get_session(
             app_name=agent_id,
             user_id=contact_id,
-            session_id=session_id,
+            session_id=adk_session_id,
         )
 
         if session is None:
@@ -59,7 +63,7 @@ async def run_agent(
             session = session_service.create_session(
                 app_name=agent_id,
                 user_id=contact_id,
-                session_id=session_id,
+                session_id=adk_session_id,
             )
 
         content = Content(role="user", parts=[Part(text=message)])
@@ -69,7 +73,7 @@ async def run_agent(
         try:
             for event in agent_runner.run(
                 user_id=contact_id,
-                session_id=session_id,
+                session_id=adk_session_id,
                 new_message=content,
             ):
                 if event.is_final_response() and event.content and event.content.parts:
@@ -79,7 +83,7 @@ async def run_agent(
             completed_session = session_service.get_session(
                 app_name=agent_id,
                 user_id=contact_id,
-                session_id=session_id,
+                session_id=adk_session_id,
             )
 
             memory_service.add_session_to_memory(completed_session)
