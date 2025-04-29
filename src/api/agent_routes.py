@@ -24,6 +24,9 @@ from src.services.service_providers import (
     memory_service,
 )
 import logging
+from fastapi.responses import StreamingResponse
+from ..services.streaming_service import StreamingService
+from ..schemas.streaming import JSONRPCRequest
 
 from src.services.session_service import get_session_events
 
@@ -73,6 +76,8 @@ router = APIRouter(
     tags=["agents"],
     responses={404: {"description": "Not found"}},
 )
+
+streaming_service = StreamingService()
 
 
 @router.post("/", response_model=Agent, status_code=status.HTTP_201_CREATED)
@@ -192,8 +197,8 @@ async def get_agent_json(
             },
             "version": os.getenv("API_VERSION", ""),
             "capabilities": {
-                "streaming": False,
-                "pushNotifications": False,
+                "streaming": True,
+                "pushNotifications": True,
                 "stateTransitionHistory": True,
             },
             "authentication": {
@@ -355,6 +360,11 @@ async def handle_task(
 
         except Exception as e:
             logger.error(f"Error processing history: {str(e)}")
+
+        # pushNotification = task_request.get("pushNotification", False)
+        # if pushNotification:
+        #     await send_push_notification(task_id, final_response_text)
+
         return response_task
 
     except HTTPException:
@@ -365,3 +375,51 @@ async def handle_task(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error",
         )
+
+
+@router.post("/{agent_id}/tasks/sendSubscribe")
+async def subscribe_task_streaming(
+    agent_id: str,
+    request: JSONRPCRequest,
+    x_api_key: str = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Endpoint para streaming de eventos SSE de uma tarefa.
+
+    Args:
+        agent_id: ID do agente
+        request: Requisição JSON-RPC
+        x_api_key: Chave de API no header
+        db: Sessão do banco de dados
+
+    Returns:
+        StreamingResponse com eventos SSE
+    """
+    if not x_api_key:
+        raise HTTPException(status_code=401, detail="API key é obrigatória")
+
+    # Extrai mensagem do payload
+    message = request.params.get("message", {}).get("parts", [{}])[0].get("text", "")
+    session_id = request.params.get("sessionId")
+
+    # Configura streaming
+    async def event_generator():
+        async for event in streaming_service.send_task_streaming(
+            agent_id=agent_id,
+            api_key=x_api_key,
+            message=message,
+            session_id=session_id,
+            db=db,
+        ):
+            yield event
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
