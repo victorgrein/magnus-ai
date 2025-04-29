@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   api:
@@ -46,4 +46,4 @@ services:
 
 volumes:
   postgres_data:
-  redis_data: 
+  redis_data:
