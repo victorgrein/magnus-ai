@@ -229,18 +229,6 @@ async def handle_task(
 ):
     """Endpoint to clients A2A send a new task (with an initial user message)."""
     try:
-        # Verify JSON-RPC method
-        if request.method != "tasks/send":
-            return {
-                "jsonrpc": "2.0",
-                "id": request.id,
-                "error": {
-                    "code": -32601,
-                    "message": "Method not found",
-                    "data": {"detail": f"Method '{request.method}' not found"},
-                },
-            }
-
         # Verify agent
         agent = agent_service.get_agent(db, agent_id)
         if agent is None:
@@ -253,10 +241,11 @@ async def handle_task(
         # Verify API key
         agent_config = agent.config
         if agent_config.get("api_key") != x_api_key:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid API key for this agent",
-            )
+            return {
+                "jsonrpc": "2.0",
+                "id": request.id,
+                "error": {"code": 401, "message": "Invalid API key", "data": None},
+            }
 
         # Extract task request from JSON-RPC params
         task_request = request.params
@@ -497,18 +486,6 @@ async def subscribe_task_streaming(
     Returns:
         StreamingResponse com eventos SSE
     """
-    # Verify JSON-RPC method
-    if request.method != "tasks/sendSubscribe":
-        return {
-            "jsonrpc": "2.0",
-            "id": request.id,
-            "error": {
-                "code": -32601,
-                "message": "Method not found",
-                "data": {"detail": f"Method '{request.method}' not found"},
-            },
-        }
-
     if not x_api_key:
         return {
             "jsonrpc": "2.0",
