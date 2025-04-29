@@ -1,10 +1,10 @@
 from datetime import datetime
 import asyncio
 import os
-from fastapi import APIRouter, Depends, HTTPException, status, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.orm import Session
 from src.config.database import get_db
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import uuid
 from src.core.jwt_middleware import (
     get_jwt_token,

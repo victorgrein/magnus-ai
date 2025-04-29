@@ -6,7 +6,6 @@ from datetime import datetime
 from ..schemas.streaming import (
     JSONRPCRequest,
     TaskStatusUpdateEvent,
-    TaskArtifactUpdateEvent,
 )
 from ..services.agent_runner import run_agent
 from ..services.service_providers import (
