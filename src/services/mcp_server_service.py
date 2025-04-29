@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 from src.models.models import MCPServer
-from src.schemas.schemas import MCPServerCreate, ToolConfig
+from src.schemas.schemas import MCPServerCreate
 from typing import List, Optional
 import uuid
 import logging

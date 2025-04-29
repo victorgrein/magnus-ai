@@ -32,11 +32,6 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     LOG_DIR: str = "logs"
 
-    # Knowledge API settings
-    KNOWLEDGE_API_URL: str = os.getenv("KNOWLEDGE_API_URL", "http://localhost:5540")
-    KNOWLEDGE_API_KEY: str = os.getenv("KNOWLEDGE_API_KEY", "")
-    TENANT_ID: str = os.getenv("TENANT_ID", "")
-
     # Redis settings
     REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.getenv("REDIS_PORT", 6379))
