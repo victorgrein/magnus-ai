@@ -149,3 +149,17 @@ def get_current_user_client_id(
         return UUID(client_id)
 
     return None
+
+
+async def get_jwt_token_ws(token: str) -> Optional[dict]:
+    """
+    Verifica e decodifica o token JWT para WebSocket.
+    Retorna o payload se o token for válido, None caso contrário.
+    """
+    try:
+        payload = jwt.decode(
+            token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
+        )
+        return payload
+    except JWTError:
+        return None

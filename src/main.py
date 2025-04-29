@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from src.config.database import engine, Base
 from src.config.settings import settings
 from src.utils.logger import setup_logger
@@ -39,11 +40,17 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"],  # Permite todas as origens em desenvolvimento
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Configuração de arquivos estáticos
+static_dir = Path("static")
+if not static_dir.exists():
+    static_dir.mkdir(parents=True)
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # PostgreSQL configuration
 POSTGRES_CONNECTION_STRING = os.getenv(

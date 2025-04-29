@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>ADK Streaming Test</title>
+    <style>
+        #messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .message {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 5px;
+        }
+
+        .user-message {
+            background-color: #e3f2fd;
+            margin-left: 20%;
+            margin-right: 5px;
+        }
+
+        .agent-message {
+            background-color: #f5f5f5;
+            margin-right: 20%;
+            margin-left: 5px;
+        }
+
+        #debug {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>ADK Streaming Test</h1>
+    <div id="messages"></div>
+    <div id="connection-status" style="margin-bottom: 10px;"></div>
+    <form id="messageForm">
+        <input type="text" id="agentId" placeholder="Agent ID" style="margin-bottom: 10px; width: 300px;"><br>
+        <input type="text" id="contactId" placeholder="Contact ID" style="margin-bottom: 10px; width: 300px;"><br>
+        <input type="text" id="token" placeholder="JWT Token" style="margin-bottom: 10px; width: 300px;"><br>
+        <button type="button" id="connectButton">Conectar</button><br><br>
+        <input type="text" id="message" placeholder="Digite sua mensagem..." style="width: 300px;">
+        <button type="submit" id="sendButton" disabled>Enviar</button>
+    </form>
+
+    <div id="debug"></div>
+
+    <script>
+        let ws = null;
+        let currentMessageId = null;
+        const messagesDiv = document.getElementById('messages');
+        const messageForm = document.getElementById('messageForm');
+        const connectButton = document.getElementById('connectButton');
+        const sendButton = document.getElementById('sendButton');
+        const statusDiv = document.getElementById('connection-status');
+        const debugDiv = document.getElementById('debug');
+
+        function log(message, data = null) {
+            const timestamp = new Date().toISOString();
+            let logMessage = `${timestamp} - ${message}`;
+            if (data) {
+                logMessage += '\n' + JSON.stringify(data, null, 2);
+            }
+            debugDiv.textContent = logMessage + '\n\n' + debugDiv.textContent;
+            console.log(message, data);
+        }
+
+        connectButton.onclick = function () {
+            const agentId = document.getElementById('agentId').value;
+            const contactId = document.getElementById('contactId').value;
+            const token = document.getElementById('token').value;
+
+            if (!agentId || !contactId || !token) {
+                alert('Por favor, preencha todos os campos');
+                return;
+            }
+
+            // Fechar conexão existente se houver
+            if (ws) {
+                ws.close();
+            }
+
+            // Criar nova conexão WebSocket
+            const ws_url = `ws://${window.location.host}/api/v1/chat/ws/${agentId}/${contactId}`;
+            log('Connecting to WebSocket', {
+                url: ws_url
+            });
+
+            ws = new WebSocket(ws_url);
+
+            ws.onopen = function () {
+                log('WebSocket connected, sending authentication');
+                // Adicionar token no header
+                const authMessage = {
+                    type: 'authorization',
+                    token: token
+                };
+                ws.send(JSON.stringify(authMessage));
+                log('Authentication sent', authMessage);
+
+                statusDiv.textContent = 'Conectado';
+                statusDiv.style.color = 'green';
+                sendButton.disabled = false;
+                connectButton.disabled = true;
+            };
+
+            ws.onmessage = function (event) {
+                const packet = JSON.parse(event.data);
+                log('Received message', packet);
+
+                if (packet.turn_complete) {
+                    currentMessageId = null;
+                    return;
+                }
+
+                if (currentMessageId == null) {
+                    currentMessageId = Math.random().toString(36).substring(7);
+                    const messageDiv = document.createElement('div');
+                    messageDiv.id = currentMessageId;
+                    messageDiv.className = 'message agent-message';
+                    messagesDiv.appendChild(messageDiv);
+                }
+
+                const messageDiv = document.getElementById(currentMessageId);
+                messageDiv.textContent = (messageDiv.textContent || '') + packet.message;
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            };
+
+            ws.onclose = function (event) {
+                log('WebSocket closed', {
+                    code: event.code,
+                    reason: event.reason,
+                    wasClean: event.wasClean
+                });
+                statusDiv.textContent = 'Desconectado';
+                statusDiv.style.color = 'red';
+                sendButton.disabled = true;
+                connectButton.disabled = false;
+                ws = null;
+            };
+
+            ws.onerror = function (error) {
+                log('WebSocket error', error);
+                statusDiv.textContent = 'Erro na conexão';
+                statusDiv.style.color = 'red';
+            };
+        };
+
+        messageForm.onsubmit = function (e) {
+            e.preventDefault();
+            const messageInput = document.getElementById('message');
+            const message = messageInput.value;
+
+            if (message && ws) {
+                // Criar div para mensagem do usuário
+                const userMessageDiv = document.createElement('div');
+                userMessageDiv.className = 'message user-message';
+                userMessageDiv.textContent = message;
+                messagesDiv.appendChild(userMessageDiv);
+
+                // Enviar mensagem via WebSocket
+                const messagePacket = {
+                    message: message
+                };
+                log('Sending message', messagePacket);
+                ws.send(JSON.stringify(messagePacket));
+
+                messageInput.value = '';
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }
+            return false;
+        };
+    </script>
+</body>
+
+</html>
