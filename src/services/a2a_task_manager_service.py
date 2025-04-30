@@ -602,7 +602,7 @@ class A2ATaskManager:
                 # Processa a resposta do agente
                 if response and isinstance(response, dict):
                     # Extrai texto da resposta
-                    response_text = response.get("text", "")
+                    response_text = response.get("content", "")
                     if not response_text and "message" in response:
                         message = response.get("message", {})
                         parts = message.get("parts", [])

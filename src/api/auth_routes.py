@@ -54,10 +54,10 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     """
     user, message = create_user(db, user_data, is_admin=False)
     if not user:
-        logger.error(f"Erro ao registrar usuário: {message}")
+        logger.error(f"Error registering user: {message}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
 
-    logger.info(f"Usuário registrado com sucesso: {user.email}")
+    logger.info(f"User registered successfully: {user.email}")
     return user
 
 
@@ -86,7 +86,7 @@ async def register_admin(
     """
     user, message = create_user(db, user_data, is_admin=True)
     if not user:
-        logger.error(f"Erro ao registrar administrador: {message}")
+        logger.error(f"Error registering admin: {message}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
 
     logger.info(

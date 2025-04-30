@@ -50,7 +50,7 @@ async def websocket_chat(
         await websocket.accept()
         logger.info("WebSocket connection accepted, waiting for authentication")
 
-        # Aguardar mensagem de autenticação
+        # Wait for authentication message
         try:
             auth_data = await websocket.receive_json()
             logger.info(f"Received authentication data: {auth_data}")
@@ -70,14 +70,14 @@ async def websocket_chat(
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                 return
 
-            # Verificar se o agente pertence ao cliente do usuário
+            # Verify if the agent belongs to the user's client
             agent = agent_service.get_agent(db, agent_id)
             if not agent:
                 logger.warning(f"Agent {agent_id} not found")
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                 return
 
-            # Verificar se o usuário tem acesso ao agente (via client)
+            # Verify if the user has access to the agent (via client)
             await verify_user_client(payload, db, agent.client_id)
 
             logger.info(
@@ -102,12 +102,12 @@ async def websocket_chat(
                         memory_service=memory_service,
                         db=db,
                     ):
-                        # Enviar cada chunk como uma mensagem JSON
+                        # Send each chunk as a JSON message
                         await websocket.send_json(
                             {"message": chunk, "turn_complete": False}
                         )
 
-                    # Enviar sinal de turno completo
+                    # Send signal of complete turn
                     await websocket.send_json({"message": "", "turn_complete": True})
 
                 except WebSocketDisconnect:
