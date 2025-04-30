@@ -3,12 +3,12 @@ import json
 from typing import AsyncGenerator, Dict, Any
 from fastapi import HTTPException
 from datetime import datetime
-from ..schemas.streaming import (
+from src.schemas.streaming import (
     JSONRPCRequest,
     TaskStatusUpdateEvent,
 )
-from ..services.agent_runner import run_agent
-from ..services.service_providers import (
+from src.services.agent_runner import run_agent
+from src.services.service_providers import (
     session_service,
     artifacts_service,
     memory_service,
@@ -25,31 +25,33 @@ class StreamingService:
         agent_id: str,
         api_key: str,
         message: str,
+        contact_id: str = None,
         session_id: str = None,
         db: Session = None,
     ) -> AsyncGenerator[str, None]:
         """
-        Inicia o streaming de eventos SSE para uma tarefa.
+        Starts the SSE event streaming for a task.
 
         Args:
-            agent_id: ID do agente
-            api_key: Chave de API para autenticação
-            message: Mensagem inicial
-            session_id: ID da sessão (opcional)
-            db: Sessão do banco de dados
+            agent_id: Agent ID
+            api_key: API key for authentication
+            message: Initial message
+            contact_id: Contact ID (optional)
+            session_id: Session ID (optional)
+            db: Database session
 
         Yields:
-            Eventos SSE formatados
+            Formatted SSE events
         """
-        # Validação básica da API key
+        # Basic API key validation
         if not api_key:
-            raise HTTPException(status_code=401, detail="API key é obrigatória")
+            raise HTTPException(status_code=401, detail="API key is required")
 
-        # Gera IDs únicos
-        task_id = str(uuid.uuid4())
+        # Generate unique IDs
+        task_id = contact_id or str(uuid.uuid4())
         request_id = str(uuid.uuid4())
 
-        # Monta payload JSON-RPC
+        # Build JSON-RPC payload
         payload = JSONRPCRequest(
             id=request_id,
             params={
@@ -62,7 +64,7 @@ class StreamingService:
             },
         )
 
-        # Registra conexão
+        # Register connection
         self.active_connections[task_id] = {
             "agent_id": agent_id,
             "api_key": api_key,
@@ -70,7 +72,7 @@ class StreamingService:
         }
 
         try:
-            # Envia evento de início
+            # Send start event
             yield self._format_sse_event(
                 "status",
                 TaskStatusUpdateEvent(
@@ -80,10 +82,10 @@ class StreamingService:
                 ).model_dump_json(),
             )
 
-            # Executa o agente
+            # Execute the agent
             result = await run_agent(
                 str(agent_id),
-                task_id,
+                contact_id or task_id,
                 message,
                 session_service,
                 artifacts_service,
@@ -92,7 +94,7 @@ class StreamingService:
                 session_id,
             )
 
-            # Envia a resposta do agente como um evento separado
+            # Send the agent's response as a separate event
             yield self._format_sse_event(
                 "message",
                 json.dumps(
@@ -104,7 +106,7 @@ class StreamingService:
                 ),
             )
 
-            # Evento de conclusão
+            # Completion event
             yield self._format_sse_event(
                 "status",
                 TaskStatusUpdateEvent(
@@ -114,7 +116,7 @@ class StreamingService:
             )
 
         except Exception as e:
-            # Evento de erro
+            # Error event
             yield self._format_sse_event(
                 "status",
                 TaskStatusUpdateEvent(
@@ -126,14 +128,14 @@ class StreamingService:
             raise
 
         finally:
-            # Limpa conexão
+            # Clean connection
             self.active_connections.pop(task_id, None)
 
     def _format_sse_event(self, event_type: str, data: str) -> str:
-        """Formata um evento SSE."""
+        """Format an SSE event."""
         return f"event: {event_type}\ndata: {data}\n\n"
 
     async def close_connection(self, task_id: str):
-        """Fecha uma conexão de streaming."""
+        """Close a streaming connection."""
         if task_id in self.active_connections:
             self.active_connections.pop(task_id)

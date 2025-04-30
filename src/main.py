@@ -22,6 +22,7 @@ import src.api.contact_routes
 import src.api.mcp_server_routes
 import src.api.tool_routes
 import src.api.client_routes
+import src.api.a2a_routes
 
 # Add the root directory to PYTHONPATH
 root_dir = Path(__file__).parent.parent
@@ -40,13 +41,13 @@ app = FastAPI(
 # CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Permite todas as origens em desenvolvimento
+    allow_origins=["*"],  # Allows all origins in development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Configuração de arquivos estáticos
+# Static files configuration
 static_dir = Path("static")
 if not static_dir.exists():
     static_dir.mkdir(parents=True)
@@ -72,6 +73,7 @@ contact_router = src.api.contact_routes.router
 mcp_server_router = src.api.mcp_server_routes.router
 tool_router = src.api.tool_routes.router
 client_router = src.api.client_routes.router
+a2a_router = src.api.a2a_routes.router
 
 # Include routes
 app.include_router(auth_router, prefix=API_PREFIX)
@@ -83,6 +85,7 @@ app.include_router(chat_router, prefix=API_PREFIX)
 app.include_router(session_router, prefix=API_PREFIX)
 app.include_router(agent_router, prefix=API_PREFIX)
 app.include_router(contact_router, prefix=API_PREFIX)
+app.include_router(a2a_router, prefix=API_PREFIX)
 
 
 @app.get("/")

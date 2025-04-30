@@ -10,14 +10,21 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - POSTGRES_CONNECTION_STRING=postgresql://postgres:postgres@postgres:5432/evo_ai
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_PASSWORD=
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
-      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
-      - EMAIL_FROM=${EMAIL_FROM}
-      - APP_URL=${APP_URL}
+      POSTGRES_CONNECTION_STRING: postgresql://postgres:postgres@postgres:5432/evo_ai
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_SSL: "false"
+      REDIS_KEY_PREFIX: "a2a:"
+      REDIS_TTL: 3600
+      A2A_TASK_TTL: 3600
+      A2A_HISTORY_TTL: 86400
+      A2A_PUSH_NOTIFICATION_TTL: 3600
+      A2A_SSE_CLIENT_TTL: 300
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      EMAIL_FROM: ${EMAIL_FROM}
+      APP_URL: ${APP_URL}
     volumes:
       - ./logs:/app/logs
     restart: unless-stopped
@@ -26,9 +33,9 @@ services:
     image: postgres:14-alpine
     container_name: evo-ai-postgres
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=evo_ai
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: evo_ai
     ports:
       - "5432:5432"
     volumes:
@@ -42,6 +49,12 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 30s
+      retries: 50
     restart: unless-stopped
 
 volumes:

@@ -3,7 +3,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 from src.models.models import Agent
 from src.schemas.schemas import AgentCreate
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 from src.services.mcp_server_service import get_mcp_server
 import uuid
 import logging
@@ -20,9 +20,17 @@ def validate_sub_agents(db: Session, sub_agents: List[uuid.UUID]) -> bool:
     return True
 
 
-def get_agent(db: Session, agent_id: uuid.UUID) -> Optional[Agent]:
+def get_agent(db: Session, agent_id: Union[uuid.UUID, str]) -> Optional[Agent]:
     """Search for an agent by ID"""
     try:
+        # Convert to UUID if it's a string
+        if isinstance(agent_id, str):
+            try:
+                agent_id = uuid.UUID(agent_id)
+            except ValueError:
+                logger.warning(f"Invalid agent ID: {agent_id}")
+                return None
+
         agent = db.query(Agent).filter(Agent.id == agent_id).first()
         if not agent:
             logger.warning(f"Agent not found: {agent_id}")
