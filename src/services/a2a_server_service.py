@@ -530,13 +530,9 @@ class A2AServer:
                 body = await request.json()
                 logger.info(f"Received JSON data: {json.dumps(body)}")
                 method = body.get("method", "unknown")
-                logger.info(f"[SERVER] Processando método: {method}")
 
                 # Validate the request using the A2A validator
                 json_rpc_request = A2ARequest.validate_python(body)
-                logger.info(
-                    f"[SERVER] Request validado como: {type(json_rpc_request).__name__}"
-                )
 
                 original_db = self.task_manager.db
                 try:
@@ -546,55 +542,34 @@ class A2AServer:
 
                     # Process the request
                     if isinstance(json_rpc_request, SendTaskRequest):
-                        logger.info(
-                            f"[SERVER] Processando SendTaskRequest para task_id={json_rpc_request.params.id}"
-                        )
                         json_rpc_request.params.agentId = agent_id
                         result = await self.task_manager.on_send_task(json_rpc_request)
                     elif isinstance(json_rpc_request, SendTaskStreamingRequest):
-                        logger.info(
-                            f"[SERVER] Processando SendTaskStreamingRequest para task_id={json_rpc_request.params.id}"
-                        )
                         json_rpc_request.params.agentId = agent_id
                         result = await self.task_manager.on_send_task_subscribe(
                             json_rpc_request
                         )
                     elif isinstance(json_rpc_request, GetTaskRequest):
-                        logger.info(
-                            f"[SERVER] Processando GetTaskRequest para task_id={json_rpc_request.params.id}"
-                        )
                         result = await self.task_manager.on_get_task(json_rpc_request)
                     elif isinstance(json_rpc_request, CancelTaskRequest):
-                        logger.info(
-                            f"[SERVER] Processando CancelTaskRequest para task_id={json_rpc_request.params.id}"
-                        )
                         result = await self.task_manager.on_cancel_task(
                             json_rpc_request
                         )
                     elif isinstance(json_rpc_request, SetTaskPushNotificationRequest):
-                        logger.info(
-                            f"[SERVER] Processando SetTaskPushNotificationRequest para task_id={json_rpc_request.params.id}"
-                        )
                         result = await self.task_manager.on_set_task_push_notification(
                             json_rpc_request
                         )
                     elif isinstance(json_rpc_request, GetTaskPushNotificationRequest):
-                        logger.info(
-                            f"[SERVER] Processando GetTaskPushNotificationRequest para task_id={json_rpc_request.params.id}"
-                        )
                         result = await self.task_manager.on_get_task_push_notification(
                             json_rpc_request
                         )
                     elif isinstance(json_rpc_request, TaskResubscriptionRequest):
-                        logger.info(
-                            f"[SERVER] Processando TaskResubscriptionRequest para task_id={json_rpc_request.params.id}"
-                        )
                         result = await self.task_manager.on_resubscribe_to_task(
                             json_rpc_request
                         )
                     else:
                         logger.warning(
-                            f"[SERVER] Tipo de request não suportado: {type(json_rpc_request)}"
+                            f"[SERVER] Request type not supported: {type(json_rpc_request)}"
                         )
                         return JSONResponse(
                             status_code=400,

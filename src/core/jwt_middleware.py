@@ -69,7 +69,7 @@ async def verify_user_client(
         required_client_id: Client ID to be verified
 
     Returns:
-        bool: True se verificado com sucesso
+        bool: True if verified successfully
 
     Raises:
         HTTPException: If the user does not have permission
@@ -78,7 +78,7 @@ async def verify_user_client(
     if payload.get("is_admin", False):
         return True
 
-    # Para não-admins, verificar se o client_id corresponde
+    # For non-admins, verify if the client_id corresponds
     user_client_id = payload.get("client_id")
     if not user_client_id:
         logger.warning(
@@ -153,8 +153,8 @@ def get_current_user_client_id(
 
 async def get_jwt_token_ws(token: str) -> Optional[dict]:
     """
-    Verifica e decodifica o token JWT para WebSocket.
-    Retorna o payload se o token for válido, None caso contrário.
+    Verifies and decodes the JWT token for WebSocket.
+    Returns the payload if the token is valid, None otherwise.
     """
     try:
         payload = jwt.decode(

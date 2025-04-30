@@ -7,6 +7,7 @@ from typing import List, Optional, Dict, Any, Union
 from src.services.mcp_server_service import get_mcp_server
 import uuid
 import logging
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +68,50 @@ def get_agents_by_client(
         )
 
 
-def create_agent(db: Session, agent: AgentCreate) -> Agent:
+async def create_agent(db: Session, agent: AgentCreate) -> Agent:
     """Create a new agent"""
     try:
-        # Additional sub-agent validation
-        if agent.type != "llm":
+        # Special handling for a2a type agents
+        if agent.type == "a2a":
+            if not agent.agent_card_url:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="agent_card_url is required for a2a type agents",
+                )
+
+            try:
+                # Fetch agent card information
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(agent.agent_card_url)
+                    if response.status_code != 200:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail=f"Failed to fetch agent card: HTTP {response.status_code}",
+                        )
+                    agent_card = response.json()
+
+                # Update agent with information from agent card
+                agent.name = agent_card.get("name", "Unknown Agent")
+                agent.description = agent_card.get("description", "")
+
+                if agent.config is None:
+                    agent.config = {}
+
+                # Store the whole agent card in config
+                if isinstance(agent.config, dict):
+                    agent.config["agent_card"] = agent_card
+                else:
+                    agent.config = {"agent_card": agent_card}
+
+            except Exception as e:
+                logger.error(f"Error fetching agent card: {str(e)}")
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Failed to process agent card: {str(e)}",
+                )
+
+        # Additional sub-agent validation (for non-llm and non-a2a types)
+        elif agent.type != "llm":
             if not isinstance(agent.config, dict):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -169,6 +209,82 @@ async def update_agent(
         agent = db.query(Agent).filter(Agent.id == agent_id).first()
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
+
+        if "type" in agent_data and agent_data["type"] == "a2a":
+            if "agent_card_url" not in agent_data or not agent_data["agent_card_url"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="agent_card_url is required for a2a type agents",
+                )
+
+            if not agent_data["agent_card_url"].endswith("/.well-known/agent.json"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="agent_card_url must end with /.well-known/agent.json",
+                )
+
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(agent_data["agent_card_url"])
+                    if response.status_code != 200:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Failed to fetch agent card: HTTP {response.status_code}",
+                        )
+                    agent_card = response.json()
+
+                agent_data["name"] = agent_card.get("name", "Unknown Agent")
+                agent_data["description"] = agent_card.get("description", "")
+
+                if "config" not in agent_data or agent_data["config"] is None:
+                    agent_data["config"] = agent.config if agent.config else {}
+
+                agent_data["config"]["agent_card"] = agent_card
+
+            except Exception as e:
+                logger.error(f"Error fetching agent card: {str(e)}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to process agent card: {str(e)}",
+                )
+
+        elif "agent_card_url" in agent_data and agent.type == "a2a":
+            if not agent_data["agent_card_url"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="agent_card_url cannot be empty for a2a type agents",
+                )
+
+            if not agent_data["agent_card_url"].endswith("/.well-known/agent.json"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="agent_card_url must end with /.well-known/agent.json",
+                )
+
+            try:
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(agent_data["agent_card_url"])
+                    if response.status_code != 200:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Failed to fetch agent card: HTTP {response.status_code}",
+                        )
+                    agent_card = response.json()
+
+                agent_data["name"] = agent_card.get("name", "Unknown Agent")
+                agent_data["description"] = agent_card.get("description", "")
+
+                if "config" not in agent_data or agent_data["config"] is None:
+                    agent_data["config"] = agent.config if agent.config else {}
+
+                agent_data["config"]["agent_card"] = agent_card
+
+            except Exception as e:
+                logger.error(f"Error fetching agent card: {str(e)}")
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Failed to process agent card: {str(e)}",
+                )
 
         # Convert UUIDs to strings before saving
         if "config" in agent_data:

@@ -52,9 +52,13 @@ class Contact(ContactBase):
 
 
 class AgentBase(BaseModel):
-    name: str = Field(..., description="Agent name (no spaces or special characters)")
+    name: Optional[str] = Field(
+        None, description="Agent name (no spaces or special characters)"
+    )
     description: Optional[str] = Field(None, description="Agent description")
-    type: str = Field(..., description="Agent type (llm, sequential, parallel, loop)")
+    type: str = Field(
+        ..., description="Agent type (llm, sequential, parallel, loop, a2a)"
+    )
     model: Optional[str] = Field(
         None, description="Agent model (required only for llm type)"
     )
@@ -62,22 +66,40 @@ class AgentBase(BaseModel):
         None, description="Agent API Key (required only for llm type)"
     )
     instruction: Optional[str] = None
-    config: Union[LLMConfig, Dict[str, Any]] = Field(
-        ..., description="Agent configuration based on type"
+    agent_card_url: Optional[str] = Field(
+        None, description="Agent card URL (required for a2a type)"
+    )
+    config: Optional[Union[LLMConfig, Dict[str, Any]]] = Field(
+        None, description="Agent configuration based on type"
     )
 
     @validator("name")
-    def validate_name(cls, v):
+    def validate_name(cls, v, values):
+        if values.get("type") == "a2a":
+            return v
+
+        if not v:
+            raise ValueError("Name is required for non-a2a agent types")
+
         if not re.match(r"^[a-zA-Z0-9_-]+$", v):
             raise ValueError("Agent name cannot contain spaces or special characters")
         return v
 
     @validator("type")
     def validate_type(cls, v):
-        if v not in ["llm", "sequential", "parallel", "loop"]:
+        if v not in ["llm", "sequential", "parallel", "loop", "a2a"]:
             raise ValueError(
-                "Invalid agent type. Must be: llm, sequential, parallel or loop"
+                "Invalid agent type. Must be: llm, sequential, parallel, loop or a2a"
             )
+        return v
+
+    @validator("agent_card_url")
+    def validate_agent_card_url(cls, v, values):
+        if "type" in values and values["type"] == "a2a":
+            if not v:
+                raise ValueError("agent_card_url is required for a2a type agents")
+            if not v.endswith("/.well-known/agent.json"):
+                raise ValueError("agent_card_url must end with /.well-known/agent.json")
         return v
 
     @validator("model")
@@ -94,8 +116,16 @@ class AgentBase(BaseModel):
 
     @validator("config")
     def validate_config(cls, v, values):
+        if "type" in values and values["type"] == "a2a":
+            return v or {}
+
         if "type" not in values:
             return v
+
+        if not v and values.get("type") != "a2a":
+            raise ValueError(
+                f"Configuration is required for {values.get('type')} agent type"
+            )
 
         if values["type"] == "llm":
             if isinstance(v, dict):
@@ -133,6 +163,18 @@ class Agent(AgentBase):
 
     class Config:
         from_attributes = True
+
+    @validator("agent_card_url", pre=True)
+    def set_agent_card_url(cls, v, values):
+        if v:
+            return v
+
+        if "id" in values:
+            from os import getenv
+
+            return f"{getenv('API_URL', '')}/api/v1/a2a/{values['id']}/.well-known/agent.json"
+
+        return v
 
 
 class ToolConfig(BaseModel):

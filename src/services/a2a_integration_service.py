@@ -85,12 +85,6 @@ class AgentRunnerAdapter:
         Returns:
             Dictionary with the agent's response
         """
-        logger.info(
-            f"[AGENT-RUNNER] run_agent iniciado - agent_id={agent_id}, task_id={task_id}, session_id={session_id}"
-        )
-        logger.info(
-            f"[AGENT-RUNNER] run_agent - message: '{message[:50]}...' (truncado)"
-        )
 
         try:
             # Use the existing agent runner function
@@ -100,18 +94,6 @@ class AgentRunnerAdapter:
             # Use the provided db or fallback to self.db
             db_session = db if db is not None else self.db
 
-            if db_session is None:
-                logger.error(
-                    f"[AGENT-RUNNER] No database session available. db={db}, self.db={self.db}"
-                )
-            else:
-                logger.info(
-                    f"[AGENT-RUNNER] Using database session: {type(db_session).__name__}"
-                )
-
-            logger.info(
-                f"[AGENT-RUNNER] Chamando agent_runner_func com agent_id={agent_id}, contact_id={task_id}"
-            )
             response_text = await self.agent_runner_func(
                 agent_id=agent_id,
                 contact_id=task_id,
@@ -121,13 +103,6 @@ class AgentRunnerAdapter:
                 memory_service=self.memory_service,
                 db=db_session,
                 session_id=session_id,
-            )
-
-            logger.info(
-                f"[AGENT-RUNNER] run_agent concluído com sucesso para agent_id={agent_id}, task_id={task_id}"
-            )
-            logger.info(
-                f"[AGENT-RUNNER] resposta: '{str(response_text)[:50]}...' (truncado)"
             )
 
             return {
@@ -216,7 +191,6 @@ class StreamingServiceAdapter:
         status_event = TaskStatusUpdateEvent(
             id=task_id, status=working_status, final=False
         )
-        # IMPORTANTE: Converter para string JSON para SSE
         yield json.dumps(status_event.model_dump())
 
         content_buffer = ""
@@ -229,9 +203,8 @@ class StreamingServiceAdapter:
             # To streaming, we use task_id as contact_id
             contact_id = task_id
 
-            # Adicionar tratamento de heartbeat para manter conexão ativa
             last_event_time = datetime.now()
-            heartbeat_interval = 20  # segundos
+            heartbeat_interval = 20
 
             async for event in self.streaming_service.send_task_streaming(
                 agent_id=agent_id,
@@ -241,7 +214,6 @@ class StreamingServiceAdapter:
                 session_id=session_id,
                 db=db,
             ):
-                # Atualizar timestamp do último evento
                 last_event_time = datetime.now()
 
                 # Process the streaming event format
@@ -268,7 +240,6 @@ class StreamingServiceAdapter:
                         artifact_event = TaskArtifactUpdateEvent(
                             id=task_id, artifact=artifact
                         )
-                        # IMPORTANTE: Converter para string JSON para SSE
                         yield json.dumps(artifact_event.model_dump())
 
                     # Check if final event
@@ -299,7 +270,7 @@ class StreamingServiceAdapter:
                         final_artifact_event = TaskArtifactUpdateEvent(
                             id=task_id, artifact=final_artifact
                         )
-                        # IMPORTANTE: Converter para string JSON para SSE
+
                         yield json.dumps(final_artifact_event.model_dump())
 
                         # Send the completed status
@@ -308,7 +279,7 @@ class StreamingServiceAdapter:
                             status=completed_status,
                             final=True,
                         )
-                        # IMPORTANTE: Converter para string JSON para SSE
+
                         yield json.dumps(final_status_event.model_dump())
 
                         final_sent = True
@@ -333,7 +304,7 @@ class StreamingServiceAdapter:
                         artifact_event = TaskArtifactUpdateEvent(
                             id=task_id, artifact=artifact
                         )
-                        # IMPORTANTE: Converter para string JSON para SSE
+
                         yield json.dumps(artifact_event.model_dump())
                     elif isinstance(event_data, dict):
                         # Try to extract text from the dictionary
@@ -351,14 +322,14 @@ class StreamingServiceAdapter:
                         artifact_event = TaskArtifactUpdateEvent(
                             id=task_id, artifact=artifact
                         )
-                        # IMPORTANTE: Converter para string JSON para SSE
+
                         yield json.dumps(artifact_event.model_dump())
 
-                # Enviar heartbeat/keep-alive para manter a conexão SSE aberta
+                # Send heartbeat/keep-alive to keep the SSE connection open
                 now = datetime.now()
                 if (now - last_event_time).total_seconds() > heartbeat_interval:
                     logger.info(f"Sending heartbeat for task {task_id}")
-                    # Enviando evento de keep-alive como um evento de status de "working"
+                    # Sending keep-alive event as a "working" status event
                     working_heartbeat = TaskStatus(
                         state="working",
                         timestamp=now,
@@ -369,7 +340,6 @@ class StreamingServiceAdapter:
                     heartbeat_event = TaskStatusUpdateEvent(
                         id=task_id, status=working_heartbeat, final=False
                     )
-                    # IMPORTANTE: Converter para string JSON para SSE
                     yield json.dumps(heartbeat_event.model_dump())
                     last_event_time = now
 
@@ -392,7 +362,6 @@ class StreamingServiceAdapter:
                 final_event = TaskStatusUpdateEvent(
                     id=task_id, status=completed_status, final=True
                 )
-                # IMPORTANTE: Converter para string JSON para SSE
                 yield json.dumps(final_event.model_dump())
 
         except Exception as e:
@@ -416,11 +385,10 @@ class StreamingServiceAdapter:
             error_event = TaskStatusUpdateEvent(
                 id=task_id, status=failed_status, final=True
             )
-            # IMPORTANTE: Converter para string JSON para SSE
             yield json.dumps(error_event.model_dump())
 
         finally:
-            # Garantir que enviamos um evento final para fechar a conexão corretamente
+            # Ensure we send a final event to properly close the connection
             if not final_sent and not has_error:
                 logger.info(f"Stream finalizing for task {task_id} via finally block")
                 try:
@@ -442,7 +410,6 @@ class StreamingServiceAdapter:
                     final_event = TaskStatusUpdateEvent(
                         id=task_id, status=completed_status, final=True
                     )
-                    # IMPORTANTE: Converter para string JSON para SSE
                     yield json.dumps(final_event.model_dump())
                 except Exception as final_error:
                     logger.error(
@@ -479,7 +446,6 @@ def create_agent_card_from_agent(agent, db) -> AgentCard:
 
         # We create a new thread to execute the asynchronous function
         import concurrent.futures
-        import functools
 
         def run_async(coro):
             loop = asyncio.new_event_loop()

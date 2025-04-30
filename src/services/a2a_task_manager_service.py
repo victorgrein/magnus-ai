@@ -104,29 +104,29 @@ class A2ATaskManager:
 
     async def on_get_task(self, request: GetTaskRequest) -> GetTaskResponse:
         """
-        Manipula requisição para obter informações sobre uma tarefa.
+        Handle request to get task information.
 
         Args:
-            request: Requisição Get Task do A2A
+            request: A2A Get Task request
 
         Returns:
-            Resposta com os detalhes da tarefa
+            Response with task details
         """
         try:
             task_id = request.params.id
             history_length = request.params.historyLength
 
-            # Busca dados da tarefa do cache
+            # Get task data from cache
             task_data = await self.redis_cache.get(f"task:{task_id}")
 
             if not task_data:
-                logger.warning(f"Tarefa não encontrada: {task_id}")
+                logger.warning(f"Task not found: {task_id}")
                 return GetTaskResponse(id=request.id, error=TaskNotFoundError())
 
-            # Cria uma instância Task a partir dos dados do cache
+            # Create a Task instance from cache data
             task = Task.model_validate(task_data)
 
-            # Se o parâmetro historyLength estiver presente, manipula o histórico
+            # If historyLength parameter is present, handle the history
             if history_length is not None and task.history:
                 if history_length == 0:
                     task.history = []
@@ -135,7 +135,7 @@ class A2ATaskManager:
 
             return GetTaskResponse(id=request.id, result=task)
         except Exception as e:
-            logger.error(f"Erro ao processar on_get_task: {str(e)}")
+            logger.error(f"Error processing on_get_task: {str(e)}")
             return GetTaskResponse(id=request.id, error=InternalError(message=str(e)))
 
     async def on_cancel_task(self, request: CancelTaskRequest) -> CancelTaskResponse:
@@ -211,78 +211,75 @@ class A2ATaskManager:
 
     async def on_send_task(self, request: SendTaskRequest) -> SendTaskResponse:
         """
-        Manipula requisição para enviar uma nova tarefa.
+        Handle request to send a new task.
 
         Args:
-            request: Requisição de envio de tarefa
+            request: Send Task request
 
         Returns:
-            Resposta com os detalhes da tarefa criada
+            Response with the created task details
         """
         try:
             params = request.params
             task_id = params.id
-            logger.info(f"Recebendo tarefa {task_id}")
+            logger.info(f"Receiving task {task_id}")
 
-            # Verifica se já existe uma tarefa com esse ID
+            # Check if a task with this ID already exists
             existing_task = await self.redis_cache.get(f"task:{task_id}")
             if existing_task:
-                # Se a tarefa já existe e está em progresso, retorna a tarefa atual
+                # If the task already exists and is in progress, return the current task
                 if existing_task.get("status", {}).get("state") in [
                     TaskState.WORKING,
                     TaskState.COMPLETED,
                 ]:
-                    logger.info(
-                        f"Tarefa {task_id} já existe e está em progresso/concluída"
-                    )
                     return SendTaskResponse(
                         id=request.id, result=Task.model_validate(existing_task)
                     )
 
-                # Se a tarefa existe mas falhou ou foi cancelada, podemos reprocessá-la
-                logger.info(f"Reprocessando tarefa existente {task_id}")
+                # If the task exists but failed or was canceled, we can reprocess it
+                logger.info(f"Reprocessing existing task {task_id}")
 
-            # Verifica compatibilidade de modalidades
+            # Check modality compatibility
             server_output_modes = []
             if self.agent_runner:
-                # Tenta obter modos suportados do agente
+                # Try to get supported modes from the agent
                 try:
                     server_output_modes = await self.agent_runner.get_supported_modes()
                 except Exception as e:
-                    logger.warning(f"Erro ao obter modos suportados: {str(e)}")
-                    server_output_modes = ["text"]  # Fallback para texto
+                    logger.warning(f"Error getting supported modes: {str(e)}")
+                    server_output_modes = ["text"]  # Fallback to text
 
             if not are_modalities_compatible(
                 server_output_modes, params.acceptedOutputModes
             ):
                 logger.warning(
-                    f"Modos incompatíveis: servidor={server_output_modes}, cliente={params.acceptedOutputModes}"
+                    f"Incompatible modes: server={server_output_modes}, client={params.acceptedOutputModes}"
                 )
                 return SendTaskResponse(
                     id=request.id, error=ContentTypeNotSupportedError()
                 )
 
-            # Cria dados da tarefa
+            # Create task data
             task_data = await self._create_task_data(params)
 
-            # Armazena a tarefa no cache
+            # Store task in cache
             await self.redis_cache.set(f"task:{task_id}", task_data)
 
-            # Configura notificações push, se fornecidas
+            # Configure push notifications, if provided
             if params.pushNotification:
                 await self.redis_cache.set(
                     f"task_notification:{task_id}", params.pushNotification.model_dump()
                 )
 
-            # Inicia a execução da tarefa em background
+            # Start task execution in background
             asyncio.create_task(self._execute_task(task_data, params))
 
-            # Converte para objeto Task e retorna
+            # Convert to Task object and return
             task = Task.model_validate(task_data)
             return SendTaskResponse(id=request.id, result=task)
 
         except Exception as e:
-            logger.error(f"Erro ao processar on_send_task: {str(e)}")
+            logger.error(f"Error processing on_send_task: {str(e)}")
             return SendTaskResponse(id=request.id, error=InternalError(message=str(e)))
 
     async def on_send_task_subscribe(
@@ -553,20 +550,20 @@ class A2ATaskManager:
 
     async def _execute_task(self, task: Dict[str, Any], params: TaskSendParams) -> None:
         """
-        Executa uma tarefa usando o adaptador do agente.
+        Execute a task using the agent adapter.
 
-        Esta função é responsável pela execução real da tarefa pelo agente,
-        atualizando seu status conforme o progresso.
+        This function is responsible for executing the task by the agent,
+        updating its status as progress is made.
 
         Args:
-            task: Dados da tarefa a ser executada
-            params: Parâmetros de envio da tarefa
+            task: Task data to be executed
+            params: Send task parameters
         """
         task_id = task["id"]
         agent_id = params.agentId
         message_text = ""
 
-        # Extrai o texto da mensagem
+        # Extract the text from the message
         if params.message and params.message.parts:
             for part in params.message.parts:
                 if part.type == "text":
@@ -574,23 +571,23 @@ class A2ATaskManager:
 
         if not message_text:
             await self._update_task_status(
-                task_id, TaskState.FAILED, "Mensagem não contém texto", final=True
+                task_id, TaskState.FAILED, "Message does not contain text", final=True
             )
             return
 
-        # Verificamos se é uma execução em andamento
+        # Check if it is an ongoing execution
         task_status = task.get("status", {})
         if task_status.get("state") in [TaskState.WORKING, TaskState.COMPLETED]:
-            logger.info(f"Tarefa {task_id} já está em execução ou concluída")
+            logger.info(f"Task {task_id} is already in execution or completed")
             return
 
         try:
-            # Atualiza para estado "working"
+            # Update to "working" state
             await self._update_task_status(
-                task_id, TaskState.WORKING, "Processando solicitação"
+                task_id, TaskState.WORKING, "Processing request"
             )
 
-            # Executa o agente
+            # Execute the agent
             if self.agent_runner:
                 response = await self.agent_runner.run_agent(
                     agent_id=agent_id,
@@ -599,9 +596,9 @@ class A2ATaskManager:
                     task_id=task_id,
                 )
 
-                # Processa a resposta do agente
+                # Process the agent's response
                 if response and isinstance(response, dict):
-                    # Extrai texto da resposta
+                    # Extract text from the response
                     response_text = response.get("content", "")
                     if not response_text and "message" in response:
                         message = response.get("message", {})
@@ -610,9 +607,9 @@ class A2ATaskManager:
                             if part.get("type") == "text":
                                 response_text += part.get("text", "")
 
-                    # Constrói a mensagem final do agente
+                    # Build the final agent message
                     if response_text:
-                        # Cria um artefato para a resposta
+                        # Create an artifact for the response
                         artifact = Artifact(
                             name="response",
                             parts=[TextPart(text=response_text)],
@@ -620,10 +617,10 @@ class A2ATaskManager:
                             lastChunk=True,
                         )
 
-                        # Adiciona o artefato à tarefa
+                        # Add the artifact to the task
                         await self._add_task_artifact(task_id, artifact)
 
-                        # Atualiza o status da tarefa para completado
+                        # Update the task status to completed
                         await self._update_task_status(
                             task_id, TaskState.COMPLETED, response_text, final=True
                         )
@@ -631,51 +628,49 @@ class A2ATaskManager:
                         await self._update_task_status(
                             task_id,
                             TaskState.FAILED,
-                            "O agente não retornou uma resposta válida",
+                            "The agent did not return a valid response",
                             final=True,
                         )
                 else:
                     await self._update_task_status(
                         task_id,
                         TaskState.FAILED,
-                        "Resposta inválida do agente",
+                        "Invalid agent response",
                         final=True,
                     )
             else:
                 await self._update_task_status(
                     task_id,
                     TaskState.FAILED,
-                    "Adaptador do agente não configurado",
+                    "Agent adapter not configured",
                     final=True,
                 )
         except Exception as e:
-            logger.error(f"Erro na execução da tarefa {task_id}: {str(e)}")
+            logger.error(f"Error executing task {task_id}: {str(e)}")
             await self._update_task_status(
-                task_id, TaskState.FAILED, f"Erro ao processar: {str(e)}", final=True
+                task_id, TaskState.FAILED, f"Error processing: {str(e)}", final=True
             )
 
     async def _update_task_status(
         self, task_id: str, state: TaskState, message_text: str, final: bool = False
     ) -> None:
         """
-        Atualiza o status de uma tarefa.
+        Update the status of a task.
 
         Args:
-            task_id: ID da tarefa a ser atualizada
-            state: Novo estado da tarefa
-            message_text: Texto da mensagem associada ao status
-            final: Indica se este é o status final da tarefa
+            task_id: ID of the task to be updated
+            state: New task state
+            message_text: Text of the message associated with the status
+            final: Indicates if this is the final status of the task
         """
         try:
-            # Busca dados atuais da tarefa
+            # Get current task data
             task_data = await self.redis_cache.get(f"task:{task_id}")
             if not task_data:
-                logger.warning(
-                    f"Não foi possível atualizar status: tarefa {task_id} não encontrada"
-                )
+                logger.warning(f"Unable to update status: task {task_id} not found")
                 return
 
-            # Cria objeto de status com a mensagem
+            # Create status object with the message
             agent_message = Message(
                 role="agent",
                 parts=[TextPart(text=message_text)],
@@ -686,26 +681,26 @@ class A2ATaskManager:
                 state=state, message=agent_message, timestamp=datetime.now()
             )
 
-            # Atualiza o status na tarefa
+            # Update the status in the task
             task_data["status"] = status.model_dump(exclude_none=True)
 
-            # Atualiza o histórico, se existir
+            # Update the history, if it exists
             if "history" not in task_data:
                 task_data["history"] = []
 
-            # Adiciona a mensagem ao histórico
+            # Add the message to the history
             task_data["history"].append(agent_message.model_dump(exclude_none=True))
 
-            # Armazena a tarefa atualizada
+            # Store the updated task
             await self.redis_cache.set(f"task:{task_id}", task_data)
 
-            # Cria evento de atualização de status
+            # Create status update event
             status_event = TaskStatusUpdateEvent(id=task_id, status=status, final=final)
 
-            # Publica atualização
+            # Publish status update
             await self._publish_task_update(task_id, status_event)
 
-            # Envia notificação push, se configurada
+            # Send push notification, if configured
             if final or state in [
                 TaskState.FAILED,
                 TaskState.COMPLETED,
@@ -715,7 +710,7 @@ class A2ATaskManager:
                     task_id=task_id, state=state, message_text=message_text
                 )
         except Exception as e:
-            logger.error(f"Erro ao atualizar status da tarefa {task_id}: {str(e)}")
+            logger.error(f"Error updating task status {task_id}: {str(e)}")
 
     async def _add_task_artifact(self, task_id: str, artifact: Artifact) -> None:
         """

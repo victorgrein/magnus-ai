@@ -15,6 +15,7 @@ from src.services import (
     agent_service,
     mcp_server_service,
 )
+from src.models.models import Agent as AgentModel
 import logging
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,12 @@ async def create_agent(
     # Verify if the user has access to the agent's client
     await verify_user_client(payload, db, agent.client_id)
 
-    return agent_service.create_agent(db, agent)
+    db_agent = await agent_service.create_agent(db, agent)
+
+    if not db_agent.agent_card_url:
+        db_agent.agent_card_url = db_agent.agent_card_url_property
+
+    return db_agent
 
 
 @router.get("/", response_model=List[Agent])
@@ -88,7 +94,13 @@ async def read_agents(
     # Verify if the user has access to this client's data
     await verify_user_client(payload, db, x_client_id)
 
-    return agent_service.get_agents_by_client(db, x_client_id, skip, limit)
+    agents = agent_service.get_agents_by_client(db, x_client_id, skip, limit)
+
+    for agent in agents:
+        if not agent.agent_card_url:
+            agent.agent_card_url = agent.agent_card_url_property
+
+    return agents
 
 
 @router.get("/{agent_id}", response_model=Agent)
@@ -106,6 +118,9 @@ async def read_agent(
 
     # Verify if the user has access to the agent's client
     await verify_user_client(payload, db, x_client_id)
+
+    if not db_agent.agent_card_url:
+        db_agent.agent_card_url = db_agent.agent_card_url_property
 
     return db_agent
 
@@ -132,7 +147,12 @@ async def update_agent(
         new_client_id = uuid.UUID(agent_data["client_id"])
         await verify_user_client(payload, db, new_client_id)
 
-    return await agent_service.update_agent(db, agent_id, agent_data)
+    updated_agent = await agent_service.update_agent(db, agent_id, agent_data)
+
+    if not updated_agent.agent_card_url:
+        updated_agent.agent_card_url = updated_agent.agent_card_url_property
+
+    return updated_agent
 
 
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)

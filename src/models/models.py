@@ -74,22 +74,25 @@ class Agent(Base):
     model = Column(String, nullable=True, default="")
     api_key = Column(String, nullable=True, default="")
     instruction = Column(Text)
+    agent_card_url = Column(String, nullable=True)
     config = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         CheckConstraint(
-            "type IN ('llm', 'sequential', 'parallel', 'loop')", name="check_agent_type"
+            "type IN ('llm', 'sequential', 'parallel', 'loop', 'a2a')",
+            name="check_agent_type",
         ),
     )
 
     @property
-    def agent_card_url(self) -> str:
-        """URL virtual para o agent card que não é rastrada no banco de dados"""
-        return (
-            f"{os.getenv('API_URL', '')}/api/v1/agents/{self.id}/.well-known/agent.json"
-        )
+    def agent_card_url_property(self) -> str:
+        """Virtual URL for the agent card"""
+        if self.agent_card_url:
+            return self.agent_card_url
+
+        return f"{os.getenv('API_URL', '')}/api/v1/a2a/{self.id}/.well-known/agent.json"
 
     def to_dict(self):
         """Converts the object to a dictionary, converting UUIDs to strings"""
@@ -112,8 +115,7 @@ class Agent(Base):
                 ]
             else:
                 result[key] = value
-        # Adiciona a propriedade virtual ao dicionário
-        result["agent_card_url"] = self.agent_card_url
+        result["agent_card_url"] = self.agent_card_url_property
         return result
 
     def _convert_dict(self, d):
