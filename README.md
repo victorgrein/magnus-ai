@@ -14,6 +14,247 @@ The Evo AI platform allows:
 - JWT authentication with email verification
 - **Agent 2 Agent (A2A) Protocol Support**: Interoperability between AI agents following Google's A2A specification
 
+## 🤖 Agent Types and Creation
+
+Evo AI supports different types of agents that can be flexibly combined to create complex solutions:
+
+### 1. LLM Agent (Language Model)
+
+Agent based on language models like GPT-4, Claude, etc. Can be configured with tools, MCP servers, and sub-agents.
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "name": "personal_assistant",
+  "description": "Specialized personal assistant",
+  "type": "llm",
+  "model": "gpt-4",
+  "api_key": "your-api-key",
+  "instruction": "Detailed instructions for agent behavior",
+  "config": {
+    "tools": [
+      {
+        "id": "tool-uuid",
+        "envs": {
+          "API_KEY": "tool-api-key",
+          "ENDPOINT": "http://localhost:8000"
+        }
+      }
+    ],
+    "mcp_servers": [
+      {
+        "id": "server-uuid",
+        "envs": {
+          "API_KEY": "server-api-key",
+          "ENDPOINT": "http://localhost:8001"
+        },
+        "tools": ["tool_name1", "tool_name2"]
+      }
+    ],
+    "custom_tools": {
+      "http_tools": []
+    },
+    "sub_agents": ["sub-agent-uuid"]
+  }
+}
+```
+
+### 2. A2A Agent (Agent-to-Agent)
+
+Agent that implements Google's A2A protocol for agent interoperability.
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "type": "a2a",
+  "agent_card_url": "http://localhost:8001/api/v1/a2a/your-agent/.well-known/agent.json",
+  "config": {
+    "sub_agents": ["sub-agent-uuid"]
+  }
+}
+```
+
+### 3. Sequential Agent
+
+Executes a sequence of sub-agents in a specific order.
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "name": "processing_flow",
+  "type": "sequential",
+  "config": {
+    "sub_agents": ["agent-uuid-1", "agent-uuid-2", "agent-uuid-3"]
+  }
+}
+```
+
+### 4. Parallel Agent
+
+Executes multiple sub-agents simultaneously.
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "name": "parallel_processing",
+  "type": "parallel",
+  "config": {
+    "sub_agents": ["agent-uuid-1", "agent-uuid-2"]
+  }
+}
+```
+
+### 5. Loop Agent
+
+Executes sub-agents in a loop with a defined maximum number of iterations.
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "name": "loop_processing",
+  "type": "loop",
+  "config": {
+    "sub_agents": ["sub-agent-uuid"],
+    "max_iterations": 5
+  }
+}
+```
+
+### Common Characteristics
+
+- All agent types can have sub-agents
+- Sub-agents can be of any type
+- Agents can be flexibly combined
+- Type-specific configurations
+- Support for custom tools and MCP servers
+
+### MCP Server Configuration
+
+Agents can be integrated with MCP (Model Control Protocol) servers for distributed processing:
+
+```json
+{
+  "config": {
+    "mcp_servers": [
+      {
+        "id": "server-uuid",
+        "envs": {
+          "API_KEY": "server-api-key",
+          "ENDPOINT": "http://localhost:8001",
+          "MODEL_NAME": "gpt-4",
+          "TEMPERATURE": 0.7,
+          "MAX_TOKENS": 2000
+        },
+        "tools": ["tool_name1", "tool_name2"]
+      }
+    ]
+  }
+}
+```
+
+Available configurations for MCP servers:
+
+- **id**: Unique MCP server identifier
+- **envs**: Environment variables for configuration
+  - API_KEY: Server authentication key
+  - ENDPOINT: MCP server URL
+  - MODEL_NAME: Model name to be used
+  - TEMPERATURE: Text generation temperature (0.0 to 1.0)
+  - MAX_TOKENS: Maximum token limit per request
+  - Other server-specific variables
+- **tools**: MCP server tool names for agent use
+
+### Agent Composition Examples
+
+Different types of agents can be combined to create complex processing flows:
+
+#### 1. Sequential Processing Pipeline
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "name": "processing_pipeline",
+  "type": "sequential",
+  "config": {
+    "sub_agents": [
+      "llm-analysis-agent-uuid", // LLM Agent for initial analysis
+      "a2a-translation-agent-uuid", // A2A Agent for translation
+      "llm-formatting-agent-uuid" // LLM Agent for final formatting
+    ]
+  }
+}
+```
+
+#### 2. Parallel Processing with Aggregation
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "name": "parallel_analysis",
+  "type": "sequential",
+  "config": {
+    "sub_agents": [
+      {
+        "type": "parallel",
+        "config": {
+          "sub_agents": [
+            "analysis-agent-uuid-1",
+            "analysis-agent-uuid-2",
+            "analysis-agent-uuid-3"
+          ]
+        }
+      },
+      "aggregation-agent-uuid" // Agent for aggregating results
+    ]
+  }
+}
+```
+
+#### 3. Multi-Agent Conversation System
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "name": "conversation_system",
+  "type": "parallel",
+  "config": {
+    "sub_agents": [
+      {
+        "type": "llm",
+        "name": "context_agent",
+        "model": "gpt-4",
+        "instruction": "Maintain conversation context"
+      },
+      {
+        "type": "a2a",
+        "agent_card_url": "expert-agent-url"
+      },
+      {
+        "type": "loop",
+        "config": {
+          "sub_agents": ["memory-agent-uuid"],
+          "max_iterations": 1
+        }
+      }
+    ]
+  }
+}
+```
+
+### API Creation
+
+For creating a new agent, use the endpoint:
+
+```http
+POST /api/v1/agents
+Content-Type: application/json
+Authorization: Bearer your-token-jwt
+
+{
+    // Configuration of the agent as per the examples above
+}
+```
+
 ## 🛠️ Technologies
 
 - **FastAPI**: Web framework for building the API
@@ -125,9 +366,9 @@ venv\Scripts\activate  # Windows
 3. Install dependencies:
 
 ```bash
-make install      # Para instalação básica
-# ou
-make install-dev  # Para instalação com dependências de desenvolvimento
+make install      # For basic installation
+# or
+make install-dev  # For development dependencies
 ```
 
 4. Set up environment variables:
@@ -218,9 +459,9 @@ All email templates feature responsive design, clear call-to-action buttons, and
 ## 🚀 Running the Project
 
 ```bash
-make run         # Para desenvolvimento com reload automático
-# ou
-make run-prod    # Para produção com múltiplos workers
+make run         # For development with automatic reload
+# or
+make run-prod    # For production with multiple workers
 ```
 
 The API will be available at `http://localhost:8000`
@@ -261,26 +502,26 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ```bash
 # Database migrations
-make init                       # Inicializar Alembic
-make alembic-revision message="description"  # Criar nova migração
-make alembic-upgrade            # Atualizar banco para última versão
-make alembic-downgrade          # Reverter última migração
-make alembic-migrate message="description"  # Criar e aplicar migração
-make alembic-reset              # Resetar banco de dados
+make init                       # Initialize Alembic
+make alembic-revision message="description"  # Create new migration
+make alembic-upgrade            # Update database to latest version
+make alembic-downgrade          # Revert latest migration
+make alembic-migrate message="description"  # Create and apply migration
+make alembic-reset              # Reset database
 
 # Seeders
-make seed-admin                 # Criar administrador padrão
-make seed-client                # Criar cliente padrão
-make seed-agents                # Criar agentes de exemplo
-make seed-mcp-servers           # Criar servidores MCP de exemplo
-make seed-tools                 # Criar ferramentas de exemplo
-make seed-contacts              # Criar contatos de exemplo
-make seed-all                   # Executar todos os seeders
+make seed-admin                 # Create default admin
+make seed-client                # Create default client
+make seed-agents                # Create example agents
+make seed-mcp-servers           # Create example MCP servers
+make seed-tools                 # Create example tools
+make seed-contacts              # Create example contacts
+make seed-all                   # Run all seeders
 
-# Verificação de código
-make lint                       # Verificar código com flake8
-make format                     # Formatar código com black
-make clear-cache                # Limpar cache do projeto
+# Code verification
+make lint                       # Verify code with flake8
+make format                     # Format code with black
+make clear-cache                # Clear project cache
 ```
 
 ## 🐳 Running with Docker
