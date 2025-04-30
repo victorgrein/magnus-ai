@@ -7,11 +7,10 @@ push notification configurations, and other A2A-related data.
 
 import json
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 import asyncio
 import redis.asyncio as aioredis
-from redis.exceptions import RedisError
-from src.config.redis import get_redis_config, get_a2a_config
+from src.config.redis import get_redis_config
 import threading
 import time
 

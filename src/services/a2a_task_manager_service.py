@@ -6,12 +6,9 @@ including execution, streaming, push notifications, status queries, and cancella
 """
 
 import asyncio
-import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union, AsyncIterable
-
-from sqlalchemy.orm import Session
+from typing import Any, Dict, Union, AsyncIterable
 
 from src.schemas.a2a.exceptions import (
     TaskNotFoundError,
@@ -23,8 +20,6 @@ from src.schemas.a2a.exceptions import (
 
 from src.schemas.a2a.types import (
     JSONRPCResponse,
-    TaskIdParams,
-    TaskQueryParams,
     GetTaskRequest,
     SendTaskRequest,
     CancelTaskRequest,
@@ -55,9 +50,6 @@ from src.services.redis_cache_service import RedisCacheService
 from src.utils.a2a_utils import (
     are_modalities_compatible,
     new_incompatible_types_error,
-    new_not_implemented_error,
-    create_task_id,
-    format_error_response,
 )
 
 logger = logging.getLogger(__name__)

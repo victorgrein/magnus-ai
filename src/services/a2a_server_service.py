@@ -5,10 +5,8 @@ This module implements a JSON-RPC compatible server for the A2A protocol,
 that manages agent tasks, streaming events and push notifications.
 """
 
-import asyncio
 import json
 import logging
-import uuid
 from datetime import datetime
 from typing import (
     Any,
@@ -16,18 +14,14 @@ from typing import (
     List,
     Optional,
     AsyncGenerator,
-    Callable,
     Union,
     AsyncIterable,
 )
-import httpx
 from fastapi import Request
 from fastapi.responses import JSONResponse, StreamingResponse, Response
-from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from src.schemas.a2a.types import A2ARequest
-from src.services.agent_runner import run_agent
 from src.services.a2a_integration_service import (
     AgentRunnerAdapter,
     StreamingServiceAdapter,
@@ -42,9 +36,7 @@ from src.schemas.a2a.types import (
     SetTaskPushNotificationRequest,
     GetTaskPushNotificationRequest,
     TaskResubscriptionRequest,
-    TaskSendParams,
 )
-from src.utils.a2a_utils import are_modalities_compatible
 
 logger = logging.getLogger(__name__)
 
@@ -579,7 +571,9 @@ class A2AServer:
                                 "error": {
                                     "code": -32601,
                                     "message": "Method not found",
-                                    "data": {"detail": f"Method not supported"},
+                                    "data": {
+                                        "detail": f"Method not supported: {method}"
+                                    },
                                 },
                             },
                         )

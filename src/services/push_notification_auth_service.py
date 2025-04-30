@@ -17,7 +17,7 @@ import jwt
 from jwt import PyJWK, PyJWKClient
 from fastapi import Request
 from starlette.responses import JSONResponse
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 AUTH_HEADER_PREFIX = "Bearer "

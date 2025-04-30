@@ -15,7 +15,6 @@ from src.services import (
     agent_service,
     mcp_server_service,
 )
-from src.models.models import Agent as AgentModel
 import logging
 
 logger = logging.getLogger(__name__)

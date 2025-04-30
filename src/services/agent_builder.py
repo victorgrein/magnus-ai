@@ -1,12 +1,13 @@
 from typing import List, Optional, Tuple
 from google.adk.agents.llm_agent import LlmAgent
-from google.adk.agents import SequentialAgent, ParallelAgent, LoopAgent
+from google.adk.agents import SequentialAgent, ParallelAgent, LoopAgent, BaseAgent
 from google.adk.models.lite_llm import LiteLlm
 from src.utils.logger import setup_logger
 from src.core.exceptions import AgentNotFoundError
 from src.services.agent_service import get_agent
 from src.services.custom_tools import CustomToolBuilder
 from src.services.mcp_service import MCPService
+from src.services.a2a_agent import A2ACustomAgent
 from sqlalchemy.orm import Session
 from contextlib import AsyncExitStack
 from google.adk.tools import load_memory
@@ -87,12 +88,19 @@ class AgentBuilder:
             if agent is None:
                 raise AgentNotFoundError(f"Agent with ID {sub_agent_id} not found")
 
-            if agent.type != "llm":
-                raise ValueError(
-                    f"Agent {agent.name} (ID: {agent.id}) is not an LLM agent"
-                )
+            if agent.type == "llm":
+                sub_agent, exit_stack = await self._create_llm_agent(agent)
+            elif agent.type == "a2a":
+                sub_agent, exit_stack = await self.build_a2a_agent(agent)
+            elif agent.type == "sequential":
+                sub_agent, exit_stack = await self.build_composite_agent(agent)
+            elif agent.type == "parallel":
+                sub_agent, exit_stack = await self.build_composite_agent(agent)
+            elif agent.type == "loop":
+                sub_agent, exit_stack = await self.build_composite_agent(agent)
+            else:
+                raise ValueError(f"Invalid agent type: {agent.type}")
 
-            sub_agent, exit_stack = await self._create_llm_agent(agent)
             sub_agents.append((sub_agent, exit_stack))
 
         return sub_agents
@@ -115,6 +123,41 @@ class AgentBuilder:
             root_llm_agent.sub_agents = sub_agents
 
         return root_llm_agent, exit_stack
+
+    async def build_a2a_agent(
+        self, root_agent
+    ) -> Tuple[BaseAgent, Optional[AsyncExitStack]]:
+        """Build an A2A agent with its sub-agents."""
+        logger.info(f"Creating A2A agent from {root_agent.agent_card_url}")
+
+        if not root_agent.agent_card_url:
+            raise ValueError("agent_card_url is required for a2a agents")
+
+        try:
+            config = root_agent.config or {}
+            poll_interval = config.get("poll_interval", 1.0)
+            max_wait_time = config.get("max_wait_time", 60)
+            timeout = config.get("timeout", 300)
+
+            a2a_agent = A2ACustomAgent(
+                name=root_agent.name,
+                agent_card_url=root_agent.agent_card_url,
+                poll_interval=poll_interval,
+                max_wait_time=max_wait_time,
+                timeout=timeout,
+                description=root_agent.description
+                or f"A2A Agent for {root_agent.name}",
+            )
+
+            logger.info(
+                f"A2A agent created successfully: {root_agent.name} ({root_agent.agent_card_url})"
+            )
+
+            return a2a_agent, None
+
+        except Exception as e:
+            logger.error(f"Error building A2A agent: {str(e)}")
+            raise ValueError(f"Error building A2A agent: {str(e)}")
 
     async def build_composite_agent(
         self, root_agent
@@ -161,13 +204,14 @@ class AgentBuilder:
         else:
             raise ValueError(f"Invalid agent type: {root_agent.type}")
 
-    async def build_agent(
-        self, root_agent
-    ) -> Tuple[
-        LlmAgent | SequentialAgent | ParallelAgent | LoopAgent, Optional[AsyncExitStack]
+    async def build_agent(self, root_agent) -> Tuple[
+        LlmAgent | SequentialAgent | ParallelAgent | LoopAgent | A2ACustomAgent,
+        Optional[AsyncExitStack],
     ]:
         """Build the appropriate agent based on the type of the root agent."""
         if root_agent.type == "llm":
             return await self.build_llm_agent(root_agent)
+        elif root_agent.type == "a2a":
+            return await self.build_a2a_agent(root_agent)
         else:
             return await self.build_composite_agent(root_agent)
