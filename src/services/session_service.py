@@ -11,20 +11,36 @@ from src.services.agent_service import get_agents_by_client
 
 import uuid
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+
+def _session_to_dict(session: SessionModel):
+    """Convert Session model to dictionary with created_at field"""
+    result = {
+        "id": session.id,
+        "app_name": session.app_name,
+        "user_id": session.user_id,
+        "state": session.state,
+        "create_time": session.create_time,
+        "update_time": session.update_time,
+        "created_at": session.create_time,
+    }
+    return result
 
 
 def get_sessions_by_client(
     db: Session,
     client_id: uuid.UUID,
-) -> List[SessionModel]:
+) -> List[dict]:
     """Search for sessions of a client with pagination"""
     try:
         agents_by_client = get_agents_by_client(db, client_id)
         sessions = []
         for agent in agents_by_client:
-            sessions.extend(get_sessions_by_agent(db, agent.id))
+            db_sessions = get_sessions_by_agent(db, agent.id)
+            sessions.extend(db_sessions)
 
         return sessions
     except SQLAlchemyError as e:
@@ -40,13 +56,15 @@ def get_sessions_by_agent(
     agent_id: uuid.UUID,
     skip: int = 0,
     limit: int = 100,
-) -> List[SessionModel]:
+) -> List[dict]:
     """Search for sessions of an agent with pagination"""
     try:
         agent_id_str = str(agent_id)
         query = db.query(SessionModel).filter(SessionModel.app_name == agent_id_str)
 
-        return query.offset(skip).limit(limit).all()
+        db_sessions = query.offset(skip).limit(limit).all()
+        # Convert each session to dictionary with created_at field
+        return [_session_to_dict(session) for session in db_sessions]
     except SQLAlchemyError as e:
         logger.error(f"Error searching for sessions of agent {agent_id_str}: {str(e)}")
         raise HTTPException(

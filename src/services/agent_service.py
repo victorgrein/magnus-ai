@@ -12,6 +12,21 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
+def _convert_uuid_to_str(obj):
+    """
+    Recursively convert all UUID objects to strings in a dictionary, list or scalar value.
+    This ensures JSON serialize for complex nested objects.
+    """
+    if isinstance(obj, dict):
+        return {key: _convert_uuid_to_str(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [_convert_uuid_to_str(item) for item in obj]
+    elif isinstance(obj, uuid.UUID):
+        return str(obj)
+    else:
+        return obj
+
+
 def validate_sub_agents(db: Session, sub_agents: List[uuid.UUID]) -> bool:
     """Validate if all sub-agents exist"""
     for agent_id in sub_agents:
@@ -143,8 +158,13 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
             if "mcp_servers" in config:
                 processed_servers = []
                 for server in config["mcp_servers"]:
+                    # Convert server id to UUID if it's a string
+                    server_id = server["id"]
+                    if isinstance(server_id, str):
+                        server_id = uuid.UUID(server_id)
+
                     # Search for MCP server in the database
-                    mcp_server = get_mcp_server(db, server["id"])
+                    mcp_server = get_mcp_server(db, server_id)
                     if not mcp_server:
                         raise HTTPException(
                             status_code=400,
@@ -185,7 +205,22 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
 
             agent.config = config
 
-        db_agent = Agent(**agent.model_dump())
+        # Ensure all config objects are serializable (convert UUIDs to strings)
+        if agent.config is not None:
+            agent.config = _convert_uuid_to_str(agent.config)
+
+        # Convert agent to dict ensuring all UUIDs are converted to strings
+        agent_dict = agent.model_dump()
+        agent_dict = _convert_uuid_to_str(agent_dict)
+
+        # Create agent from the processed dictionary
+        db_agent = Agent(**agent_dict)
+
+        # Make one final check to ensure all nested objects are serializable
+        # (especially nested UUIDs in config)
+        if db_agent.config is not None:
+            db_agent.config = _convert_uuid_to_str(db_agent.config)
+
         db.add(db_agent)
         db.commit()
         db.refresh(db_agent)
@@ -195,9 +230,20 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
     except SQLAlchemyError as e:
         db.rollback()
         logger.error(f"Error creating agent: {str(e)}")
+
+        # Add debugging info
+        try:
+            import json
+
+            if "agent_dict" in locals():
+                agent_json = json.dumps(agent_dict)
+                logger.info(f"Agent creation attempt with: {agent_json[:200]}...")
+        except Exception as json_err:
+            logger.error(f"Could not serialize agent for debugging: {str(json_err)}")
+
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error creating agent",
+            detail=f"Error creating agent: {str(e)}",
         )
 
 
@@ -294,8 +340,13 @@ async def update_agent(
             if "mcp_servers" in config:
                 processed_servers = []
                 for server in config["mcp_servers"]:
+                    # Convert server id to UUID if it's a string
+                    server_id = server["id"]
+                    if isinstance(server_id, str):
+                        server_id = uuid.UUID(server_id)
+
                     # Search for MCP server in the database
-                    mcp_server = get_mcp_server(db, server["id"])
+                    mcp_server = get_mcp_server(db, server_id)
                     if not mcp_server:
                         raise HTTPException(
                             status_code=400,
@@ -336,6 +387,10 @@ async def update_agent(
 
             agent_data["config"] = config
 
+        # Ensure all config objects are serializable (convert UUIDs to strings)
+        if "config" in agent_data and agent_data["config"] is not None:
+            agent_data["config"] = _convert_uuid_to_str(agent_data["config"])
+
         for key, value in agent_data.items():
             setattr(agent, key, value)
 
@@ -348,21 +403,23 @@ async def update_agent(
 
 
 def delete_agent(db: Session, agent_id: uuid.UUID) -> bool:
-    """Remove an agent (soft delete)"""
+    """Remove an agent from the database"""
     try:
         db_agent = get_agent(db, agent_id)
         if not db_agent:
             return False
 
+        # Actually delete the agent from the database
+        db.delete(db_agent)
         db.commit()
-        logger.info(f"Agent deactivated successfully: {agent_id}")
+        logger.info(f"Agent deleted successfully: {agent_id}")
         return True
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Error deactivating agent {agent_id}: {str(e)}")
+        logger.error(f"Error deleting agent {agent_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Error deactivating agent",
+            detail="Error deleting agent",
         )
 
 

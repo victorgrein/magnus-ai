@@ -1,6 +1,6 @@
 # Evo AI - AI Agents Platform
 
-Evo AI is an open-source platform for creating and managing AI agents, enabling integration with different AI models and services.
+Evo AI is an free platform for creating and managing AI agents, enabling integration with different AI models and services.
 
 ## 🚀 Overview
 

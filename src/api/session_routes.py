@@ -32,7 +32,7 @@ router = APIRouter(
 
 
 # Session Routes
-@router.get("/client/{client_id}", response_model=List[Adk_Session])
+@router.get("/client/{client_id}")
 async def get_client_sessions(
     client_id: uuid.UUID,
     db: Session = Depends(get_db),
@@ -43,7 +43,7 @@ async def get_client_sessions(
     return get_sessions_by_client(db, client_id)
 
 
-@router.get("/agent/{agent_id}", response_model=List[Adk_Session])
+@router.get("/agent/{agent_id}")
 async def get_agent_sessions(
     agent_id: uuid.UUID,
     db: Session = Depends(get_db),

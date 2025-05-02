@@ -54,6 +54,7 @@ def create_mcp_servers():
                 {
                     "name": "Sequential Thinking",
                     "description": "Sequential Thinking helps users organize their thoughts and break down complex problems through a structured workflow. By guiding users through defined cognitive stages like Problem Definition, Research, Analysis, Synthesis, and Conclusion, it provides a framework for progressive thinking. The server tracks the progression of your thinking process, identifies connections between similar thoughts, monitors progress, and generates summaries, making it easier to approach challenges methodically and reach well-reasoned conclusions.",
+                    "config_type": "studio",
                     "config_json": {
                         "command": "npx",
                         "args": [
@@ -84,6 +85,7 @@ def create_mcp_servers():
                 {
                     "name": "CloudFlare",
                     "description": "Model Context Protocol (MCP) is a new, standardized protocol for managing context between large language models (LLMs) and external systems. In this repository, we provide an installer as well as an MCP Server for Cloudflare's API.\r\n\r\nThis lets you use Claude Desktop, or any MCP Client, to use natural language to accomplish things on your Cloudflare account, e.g.:\r\n\r\nList all the Cloudflare workers on my <some-email>@gmail.com account.\r\nCan you tell me about any potential issues on this particular worker '...'?",
+                    "config_type": "sse",
                     "config_json": {
                         "url": "https://observability.mcp.cloudflare.com/sse"
                     },
@@ -122,6 +124,7 @@ def create_mcp_servers():
                 {
                     "name": "Brave Search",
                     "description": "Brave Search allows you to seamlessly integrate Brave Search functionality into AI assistants like Claude. By implementing a Model Context Protocol (MCP) server, it enables the AI to leverage Brave Search's web search and local business search capabilities. It provides tools for both general web searches and specific local searches, enhancing the AI assistant's ability to provide relevant and up-to-date information.",
+                    "config_type": "studio",
                     "config_json": {
                         "command": "npx",
                         "args": ["-y", "@modelcontextprotocol/server-brave-search"],
@@ -166,6 +169,7 @@ def create_mcp_servers():
                 server = MCPServer(
                     name=server_data["name"],
                     description=server_data["description"],
+                    config_type=server_data["config_type"],
                     config_json=server_data["config_json"],
                     environments=server_data["environments"],
                     tools=server_data["tools"],

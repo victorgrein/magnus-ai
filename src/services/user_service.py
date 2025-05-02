@@ -53,7 +53,7 @@ def create_user(
         try:
             # If not admin and no client_id, create an associated client
             if not is_admin and local_client_id is None:
-                client = Client(name=user_data.name)
+                client = Client(name=user_data.name, email=user_data.email)
                 db.add(client)
                 db.flush()  # Get the client ID
                 local_client_id = client.id

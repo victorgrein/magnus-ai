@@ -190,6 +190,7 @@ class ToolConfig(BaseModel):
 class MCPServerBase(BaseModel):
     name: str
     description: Optional[str] = None
+    config_type: str = Field(default="studio")
     config_json: Dict[str, Any] = Field(default_factory=dict)
     environments: Dict[str, Any] = Field(default_factory=dict)
     tools: List[ToolConfig] = Field(default_factory=list)

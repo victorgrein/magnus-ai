@@ -146,6 +146,7 @@ class MCPServer(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
+    config_type = Column(String, nullable=False, default="studio")
     config_json = Column(JSON, nullable=False, default={})
     environments = Column(JSON, nullable=False, default={})
     tools = Column(JSON, nullable=False, default=[])
@@ -156,6 +157,9 @@ class MCPServer(Base):
     __table_args__ = (
         CheckConstraint(
             "type IN ('official', 'community')", name="check_mcp_server_type"
+        ),
+        CheckConstraint(
+            "config_type IN ('studio', 'sse')", name="check_mcp_server_config_type"
         ),
     )
 
