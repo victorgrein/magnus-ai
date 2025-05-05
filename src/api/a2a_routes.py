@@ -124,7 +124,7 @@ def get_task_manager(agent_id, db=None, reuse=True, operation_type="query"):
     return task_manager
 
 
-@router.post("/{agent_id}/rpc")
+@router.post("/{agent_id}")
 async def process_a2a_request(
     agent_id: uuid.UUID,
     request: Request,
@@ -156,6 +156,13 @@ async def process_a2a_request(
         try:
             body = await request.json()
             method = body.get("method", "unknown")
+            request_id = body.get("id")  # Extract request ID to ensure it's preserved
+
+            # Extrair sessionId do params se for tasks/send
+            session_id = None
+            if method == "tasks/send" and body.get("params"):
+                session_id = body.get("params", {}).get("sessionId")
+                logger.info(f"Extracted sessionId from request: {session_id}")
 
             is_query_request = method in [
                 "tasks/get",
@@ -189,7 +196,7 @@ async def process_a2a_request(
                 status_code=404,
                 content={
                     "jsonrpc": "2.0",
-                    "id": None,
+                    "id": request_id,  # Use the extracted request ID
                     "error": {"code": 404, "message": "Agent not found", "data": None},
                 },
             )
@@ -203,7 +210,7 @@ async def process_a2a_request(
                 status_code=401,
                 content={
                     "jsonrpc": "2.0",
-                    "id": None,
+                    "id": request_id,  # Use the extracted request ID
                     "error": {"code": 401, "message": "Invalid API key", "data": None},
                 },
             )
@@ -226,7 +233,7 @@ async def process_a2a_request(
                 status_code=400,
                 content={
                     "jsonrpc": "2.0",
-                    "id": body.get("id"),
+                    "id": request_id,  # Use the extracted request ID
                     "error": {
                         "code": -32600,
                         "message": "Invalid Request: jsonrpc must be '2.0'",
@@ -241,7 +248,7 @@ async def process_a2a_request(
                 status_code=400,
                 content={
                     "jsonrpc": "2.0",
-                    "id": body.get("id"),
+                    "id": request_id,  # Use the extracted request ID
                     "error": {
                         "code": -32600,
                         "message": "Invalid Request: method is required",
@@ -250,15 +257,24 @@ async def process_a2a_request(
                 },
             )
 
+        # Processar a requisição normalmente
         return await a2a_server.process_request(request, agent_id=str(agent_id), db=db)
 
     except Exception as e:
         logger.error(f"Error processing A2A request: {str(e)}", exc_info=True)
+        # Try to extract request ID from the body, if available
+        request_id = None
+        try:
+            body = await request.json()
+            request_id = body.get("id")
+        except:
+            pass
+
         return JSONResponse(
             status_code=500,
             content={
                 "jsonrpc": "2.0",
-                "id": None,
+                "id": request_id,  # Use the extracted request ID or None
                 "error": {
                     "code": -32603,
                     "message": "Internal server error",

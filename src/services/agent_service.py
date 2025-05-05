@@ -189,83 +189,114 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
             logger.info("Generating automatic API key for new agent")
             config["api_key"] = generate_api_key()
 
-        if isinstance(config, dict):
-            # Process MCP servers
-            if "mcp_servers" in config:
-                if config["mcp_servers"] is not None:
-                    processed_servers = []
-                    for server in config["mcp_servers"]:
-                        # Convert server id to UUID if it's a string
-                        server_id = server["id"]
-                        if isinstance(server_id, str):
-                            server_id = uuid.UUID(server_id)
+        # Preservar todos os campos originais
+        processed_config = {}
+        processed_config["api_key"] = config.get("api_key", "")
 
-                        # Search for MCP server in the database
-                        mcp_server = get_mcp_server(db, server_id)
-                        if not mcp_server:
-                            raise HTTPException(
-                                status_code=400,
-                                detail=f"MCP server not found: {server['id']}",
-                            )
+        # Copiar campos originais
+        if "tools" in config:
+            processed_config["tools"] = config["tools"]
 
-                        # Check if all required environment variables are provided
-                        for env_key, env_value in mcp_server.environments.items():
-                            if env_key not in server.get("envs", {}):
-                                raise HTTPException(
-                                    status_code=400,
-                                    detail=f"Environment variable '{env_key}' not provided for MCP server {mcp_server.name}",
-                                )
+        if "custom_tools" in config:
+            processed_config["custom_tools"] = config["custom_tools"]
 
-                        # Add the processed server with its tools
-                        processed_servers.append(
-                            {
-                                "id": str(server["id"]),
-                                "envs": server["envs"],
-                                "tools": server["tools"],
-                            }
+        if "sub_agents" in config:
+            processed_config["sub_agents"] = config["sub_agents"]
+
+        if "custom_mcp_servers" in config:
+            processed_config["custom_mcp_servers"] = config["custom_mcp_servers"]
+
+        # Preservar outros campos não processados especificamente
+        for key, value in config.items():
+            if key not in [
+                "api_key",
+                "tools",
+                "custom_tools",
+                "sub_agents",
+                "custom_mcp_servers",
+                "mcp_servers",
+            ]:
+                processed_config[key] = value
+
+        # Processar apenas campos que precisam de processamento
+        # Process MCP servers
+        if "mcp_servers" in config and config["mcp_servers"] is not None:
+            processed_servers = []
+            for server in config["mcp_servers"]:
+                # Convert server id to UUID if it's a string
+                server_id = server["id"]
+                if isinstance(server_id, str):
+                    server_id = uuid.UUID(server_id)
+
+                # Search for MCP server in the database
+                mcp_server = get_mcp_server(db, server_id)
+                if not mcp_server:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"MCP server not found: {server['id']}",
+                    )
+
+                # Check if all required environment variables are provided
+                for env_key, env_value in mcp_server.environments.items():
+                    if env_key not in server.get("envs", {}):
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Environment variable '{env_key}' not provided for MCP server {mcp_server.name}",
                         )
 
-                    config["mcp_servers"] = processed_servers
-                else:
-                    config["mcp_servers"] = []
+                # Add the processed server
+                processed_servers.append(
+                    {
+                        "id": str(server["id"]),
+                        "envs": server["envs"],
+                        "tools": server["tools"],
+                    }
+                )
 
-            # Process custom MCP servers
-            if "custom_mcp_servers" in config:
-                if config["custom_mcp_servers"] is not None:
-                    processed_custom_servers = []
-                    for server in config["custom_mcp_servers"]:
-                        # Validate URL format
-                        if not server.get("url"):
-                            raise HTTPException(
-                                status_code=400,
-                                detail="URL is required for custom MCP servers",
-                            )
+            processed_config["mcp_servers"] = processed_servers
+        elif "mcp_servers" in config:
+            processed_config["mcp_servers"] = config["mcp_servers"]
 
-                        # Add the custom server
-                        processed_custom_servers.append(
-                            {"url": server["url"], "headers": server.get("headers", {})}
-                        )
+        # Process custom MCP servers
+        if "custom_mcp_servers" in config and config["custom_mcp_servers"] is not None:
+            processed_custom_servers = []
+            for server in config["custom_mcp_servers"]:
+                # Validate URL format
+                if not server.get("url"):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="URL is required for custom MCP servers",
+                    )
 
-                    config["custom_mcp_servers"] = processed_custom_servers
-                else:
-                    config["custom_mcp_servers"] = []
+                # Add the custom server
+                processed_custom_servers.append(
+                    {"url": server["url"], "headers": server.get("headers", {})}
+                )
 
-            # Process sub-agents
-            if "sub_agents" in config:
-                if config["sub_agents"] is not None:
-                    config["sub_agents"] = [
-                        str(agent_id) for agent_id in config["sub_agents"]
-                    ]
+            processed_config["custom_mcp_servers"] = processed_custom_servers
 
-            # Process tools
-            if "tools" in config:
-                if config["tools"] is not None:
-                    config["tools"] = [
-                        {"id": str(tool["id"]), "envs": tool["envs"]}
-                        for tool in config["tools"]
-                    ]
+        # Process sub-agents
+        if "sub_agents" in config and config["sub_agents"] is not None:
+            processed_config["sub_agents"] = [
+                str(agent_id) for agent_id in config["sub_agents"]
+            ]
 
-            agent.config = config
+        # Process tools
+        if "tools" in config and config["tools"] is not None:
+            processed_tools = []
+            for tool in config["tools"]:
+                # Convert tool id to string
+                tool_id = tool["id"]
+
+                # Validar envs para garantir que não é None
+                envs = tool.get("envs", {})
+                if envs is None:
+                    envs = {}
+
+                processed_tools.append({"id": str(tool_id), "envs": envs})
+            processed_config["tools"] = processed_tools
+
+        agent.config = processed_config
 
         # Ensure all config objects are serializable (convert UUIDs to strings)
         if agent.config is not None:
@@ -398,82 +429,117 @@ async def update_agent(
         if "config" in agent_data:
             config = agent_data["config"]
 
+            # Preservar todos os campos originais
+            processed_config = {}
+            processed_config["api_key"] = config.get("api_key", "")
+
+            # Copiar campos originais
+            if "tools" in config:
+                processed_config["tools"] = config["tools"]
+
+            if "custom_tools" in config:
+                processed_config["custom_tools"] = config["custom_tools"]
+
+            if "sub_agents" in config:
+                processed_config["sub_agents"] = config["sub_agents"]
+
+            if "custom_mcp_servers" in config:
+                processed_config["custom_mcp_servers"] = config["custom_mcp_servers"]
+
+            # Preservar outros campos não processados especificamente
+            for key, value in config.items():
+                if key not in [
+                    "api_key",
+                    "tools",
+                    "custom_tools",
+                    "sub_agents",
+                    "custom_mcp_servers",
+                    "mcp_servers",
+                ]:
+                    processed_config[key] = value
+
+            # Processar apenas campos que precisam de processamento
             # Process MCP servers
-            if "mcp_servers" in config:
-                if config["mcp_servers"] is not None:
-                    processed_servers = []
-                    for server in config["mcp_servers"]:
-                        # Convert server id to UUID if it's a string
-                        server_id = server["id"]
-                        if isinstance(server_id, str):
-                            server_id = uuid.UUID(server_id)
+            if "mcp_servers" in config and config["mcp_servers"] is not None:
+                processed_servers = []
+                for server in config["mcp_servers"]:
+                    # Convert server id to UUID if it's a string
+                    server_id = server["id"]
+                    if isinstance(server_id, str):
+                        server_id = uuid.UUID(server_id)
 
-                        # Search for MCP server in the database
-                        mcp_server = get_mcp_server(db, server_id)
-                        if not mcp_server:
-                            raise HTTPException(
-                                status_code=400,
-                                detail=f"MCP server not found: {server['id']}",
-                            )
-
-                        # Check if all required environment variables are provided
-                        for env_key, env_value in mcp_server.environments.items():
-                            if env_key not in server.get("envs", {}):
-                                raise HTTPException(
-                                    status_code=400,
-                                    detail=f"Environment variable '{env_key}' not provided for MCP server {mcp_server.name}",
-                                )
-
-                        # Add the processed server
-                        processed_servers.append(
-                            {
-                                "id": str(server["id"]),
-                                "envs": server["envs"],
-                                "tools": server["tools"],
-                            }
+                    # Search for MCP server in the database
+                    mcp_server = get_mcp_server(db, server_id)
+                    if not mcp_server:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"MCP server not found: {server['id']}",
                         )
 
-                    config["mcp_servers"] = processed_servers
-                else:
-                    config["mcp_servers"] = []
+                    # Check if all required environment variables are provided
+                    for env_key, env_value in mcp_server.environments.items():
+                        if env_key not in server.get("envs", {}):
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Environment variable '{env_key}' not provided for MCP server {mcp_server.name}",
+                            )
+
+                    # Add the processed server
+                    processed_servers.append(
+                        {
+                            "id": str(server["id"]),
+                            "envs": server["envs"],
+                            "tools": server["tools"],
+                        }
+                    )
+
+                processed_config["mcp_servers"] = processed_servers
+            elif "mcp_servers" in config:
+                processed_config["mcp_servers"] = config["mcp_servers"]
 
             # Process custom MCP servers
-            if "custom_mcp_servers" in config:
-                if config["custom_mcp_servers"] is not None:
-                    processed_custom_servers = []
-                    for server in config["custom_mcp_servers"]:
-                        # Validate URL format
-                        if not server.get("url"):
-                            raise HTTPException(
-                                status_code=400,
-                                detail="URL is required for custom MCP servers",
-                            )
-
-                        # Add the custom server
-                        processed_custom_servers.append(
-                            {"url": server["url"], "headers": server.get("headers", {})}
+            if (
+                "custom_mcp_servers" in config
+                and config["custom_mcp_servers"] is not None
+            ):
+                processed_custom_servers = []
+                for server in config["custom_mcp_servers"]:
+                    # Validate URL format
+                    if not server.get("url"):
+                        raise HTTPException(
+                            status_code=400,
+                            detail="URL is required for custom MCP servers",
                         )
 
-                    config["custom_mcp_servers"] = processed_custom_servers
-                else:
-                    config["custom_mcp_servers"] = []
+                    # Add the custom server
+                    processed_custom_servers.append(
+                        {"url": server["url"], "headers": server.get("headers", {})}
+                    )
+
+                processed_config["custom_mcp_servers"] = processed_custom_servers
 
             # Process sub-agents
-            if "sub_agents" in config:
-                if config["sub_agents"] is not None:
-                    config["sub_agents"] = [
-                        str(agent_id) for agent_id in config["sub_agents"]
-                    ]
+            if "sub_agents" in config and config["sub_agents"] is not None:
+                processed_config["sub_agents"] = [
+                    str(agent_id) for agent_id in config["sub_agents"]
+                ]
 
             # Process tools
-            if "tools" in config:
-                if config["tools"] is not None:
-                    config["tools"] = [
-                        {"id": str(tool["id"]), "envs": tool["envs"]}
-                        for tool in config["tools"]
-                    ]
+            if "tools" in config and config["tools"] is not None:
+                processed_tools = []
+                for tool in config["tools"]:
+                    # Convert tool id to string
+                    tool_id = tool["id"]
 
-            agent_data["config"] = config
+                    # Validar envs para garantir que não é None
+                    envs = tool.get("envs", {})
+                    if envs is None:
+                        envs = {}
+
+                    processed_tools.append({"id": str(tool_id), "envs": envs})
+                processed_config["tools"] = processed_tools
+
+            agent_data["config"] = processed_config
 
         # Ensure all config objects are serializable (convert UUIDs to strings)
         if "config" in agent_data and agent_data["config"] is not None:

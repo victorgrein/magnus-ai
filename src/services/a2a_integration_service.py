@@ -88,6 +88,7 @@ class AgentRunnerAdapter:
 
         try:
             # Use the existing agent runner function
+            # Usar o session_id fornecido, ou gerar um novo
             session_id = session_id or str(uuid.uuid4())
             task_id = task_id or str(uuid.uuid4())
 
@@ -105,12 +106,28 @@ class AgentRunnerAdapter:
                 session_id=session_id,
             )
 
+            # Format the response to include both the A2A-compatible message
+            # and the artifact format to match the Google A2A implementation
+            # Nota: O formato dos artifacts é simplificado para compatibilidade com Google A2A
+            message_obj = {
+                "role": "agent",
+                "parts": [{"type": "text", "text": response_text}],
+            }
+
+            # Formato de artefato compatível com Google A2A
+            artifact_obj = {
+                "parts": [{"type": "text", "text": response_text}],
+                "index": 0,
+            }
+
             return {
                 "status": "success",
                 "content": response_text,
                 "session_id": session_id,
                 "task_id": task_id,
                 "timestamp": datetime.now().isoformat(),
+                "message": message_obj,
+                "artifact": artifact_obj,
             }
 
         except Exception as e:
@@ -121,6 +138,10 @@ class AgentRunnerAdapter:
                 "session_id": session_id,
                 "task_id": task_id,
                 "timestamp": datetime.now().isoformat(),
+                "message": {
+                    "role": "agent",
+                    "parts": [{"type": "text", "text": f"Error: {str(e)}"}],
+                },
             }
 
     async def cancel_task(self, task_id: str) -> bool:

@@ -9,6 +9,7 @@ import asyncio
 import logging
 from datetime import datetime
 from typing import Any, Dict, Union, AsyncIterable
+import uuid
 
 from src.schemas.a2a.exceptions import (
     TaskNotFoundError,
@@ -263,8 +264,9 @@ class A2ATaskManager:
                     f"task_notification:{task_id}", params.pushNotification.model_dump()
                 )
 
-            # Start task execution in background
-            asyncio.create_task(self._execute_task(task_data, params))
+            # Execute task SYNCHRONOUSLY instead of in background
+            # This is the key change for A2A compatibility
+            task_data = await self._execute_task(task_data, params)
 
             # Convert to Task object and return
             task = Task.model_validate(task_data)
@@ -523,7 +525,8 @@ class A2ATaskManager:
         # Create task with initial status
         task_data = {
             "id": params.id,
-            "sessionId": params.sessionId,
+            "sessionId": params.sessionId
+            or str(uuid.uuid4()),  # Preservar sessionId quando fornecido
             "status": {
                 "state": TaskState.SUBMITTED,
                 "timestamp": datetime.now().isoformat(),
@@ -531,7 +534,7 @@ class A2ATaskManager:
                 "error": None,
             },
             "artifacts": [],
-            "history": [params.message.model_dump()],
+            "history": [params.message.model_dump()],  # Apenas mensagem do usuário
             "metadata": params.metadata or {},
         }
 
@@ -540,7 +543,9 @@ class A2ATaskManager:
 
         return task_data
 
-    async def _execute_task(self, task: Dict[str, Any], params: TaskSendParams) -> None:
+    async def _execute_task(
+        self, task: Dict[str, Any], params: TaskSendParams
+    ) -> Dict[str, Any]:
         """
         Execute a task using the agent adapter.
 
@@ -550,6 +555,9 @@ class A2ATaskManager:
         Args:
             task: Task data to be executed
             params: Send task parameters
+
+        Returns:
+            Updated task data with completed status and response
         """
         task_id = task["id"]
         agent_id = params.agentId
@@ -562,20 +570,22 @@ class A2ATaskManager:
                     message_text += part.text
 
         if not message_text:
-            await self._update_task_status(
+            await self._update_task_status_without_history(
                 task_id, TaskState.FAILED, "Message does not contain text", final=True
             )
-            return
+            # Return the updated task data
+            return await self.redis_cache.get(f"task:{task_id}")
 
         # Check if it is an ongoing execution
         task_status = task.get("status", {})
         if task_status.get("state") in [TaskState.WORKING, TaskState.COMPLETED]:
             logger.info(f"Task {task_id} is already in execution or completed")
-            return
+            # Return the current task data
+            return await self.redis_cache.get(f"task:{task_id}")
 
         try:
-            # Update to "working" state
-            await self._update_task_status(
+            # Update to "working" state - NÃO adicionar ao histórico
+            await self._update_task_status_without_history(
                 task_id, TaskState.WORKING, "Processing request"
             )
 
@@ -584,7 +594,7 @@ class A2ATaskManager:
                 response = await self.agent_runner.run_agent(
                     agent_id=agent_id,
                     message=message_text,
-                    session_id=params.sessionId,
+                    session_id=params.sessionId,  # Usar o sessionId da requisição
                     task_id=task_id,
                 )
 
@@ -601,37 +611,38 @@ class A2ATaskManager:
 
                     # Build the final agent message
                     if response_text:
-                        # Create an artifact for the response
-                        artifact = Artifact(
-                            name="response",
-                            parts=[TextPart(text=response_text)],
-                            index=0,
-                            lastChunk=True,
-                        )
+                        # Atualizar o histórico com a mensagem do usuário
+                        await self._update_task_history(task_id, params.message)
+
+                        # Create an artifact for the response in Google A2A format
+                        artifact = {
+                            "parts": [{"type": "text", "text": response_text}],
+                            "index": 0,
+                        }
 
                         # Add the artifact to the task
                         await self._add_task_artifact(task_id, artifact)
 
-                        # Update the task status to completed
-                        await self._update_task_status(
+                        # Update the task status to completed (sem adicionar ao histórico)
+                        await self._update_task_status_without_history(
                             task_id, TaskState.COMPLETED, response_text, final=True
                         )
                     else:
-                        await self._update_task_status(
+                        await self._update_task_status_without_history(
                             task_id,
                             TaskState.FAILED,
                             "The agent did not return a valid response",
                             final=True,
                         )
                 else:
-                    await self._update_task_status(
+                    await self._update_task_status_without_history(
                         task_id,
                         TaskState.FAILED,
                         "Invalid agent response",
                         final=True,
                     )
             else:
-                await self._update_task_status(
+                await self._update_task_status_without_history(
                     task_id,
                     TaskState.FAILED,
                     "Agent adapter not configured",
@@ -639,15 +650,78 @@ class A2ATaskManager:
                 )
         except Exception as e:
             logger.error(f"Error executing task {task_id}: {str(e)}")
-            await self._update_task_status(
+            await self._update_task_status_without_history(
                 task_id, TaskState.FAILED, f"Error processing: {str(e)}", final=True
             )
 
-    async def _update_task_status(
+        # Return the updated task data
+        return await self.redis_cache.get(f"task:{task_id}")
+
+    async def _update_task_history(self, task_id: str, message) -> None:
+        """
+        Atualiza o histórico da tarefa incluindo apenas mensagens do usuário.
+
+        Args:
+            task_id: ID da tarefa
+            message: Mensagem do usuário para adicionar ao histórico
+        """
+        if not message:
+            return
+
+        # Obter dados da tarefa atual
+        task_data = await self.redis_cache.get(f"task:{task_id}")
+        if not task_data:
+            logger.warning(f"Task {task_id} not found for history update")
+            return
+
+        # Garantir que há um campo de histórico
+        if "history" not in task_data:
+            task_data["history"] = []
+
+        # Verificar se a mensagem já existe no histórico para evitar duplicação
+        user_message = (
+            message.model_dump() if hasattr(message, "model_dump") else message
+        )
+        message_exists = False
+
+        for msg in task_data["history"]:
+            if self._compare_messages(msg, user_message):
+                message_exists = True
+                break
+
+        # Adicionar mensagem se não existir
+        if not message_exists:
+            task_data["history"].append(user_message)
+            logger.info(f"Added new user message to history for task {task_id}")
+
+        # Salvar tarefa atualizada
+        await self.redis_cache.set(f"task:{task_id}", task_data)
+
+    # Método auxiliar para comparar mensagens e evitar duplicação no histórico
+    def _compare_messages(self, msg1: Dict, msg2: Dict) -> bool:
+        """Compara duas mensagens para verificar se são essencialmente iguais."""
+        if msg1.get("role") != msg2.get("role"):
+            return False
+
+        parts1 = msg1.get("parts", [])
+        parts2 = msg2.get("parts", [])
+
+        if len(parts1) != len(parts2):
+            return False
+
+        for i in range(len(parts1)):
+            if parts1[i].get("type") != parts2[i].get("type"):
+                return False
+            if parts1[i].get("text") != parts2[i].get("text"):
+                return False
+
+        return True
+
+    async def _update_task_status_without_history(
         self, task_id: str, state: TaskState, message_text: str, final: bool = False
     ) -> None:
         """
-        Update the status of a task.
+        Update the status of a task without changing the history.
 
         Args:
             task_id: ID of the task to be updated
@@ -666,7 +740,6 @@ class A2ATaskManager:
             agent_message = Message(
                 role="agent",
                 parts=[TextPart(text=message_text)],
-                metadata={"timestamp": datetime.now().isoformat()},
             )
 
             status = TaskStatus(
@@ -675,13 +748,6 @@ class A2ATaskManager:
 
             # Update the status in the task
             task_data["status"] = status.model_dump(exclude_none=True)
-
-            # Update the history, if it exists
-            if "history" not in task_data:
-                task_data["history"] = []
-
-            # Add the message to the history
-            task_data["history"].append(agent_message.model_dump(exclude_none=True))
 
             # Store the updated task
             await self.redis_cache.set(f"task:{task_id}", task_data)
@@ -704,13 +770,13 @@ class A2ATaskManager:
         except Exception as e:
             logger.error(f"Error updating task status {task_id}: {str(e)}")
 
-    async def _add_task_artifact(self, task_id: str, artifact: Artifact) -> None:
+    async def _add_task_artifact(self, task_id: str, artifact) -> None:
         """
         Add an artifact to a task and publish the update.
 
         Args:
             task_id: Task ID
-            artifact: Artifact to add
+            artifact: Artifact to add (dict no formato do Google)
         """
         logger.info(f"Adding artifact to task {task_id}")
 
@@ -720,13 +786,21 @@ class A2ATaskManager:
             if "artifacts" not in task_data:
                 task_data["artifacts"] = []
 
-            # Convert artifact to dict
-            artifact_dict = artifact.model_dump()
-            task_data["artifacts"].append(artifact_dict)
+            # Adicionar o artefato sem substituir os existentes
+            task_data["artifacts"].append(artifact)
             await self.redis_cache.set(f"task:{task_id}", task_data)
 
+        # Criar um artefato do tipo Artifact para o evento
+        artifact_obj = Artifact(
+            parts=[
+                TextPart(text=part.get("text", ""))
+                for part in artifact.get("parts", [])
+            ],
+            index=artifact.get("index", 0),
+        )
+
         # Create artifact update event
-        event = TaskArtifactUpdateEvent(id=task_id, artifact=artifact)
+        event = TaskArtifactUpdateEvent(id=task_id, artifact=artifact_obj)
 
         # Publish event
         await self._publish_task_update(task_id, event)
