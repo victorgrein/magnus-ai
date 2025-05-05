@@ -135,13 +135,26 @@ class MCPService:
                         # Registers the exit_stack with the AsyncExitStack
                         await self.exit_stack.enter_async_context(exit_stack)
                         logger.info(
-                            f"Connected successfully. Added {len(filtered_tools)} tools."
+                            f"MCP Server {mcp_server.name} connected successfully. Added {len(filtered_tools)} tools."
                         )
                     else:
                         logger.warning(
                             f"Failed to connect or no tools available for {mcp_server.name}"
                         )
 
+                except Exception as e:
+                    logger.error(f"Error connecting to MCP server {server['id']}: {e}")
+                    continue
+
+            # Process custom MCP servers
+            for server in mcp_config.get("custom_mcp_servers", []):
+                try:
+                    tools, exit_stack = await self._connect_to_mcp_server(server)
+                    self.tools.extend(tools)
+                    await self.exit_stack.enter_async_context(exit_stack)
+                    logger.info(
+                        f"Custom MCP server connected successfully. Added {len(tools)} tools."
+                    )
                 except Exception as e:
                     logger.error(f"Error connecting to MCP server {server['id']}: {e}")
                     continue

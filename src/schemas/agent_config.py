@@ -32,6 +32,18 @@ class MCPServerConfig(BaseModel):
         from_attributes = True
 
 
+class CustomMCPServerConfig(BaseModel):
+    """Configuration of a custom MCP server"""
+
+    url: str = Field(..., description="Server URL of the custom MCP server")
+    headers: Dict[str, str] = Field(
+        default_factory=dict, description="Headers for requests to the server"
+    )
+
+    class Config:
+        from_attributes = True
+
+
 class HTTPToolParameter(BaseModel):
     """Parameter of an HTTP tool"""
 
@@ -114,6 +126,9 @@ class LLMConfig(BaseModel):
     )
     mcp_servers: Optional[List[MCPServerConfig]] = Field(
         default=None, description="List of MCP servers"
+    )
+    custom_mcp_servers: Optional[List[CustomMCPServerConfig]] = Field(
+        default=None, description="List of custom MCP servers with URL and headers"
     )
     sub_agents: Optional[List[UUID]] = Field(
         default=None, description="List of IDs of sub-agents"

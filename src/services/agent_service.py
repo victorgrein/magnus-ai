@@ -175,6 +175,20 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
 
         # Process the configuration before creating the agent
         config = agent.config
+        if config is None:
+            config = {}
+            agent.config = config
+
+        # Ensure config is a dictionary
+        if not isinstance(config, dict):
+            config = {}
+            agent.config = config
+
+        # Generate automatic API key if not provided or empty
+        if not config.get("api_key") or config.get("api_key") == "":
+            logger.info("Generating automatic API key for new agent")
+            config["api_key"] = generate_api_key()
+
         if isinstance(config, dict):
             # Process MCP servers
             if "mcp_servers" in config:
@@ -212,6 +226,24 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
 
                 config["mcp_servers"] = processed_servers
 
+            # Process custom MCP servers
+            if "custom_mcp_servers" in config:
+                processed_custom_servers = []
+                for server in config["custom_mcp_servers"]:
+                    # Validate URL format
+                    if not server.get("url"):
+                        raise HTTPException(
+                            status_code=400,
+                            detail="URL is required for custom MCP servers",
+                        )
+
+                    # Add the custom server
+                    processed_custom_servers.append(
+                        {"url": server["url"], "headers": server.get("headers", {})}
+                    )
+
+                config["custom_mcp_servers"] = processed_custom_servers
+
             # Process sub-agents
             if "sub_agents" in config:
                 config["sub_agents"] = [
@@ -224,11 +256,6 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                     {"id": str(tool["id"]), "envs": tool["envs"]}
                     for tool in config["tools"]
                 ]
-
-            # Generate automatic API key if not provided or empty
-            if not config.get("api_key") or config.get("api_key") == "":
-                logger.info("Generating automatic API key for new agent")
-                config["api_key"] = generate_api_key()
 
             agent.config = config
 
@@ -398,6 +425,24 @@ async def update_agent(
                     )
 
                 config["mcp_servers"] = processed_servers
+
+            # Process custom MCP servers
+            if "custom_mcp_servers" in config:
+                processed_custom_servers = []
+                for server in config["custom_mcp_servers"]:
+                    # Validate URL format
+                    if not server.get("url"):
+                        raise HTTPException(
+                            status_code=400,
+                            detail="URL is required for custom MCP servers",
+                        )
+
+                    # Add the custom server
+                    processed_custom_servers.append(
+                        {"url": server["url"], "headers": server.get("headers", {})}
+                    )
+
+                config["custom_mcp_servers"] = processed_custom_servers
 
             # Process sub-agents
             if "sub_agents" in config:
