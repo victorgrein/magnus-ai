@@ -124,7 +124,7 @@ def get_task_manager(agent_id, db=None, reuse=True, operation_type="query"):
     return task_manager
 
 
-@router.post("/{agent_id}")
+@router.post("/{agent_id}/rpc")
 async def process_a2a_request(
     agent_id: uuid.UUID,
     request: Request,

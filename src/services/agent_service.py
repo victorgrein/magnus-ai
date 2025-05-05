@@ -35,12 +35,26 @@ def _convert_uuid_to_str(obj):
         return obj
 
 
-def validate_sub_agents(db: Session, sub_agents: List[uuid.UUID]) -> bool:
+def validate_sub_agents(db: Session, sub_agents: List[Union[uuid.UUID, str]]) -> bool:
     """Validate if all sub-agents exist"""
+    logger.info(f"Validando sub-agentes: {sub_agents}")
+
+    if not sub_agents:
+        logger.warning("Lista de sub-agentes vazia")
+        return False
+
     for agent_id in sub_agents:
-        agent = get_agent(db, agent_id)
+        # Garantir que o ID esteja no formato correto
+        agent_id_str = str(agent_id)
+        logger.info(f"Validando sub-agente com ID: {agent_id_str}")
+
+        agent = get_agent(db, agent_id_str)
         if not agent:
+            logger.warning(f"Sub-agente não encontrado: {agent_id_str}")
             return False
+        logger.info(f"Sub-agente válido: {agent.name} (ID: {agent_id_str})")
+
+    logger.info(f"Todos os {len(sub_agents)} sub-agentes são válidos")
     return True
 
 
@@ -133,31 +147,29 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                     detail=f"Failed to process agent card: {str(e)}",
                 )
 
-        # Additional sub-agent validation (for non-llm and non-a2a types)
-        elif agent.type != "llm":
-            if not isinstance(agent.config, dict):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid configuration: must be an object with sub_agents",
-                )
+        if not isinstance(agent.config, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid configuration: must be an object with sub_agents",
+            )
 
-            if "sub_agents" not in agent.config:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid configuration: sub_agents is required for sequential, parallel or loop agents",
-                )
+        if "sub_agents" not in agent.config:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid configuration: sub_agents is required for sequential, parallel or loop agents",
+            )
 
-            if not agent.config["sub_agents"]:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid configuration: sub_agents cannot be empty",
-                )
+        if not agent.config["sub_agents"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid configuration: sub_agents cannot be empty",
+            )
 
-            if not validate_sub_agents(db, agent.config["sub_agents"]):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="One or more sub-agents do not exist",
-                )
+        if not validate_sub_agents(db, agent.config["sub_agents"]):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="One or more sub-agents do not exist",
+            )
 
         # Process the configuration before creating the agent
         config = agent.config

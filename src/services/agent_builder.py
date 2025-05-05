@@ -24,7 +24,7 @@ class AgentBuilder:
         self.custom_tool_builder = CustomToolBuilder()
         self.mcp_service = MCPService()
 
-    def _get_current_time(self, city: str = "new york") -> dict:
+    def get_current_time(self, city: str = "new york") -> dict:
         """Get the current time in a city."""
         city_timezones = {
             "new york": "America/New_York",
@@ -99,7 +99,7 @@ class AgentBuilder:
             )
 
         # Combine all tools
-        all_tools = custom_tools + mcp_tools + [self._get_current_time]
+        all_tools = custom_tools + mcp_tools + [self.get_current_time]
 
         now = datetime.now()
         current_datetime = now.strftime("%d/%m/%Y %H:%M")
@@ -116,7 +116,7 @@ class AgentBuilder:
         )
 
         # Add get_current_time instructions to prompt
-        formatted_prompt += "\n\n<get_current_time_instructions>Use the get_current_time tool to get the current time in a city. The tool is available in the tools section of the configuration. Use 'new york' by default if no city is provided.</get_current_time_instructions>\n\n"
+        formatted_prompt += "<get_current_time_instructions>Use the get_current_time tool to get the current time in a city. The tool is available in the tools section of the configuration. Use 'new york' by default if no city is provided.ALWAYS use the 'get_current_time' tool when you need to use the current date and time in any type of situation, whether in interaction with the user or for calling other tools.</get_current_time_instructions>\n\n"
 
         # Check if load_memory is enabled
         # before_model_callback_func = None
@@ -144,10 +144,15 @@ class AgentBuilder:
         """Get and create LLM sub-agents."""
         sub_agents = []
         for sub_agent_id in sub_agent_ids:
-            agent = get_agent(self.db, sub_agent_id)
+            sub_agent_id_str = str(sub_agent_id)
+
+            agent = get_agent(self.db, sub_agent_id_str)
 
             if agent is None:
-                raise AgentNotFoundError(f"Agent with ID {sub_agent_id} not found")
+                logger.error(f"Sub-agent not found: {sub_agent_id_str}")
+                raise AgentNotFoundError(f"Agent with ID {sub_agent_id_str} not found")
+
+            logger.info(f"Sub-agent found: {agent.name} (type: {agent.type})")
 
             if agent.type == "llm":
                 sub_agent, exit_stack = await self._create_llm_agent(agent)
@@ -163,6 +168,10 @@ class AgentBuilder:
                 raise ValueError(f"Invalid agent type: {agent.type}")
 
             sub_agents.append((sub_agent, exit_stack))
+            logger.info(f"Sub-agent added: {agent.name}")
+
+        logger.info(f"Sub-agents created: {len(sub_agents)}")
+        logger.info(f"Sub-agents: {str(sub_agents)}")
 
         return sub_agents
 
@@ -224,15 +233,33 @@ class AgentBuilder:
         self, root_agent
     ) -> Tuple[SequentialAgent | ParallelAgent | LoopAgent, Optional[AsyncExitStack]]:
         """Build a composite agent (Sequential, Parallel or Loop) with its sub-agents."""
-        logger.info(f"Processing sub-agents for agent {root_agent.type}")
+        logger.info(
+            f"Processing sub-agents for agent {root_agent.type} (ID: {root_agent.id}, Name: {root_agent.name})"
+        )
+
+        if not root_agent.config.get("sub_agents"):
+            logger.error(
+                f"Sub_agents configuration not found or empty for agent {root_agent.name}"
+            )
+            raise ValueError(f"Missing sub_agents configuration for {root_agent.name}")
+
+        logger.info(
+            f"Sub-agents IDs to be processed: {root_agent.config.get('sub_agents', [])}"
+        )
 
         sub_agents_with_stacks = await self._get_sub_agents(
             root_agent.config.get("sub_agents", [])
         )
+
+        logger.info(
+            f"Sub-agents processed: {len(sub_agents_with_stacks)} of {len(root_agent.config.get('sub_agents', []))}"
+        )
+
         sub_agents = [agent for agent, _ in sub_agents_with_stacks]
+        logger.info(f"Extracted sub-agents: {[agent.name for agent in sub_agents]}")
 
         if root_agent.type == "sequential":
-            logger.info("Creating SequentialAgent")
+            logger.info(f"Creating SequentialAgent with {len(sub_agents)} sub-agents")
             return (
                 SequentialAgent(
                     name=root_agent.name,
@@ -242,7 +269,7 @@ class AgentBuilder:
                 None,
             )
         elif root_agent.type == "parallel":
-            logger.info("Creating ParallelAgent")
+            logger.info(f"Creating ParallelAgent with {len(sub_agents)} sub-agents")
             return (
                 ParallelAgent(
                     name=root_agent.name,
@@ -252,7 +279,7 @@ class AgentBuilder:
                 None,
             )
         elif root_agent.type == "loop":
-            logger.info("Creating LoopAgent")
+            logger.info(f"Creating LoopAgent with {len(sub_agents)} sub-agents")
             return (
                 LoopAgent(
                     name=root_agent.name,

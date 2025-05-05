@@ -85,23 +85,31 @@ async def run_agent(
                         new_message=content,
                     )
 
+                    last_response = None
+                    all_responses = []
+
                     async for event in events_async:
-                        if event.is_final_response():
-                            if event.content and event.content.parts:
-                                # Assuming text response in the first part
-                                await response_queue.put(event.content.parts[0].text)
-                            elif event.actions and event.actions.escalate:
-                                await response_queue.put(
-                                    f"Agent escalated: {event.error_message or 'No specific message.'}"
-                                )
+                        if (
+                            event.content
+                            and event.content.parts
+                            and event.content.parts[0].text
+                        ):
+                            current_text = event.content.parts[0].text
+                            last_response = current_text
+                            all_responses.append(current_text)
 
+                        if event.actions and event.actions.escalate:
+                            escalate_text = f"Agent escalated: {event.error_message or 'No specific message.'}"
+                            await response_queue.put(escalate_text)
                             execution_completed.set()
-                            break
+                            return
 
-                    if not execution_completed.is_set():
+                    if last_response:
+                        await response_queue.put(last_response)
+                    else:
                         await response_queue.put("Finished without specific response")
-                        execution_completed.set()
 
+                    execution_completed.set()
                 except Exception as e:
                     logger.error(f"Error in process_events: {str(e)}")
                     await response_queue.put(f"Error: {str(e)}")
