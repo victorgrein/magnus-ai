@@ -11,7 +11,6 @@ from src.services.agent_service import get_agents_by_client
 
 import uuid
 import logging
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 

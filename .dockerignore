@@ -38,7 +38,6 @@ docs/
 # Development tools
 tests/
 .flake8
-pyproject.toml
 requirements-dev.txt
 Makefile
 
@@ -98,4 +97,4 @@ test_*
 *_test.py
 
 # Documentação
-docs/ 
+docs/

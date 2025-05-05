@@ -56,7 +56,7 @@ def send_verification_email(email: str, token: str) -> bool:
         to_email = To(email)
         subject = "Email Verification - Evo AI"
 
-        verification_link = f"{settings.APP_URL}/auth/verify-email/{token}"
+        verification_link = f"{settings.APP_URL}/api/v1/auth/verify-email/{token}"
 
         html_content = _render_template(
             "verification_email",

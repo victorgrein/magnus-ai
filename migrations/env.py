@@ -10,10 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from alembic import context
 
 from src.models.models import Base
+from src.config.settings import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Sobrescreve a URL do banco de dados com a definida nas configurações
+config.set_main_option("sqlalchemy.url", settings.POSTGRES_CONNECTION_STRING)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -32,7 +36,8 @@ target_metadata = [Base.metadata]
 # ... etc.
 
 # Lista de tabelas a serem ignoradas na geração automática de migrações
-exclude_tables = ['sessions', 'events', 'app_states', 'user_states']
+exclude_tables = ["sessions", "events", "app_states", "user_states"]
+
 
 def include_object(object, name, type_, reflected, compare_to):
     """
@@ -78,11 +83,13 @@ def run_migrations_online() -> None:
     connectable = context.config.attributes.get("connection", None)
     if connectable is None:
         connectable = create_async_engine(
-            context.config.get_main_option("sqlalchemy.url").replace("postgresql://", "postgresql+asyncpg://"),
-                poolclass=pool.NullPool,
-                future=True,
+            context.config.get_main_option("sqlalchemy.url").replace(
+                "postgresql://", "postgresql+asyncpg://"
+            ),
+            poolclass=pool.NullPool,
+            future=True,
         )
-        
+
     if isinstance(connectable, AsyncEngine):
         asyncio.run(run_async_migrations(connectable))
     else:
@@ -94,6 +101,7 @@ async def run_async_migrations(connectable):
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
 
+
 def do_run_migrations(connection):
     context.configure(
         connection=connection,
@@ -103,5 +111,6 @@ def do_run_migrations(connection):
     )
     with context.begin_transaction():
         context.run_migrations()
+
 
 run_migrations_online()

@@ -136,7 +136,7 @@ async def websocket_chat(
 
 
 @router.post(
-    "/",
+    "",
     response_model=ChatResponse,
     responses={
         400: {"model": ErrorResponse},
