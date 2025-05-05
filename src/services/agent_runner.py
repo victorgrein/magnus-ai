@@ -23,7 +23,9 @@ async def run_agent(
     memory_service: InMemoryMemoryService,
     db: Session,
     session_id: Optional[str] = None,
+    timeout: float = 60.0,
 ):
+    exit_stack = None
     try:
         logger.info(f"Starting execution of agent {agent_id} for contact {contact_id}")
         logger.info(f"Received message: {message}")
@@ -72,15 +74,61 @@ async def run_agent(
 
         final_response_text = None
         try:
-            for event in agent_runner.run(
-                user_id=contact_id,
-                session_id=adk_session_id,
-                new_message=content,
-            ):
-                if event.is_final_response() and event.content and event.content.parts:
-                    final_response_text = event.content.parts[0].text
-                    logger.info(f"Final response received: {final_response_text}")
+            response_queue = asyncio.Queue()
+            execution_completed = asyncio.Event()
 
+            async def process_events():
+                try:
+                    events_async = agent_runner.run_async(
+                        user_id=contact_id,
+                        session_id=adk_session_id,
+                        new_message=content,
+                    )
+
+                    async for event in events_async:
+                        if event.is_final_response():
+                            if event.content and event.content.parts:
+                                # Assuming text response in the first part
+                                await response_queue.put(event.content.parts[0].text)
+                            elif event.actions and event.actions.escalate:
+                                await response_queue.put(
+                                    f"Agent escalated: {event.error_message or 'No specific message.'}"
+                                )
+
+                            execution_completed.set()
+                            break
+
+                    if not execution_completed.is_set():
+                        await response_queue.put("Finished without specific response")
+                        execution_completed.set()
+
+                except Exception as e:
+                    logger.error(f"Error in process_events: {str(e)}")
+                    await response_queue.put(f"Error: {str(e)}")
+                    execution_completed.set()
+
+            task = asyncio.create_task(process_events())
+
+            try:
+                wait_task = asyncio.create_task(execution_completed.wait())
+                done, pending = await asyncio.wait({wait_task}, timeout=timeout)
+
+                for p in pending:
+                    p.cancel()
+
+                if not execution_completed.is_set():
+                    logger.warning(f"Agent execution timed out after {timeout} seconds")
+                    await response_queue.put(
+                        "The response took too long and was interrupted."
+                    )
+
+                final_response_text = await response_queue.get()
+
+            except Exception as e:
+                logger.error(f"Error waiting for response: {str(e)}")
+                final_response_text = f"Error processing response: {str(e)}"
+
+            # Add the session to memory after completion
             completed_session = session_service.get_session(
                 app_name=agent_id,
                 user_id=contact_id,
@@ -89,10 +137,19 @@ async def run_agent(
 
             memory_service.add_session_to_memory(completed_session)
 
-        finally:
-            # Ensure the exit_stack is closed correctly
-            if exit_stack:
-                await exit_stack.aclose()
+            # Cancel the processing task if it is still running
+            if not task.done():
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    logger.info("Task cancelled successfully")
+                except Exception as e:
+                    logger.error(f"Error cancelling task: {str(e)}")
+
+        except Exception as e:
+            logger.error(f"Error processing request: {str(e)}")
+            raise e
 
         logger.info("Agent execution completed successfully")
         return final_response_text
@@ -102,6 +159,15 @@ async def run_agent(
     except Exception as e:
         logger.error(f"Internal error processing request: {str(e)}", exc_info=True)
         raise InternalServerError(str(e))
+    finally:
+        # Clean up MCP connection - MUST be executed in the same task
+        if exit_stack:
+            logger.info("Closing MCP server connection...")
+            try:
+                await exit_stack.aclose()
+            except Exception as e:
+                logger.error(f"Error closing MCP connection: {e}")
+                # Do not raise the exception to not obscure the original error
 
 
 async def run_agent_stream(
@@ -163,11 +229,13 @@ async def run_agent_stream(
         logger.info("Starting agent streaming execution")
 
         try:
-            for event in agent_runner.run(
+            events_async = agent_runner.run_async(
                 user_id=contact_id,
                 session_id=adk_session_id,
                 new_message=content,
-            ):
+            )
+
+            async for event in events_async:
                 if event.content and event.content.parts:
                     text = event.content.parts[0].text
                     if text:
@@ -181,14 +249,19 @@ async def run_agent_stream(
             )
 
             memory_service.add_session_to_memory(completed_session)
-
+        except Exception as e:
+            logger.error(f"Error processing request: {str(e)}")
+            raise e
         finally:
-            # Ensure the exit_stack is closed correctly
+            # Clean up MCP connection
             if exit_stack:
-                await exit_stack.aclose()
+                logger.info("Closing MCP server connection...")
+                try:
+                    await exit_stack.aclose()
+                except Exception as e:
+                    logger.error(f"Error closing MCP connection: {e}")
 
         logger.info("Agent streaming execution completed successfully")
-
     except AgentNotFoundError as e:
         logger.error(f"Error processing request: {str(e)}")
         raise e

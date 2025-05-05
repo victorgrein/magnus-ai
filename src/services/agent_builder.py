@@ -1,4 +1,5 @@
 from typing import List, Optional, Tuple
+from zoneinfo import ZoneInfo
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.agents import SequentialAgent, ParallelAgent, LoopAgent, BaseAgent
 from google.adk.models.lite_llm import LiteLlm
@@ -23,6 +24,63 @@ class AgentBuilder:
         self.custom_tool_builder = CustomToolBuilder()
         self.mcp_service = MCPService()
 
+    def _get_current_time(self, city: str = "new york") -> dict:
+        """Get the current time in a city."""
+        city_timezones = {
+            "new york": "America/New_York",
+            "los angeles": "America/Los_Angeles",
+            "chicago": "America/Chicago",
+            "toronto": "America/Toronto",
+            "mexico city": "America/Mexico_City",
+            "sao paulo": "America/Sao_Paulo",
+            "rio de janeiro": "America/Sao_Paulo",
+            "buenos aires": "America/Argentina/Buenos_Aires",
+            "london": "Europe/London",
+            "paris": "Europe/Paris",
+            "berlin": "Europe/Berlin",
+            "rome": "Europe/Rome",
+            "madrid": "Europe/Madrid",
+            "moscow": "Europe/Moscow",
+            "dubai": "Asia/Dubai",
+            "mumbai": "Asia/Kolkata",
+            "delhi": "Asia/Kolkata",
+            "singapore": "Asia/Singapore",
+            "hong kong": "Asia/Hong_Kong",
+            "beijing": "Asia/Shanghai",
+            "shanghai": "Asia/Shanghai",
+            "tokyo": "Asia/Tokyo",
+            "seoul": "Asia/Seoul",
+            "sydney": "Australia/Sydney",
+            "melbourne": "Australia/Melbourne",
+            "auckland": "Pacific/Auckland",
+            "johannesburg": "Africa/Johannesburg",
+            "cairo": "Africa/Cairo",
+            "lagos": "Africa/Lagos",
+        }
+
+        try:
+            if city.lower() in city_timezones:
+                try:
+                    tz = ZoneInfo(city_timezones[city.lower()])
+                    now = datetime.now(tz)
+                    return {
+                        "status": "success",
+                        "report": f"The current time in {city} is {now.strftime('%Y-%m-%d %H:%M:%S %Z')}",
+                    }
+                except Exception:
+                    pass
+
+            return {
+                "status": "error",
+                "error_message": f"Time information for '{city}' unavailable.",
+            }
+        except Exception as e:
+            logger.error(f"Error getting current time: {e}")
+            return {
+                "status": "error",
+                "error_message": f"Error getting current time: {e}",
+            }
+
     async def _create_llm_agent(
         self, agent
     ) -> Tuple[LlmAgent, Optional[AsyncExitStack]]:
@@ -41,7 +99,7 @@ class AgentBuilder:
             )
 
         # Combine all tools
-        all_tools = custom_tools + mcp_tools
+        all_tools = custom_tools + mcp_tools + [self._get_current_time]
 
         now = datetime.now()
         current_datetime = now.strftime("%d/%m/%Y %H:%M")
@@ -56,6 +114,9 @@ class AgentBuilder:
             current_date_iso=current_date_iso,
             current_time=current_time,
         )
+
+        # Add get_current_time instructions to prompt
+        formatted_prompt += "\n\n<get_current_time_instructions>Use the get_current_time tool to get the current time in a city. The tool is available in the tools section of the configuration. Use 'new york' by default if no city is provided.</get_current_time_instructions>\n\n"
 
         # Check if load_memory is enabled
         # before_model_callback_func = None

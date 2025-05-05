@@ -92,61 +92,69 @@ class MCPService:
         self.tools = []
         self.exit_stack = AsyncExitStack()
 
-        # Process each MCP server in the configuration
-        for server in mcp_config.get("mcp_servers", []):
-            try:
-                # Search for the MCP server in the database
-                mcp_server = get_mcp_server(db, server["id"])
-                if not mcp_server:
-                    logger.warning(f"Servidor MCP não encontrado: {server['id']}")
+        try:
+            # Process each MCP server in the configuration
+            for server in mcp_config.get("mcp_servers", []):
+                try:
+                    # Search for the MCP server in the database
+                    mcp_server = get_mcp_server(db, server["id"])
+                    if not mcp_server:
+                        logger.warning(f"MCP Server not found: {server['id']}")
+                        continue
+
+                    # Prepares the server configuration
+                    server_config = mcp_server.config_json.copy()
+
+                    # Replaces the environment variables in the config_json
+                    if "env" in server_config:
+                        for key, value in server_config["env"].items():
+                            if value.startswith("env@@"):
+                                env_key = value.replace("env@@", "")
+                                if env_key in server.get("envs", {}):
+                                    server_config["env"][key] = server["envs"][env_key]
+                                else:
+                                    logger.warning(
+                                        f"Environment variable '{env_key}' not provided for the MCP server {mcp_server.name}"
+                                    )
+                                    continue
+
+                    logger.info(f"Connecting to MCP server: {mcp_server.name}")
+                    tools, exit_stack = await self._connect_to_mcp_server(server_config)
+
+                    if tools and exit_stack:
+                        # Filters incompatible tools
+                        filtered_tools = self._filter_incompatible_tools(tools)
+
+                        # Filters tools compatible with the agent
+                        agent_tools = server.get("tools", [])
+                        filtered_tools = self._filter_tools_by_agent(
+                            filtered_tools, agent_tools
+                        )
+                        self.tools.extend(filtered_tools)
+
+                        # Registers the exit_stack with the AsyncExitStack
+                        await self.exit_stack.enter_async_context(exit_stack)
+                        logger.info(
+                            f"Connected successfully. Added {len(filtered_tools)} tools."
+                        )
+                    else:
+                        logger.warning(
+                            f"Failed to connect or no tools available for {mcp_server.name}"
+                        )
+
+                except Exception as e:
+                    logger.error(f"Error connecting to MCP server {server['id']}: {e}")
                     continue
 
-                # Prepares the server configuration
-                server_config = mcp_server.config_json.copy()
+            logger.info(
+                f"MCP Toolset created successfully. Total of {len(self.tools)} tools."
+            )
 
-                # Replaces the environment variables in the config_json
-                if "env" in server_config:
-                    for key, value in server_config["env"].items():
-                        if value.startswith("env@@"):
-                            env_key = value.replace("env@@", "")
-                            if env_key in server.get("envs", {}):
-                                server_config["env"][key] = server["envs"][env_key]
-                            else:
-                                logger.warning(
-                                    f"Environment variable '{env_key}' not provided for the MCP server {mcp_server.name}"
-                                )
-                                continue
-
-                logger.info(f"Connecting to MCP server: {mcp_server.name}")
-                tools, exit_stack = await self._connect_to_mcp_server(server_config)
-
-                if tools and exit_stack:
-                    # Filters incompatible tools
-                    filtered_tools = self._filter_incompatible_tools(tools)
-
-                    # Filters tools compatible with the agent
-                    agent_tools = server.get("tools", [])
-                    filtered_tools = self._filter_tools_by_agent(
-                        filtered_tools, agent_tools
-                    )
-                    self.tools.extend(filtered_tools)
-
-                    # Registers the exit_stack with the AsyncExitStack
-                    await self.exit_stack.enter_async_context(exit_stack)
-                    logger.info(
-                        f"Connected successfully. Added {len(filtered_tools)} tools."
-                    )
-                else:
-                    logger.warning(
-                        f"Failed to connect or no tools available for {mcp_server.name}"
-                    )
-
-            except Exception as e:
-                logger.error(f"Error connecting to MCP server {server['id']}: {e}")
-                continue
-
-        logger.info(
-            f"MCP Toolset created successfully. Total of {len(self.tools)} tools."
-        )
+        except Exception as e:
+            # Ensure cleanup
+            await self.exit_stack.aclose()
+            logger.error(f"Fatal error connecting to MCP servers: {e}")
+            # Recreate an empty exit_stack
+            self.exit_stack = AsyncExitStack()
 
         return self.tools, self.exit_stack

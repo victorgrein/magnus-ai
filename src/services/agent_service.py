@@ -12,6 +12,14 @@ import httpx
 logger = logging.getLogger(__name__)
 
 
+# Helper function to generate API keys
+def generate_api_key() -> str:
+    """Generate a secure API key"""
+    # Format: sk-proj-{random 64 chars}
+
+    return str(uuid.uuid4())
+
+
 def _convert_uuid_to_str(obj):
     """
     Recursively convert all UUID objects to strings in a dictionary, list or scalar value.
@@ -203,6 +211,11 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                     for tool in config["tools"]
                 ]
 
+            # Generate automatic API key if not provided or empty
+            if not config.get("api_key") or config.get("api_key") == "":
+                logger.info(f"Generating automatic API key for new agent")
+                config["api_key"] = generate_api_key()
+
             agent.config = config
 
         # Ensure all config objects are serializable (convert UUIDs to strings)
@@ -390,6 +403,19 @@ async def update_agent(
         # Ensure all config objects are serializable (convert UUIDs to strings)
         if "config" in agent_data and agent_data["config"] is not None:
             agent_data["config"] = _convert_uuid_to_str(agent_data["config"])
+
+        # Check if the agent has API key and generate one if not
+        agent_config = agent.config or {}
+        if "config" not in agent_data:
+            agent_data["config"] = agent_config
+
+        if not agent_config.get("api_key") and (
+            "config" not in agent_data or not agent_data["config"].get("api_key")
+        ):
+            logger.info(f"Generating missing API key for existing agent: {agent_id}")
+            if "config" not in agent_data:
+                agent_data["config"] = {}
+            agent_data["config"]["api_key"] = generate_api_key()
 
         for key, value in agent_data.items():
             setattr(agent, key, value)
