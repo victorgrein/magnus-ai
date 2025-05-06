@@ -55,6 +55,8 @@ from src.schemas.a2a_types import (
     AgentCard,
     AgentCapabilities,
     AgentSkill,
+    AgentAuthentication,
+    AgentProvider,
 )
 
 logger = logging.getLogger(__name__)
@@ -558,7 +560,6 @@ class A2AService:
                 for tool_name in mcp_tools:
                     logger.info(f"Processing tool: {tool_name}")
 
-                    # Buscar informações da ferramenta pelo ID
                     tool_info = None
                     if hasattr(mcp_server, "tools") and isinstance(
                         mcp_server.tools, list
@@ -633,10 +634,18 @@ class A2AService:
             name=agent.name,
             description=agent.description or "",
             url=f"{settings.API_URL}/api/v1/a2a/{agent_id}",
-            version="1.0.0",
+            provider=AgentProvider(
+                organization=settings.ORGANIZATION_NAME,
+                url=settings.ORGANIZATION_URL,
+            ),
+            version=f"{settings.API_VERSION}",
+            capabilities=capabilities,
+            authentication=AgentAuthentication(
+                schemes=["apiKey"],
+                credentials="x-api-key",
+            ),
             defaultInputModes=["text"],
             defaultOutputModes=["text"],
-            capabilities=capabilities,
             skills=skills,
         )
 
