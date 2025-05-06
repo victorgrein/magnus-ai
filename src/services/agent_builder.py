@@ -9,6 +9,7 @@ from src.services.agent_service import get_agent
 from src.services.custom_tools import CustomToolBuilder
 from src.services.mcp_service import MCPService
 from src.services.a2a_agent import A2ACustomAgent
+from src.services.workflow_agent import WorkflowAgent
 from sqlalchemy.orm import Session
 from contextlib import AsyncExitStack
 from google.adk.tools import load_memory
@@ -158,6 +159,8 @@ class AgentBuilder:
                 sub_agent, exit_stack = await self._create_llm_agent(agent)
             elif agent.type == "a2a":
                 sub_agent, exit_stack = await self.build_a2a_agent(agent)
+            elif agent.type == "workflow":
+                sub_agent, exit_stack = await self.build_workflow_agent(agent)
             elif agent.type == "sequential":
                 sub_agent, exit_stack = await self.build_composite_agent(agent)
             elif agent.type == "parallel":
@@ -233,6 +236,46 @@ class AgentBuilder:
             logger.error(f"Error building A2A agent: {str(e)}")
             raise ValueError(f"Error building A2A agent: {str(e)}")
 
+    async def build_workflow_agent(
+        self, root_agent
+    ) -> Tuple[WorkflowAgent, Optional[AsyncExitStack]]:
+        """Build a workflow agent with its sub-agents."""
+        logger.info(f"Creating Workflow agent from {root_agent.name}")
+
+        agent_config = root_agent.config or {}
+
+        if not agent_config.get("workflow"):
+            raise ValueError("workflow is required for workflow agents")
+
+        try:
+            sub_agents = []
+            if root_agent.config.get("sub_agents"):
+                sub_agents_with_stacks = await self._get_sub_agents(
+                    root_agent.config.get("sub_agents")
+                )
+                sub_agents = [agent for agent, _ in sub_agents_with_stacks]
+
+            config = root_agent.config or {}
+            timeout = config.get("timeout", 300)
+
+            workflow_agent = WorkflowAgent(
+                name=root_agent.name,
+                flow_json=agent_config.get("workflow"),
+                timeout=timeout,
+                description=root_agent.description
+                or f"Workflow Agent for {root_agent.name}",
+                sub_agents=sub_agents,
+                db=self.db,
+            )
+
+            logger.info(f"Workflow agent created successfully: {root_agent.name}")
+
+            return workflow_agent, None
+
+        except Exception as e:
+            logger.error(f"Error building Workflow agent: {str(e)}")
+            raise ValueError(f"Error building Workflow agent: {str(e)}")
+
     async def build_composite_agent(
         self, root_agent
     ) -> Tuple[SequentialAgent | ParallelAgent | LoopAgent, Optional[AsyncExitStack]]:
@@ -297,7 +340,12 @@ class AgentBuilder:
             raise ValueError(f"Invalid agent type: {root_agent.type}")
 
     async def build_agent(self, root_agent) -> Tuple[
-        LlmAgent | SequentialAgent | ParallelAgent | LoopAgent | A2ACustomAgent,
+        LlmAgent
+        | SequentialAgent
+        | ParallelAgent
+        | LoopAgent
+        | A2ACustomAgent
+        | WorkflowAgent,
         Optional[AsyncExitStack],
     ]:
         """Build the appropriate agent based on the type of the root agent."""
@@ -305,5 +353,7 @@ class AgentBuilder:
             return await self.build_llm_agent(root_agent)
         elif root_agent.type == "a2a":
             return await self.build_a2a_agent(root_agent)
+        elif root_agent.type == "workflow":
+            return await self.build_workflow_agent(root_agent)
         else:
             return await self.build_composite_agent(root_agent)
