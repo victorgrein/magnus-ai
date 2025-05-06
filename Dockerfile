@@ -19,6 +19,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+RUN curl -fsSL https://get.docker.com | bash
+
 COPY . .
 
 RUN pip install --no-cache-dir -e .
