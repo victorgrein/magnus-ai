@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict, Union
+from typing import List, Optional, Dict, Union, Any
 from pydantic import BaseModel, Field
 from uuid import UUID
 import secrets
@@ -42,6 +42,13 @@ class CustomMCPServerConfig(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class FlowNodes(BaseModel):
+    """Configuration of workflow nodes"""
+
+    nodes: List[Any]
+    edges: List[Any]
 
 
 class HTTPToolParameter(BaseModel):
@@ -133,6 +140,9 @@ class LLMConfig(BaseModel):
     sub_agents: Optional[List[UUID]] = Field(
         default=None, description="List of IDs of sub-agents"
     )
+    workflow: Optional[FlowNodes] = Field(
+        default=None, description="Workflow configuration"
+    )
 
     class Config:
         from_attributes = True
@@ -171,6 +181,23 @@ class LoopConfig(BaseModel):
     )
     condition: Optional[str] = Field(
         default=None, description="Condition to stop the loop"
+    )
+
+    class Config:
+        from_attributes = True
+
+
+class WorkflowConfig(BaseModel):
+    """Configuration for workflow agents"""
+
+    workflow: Dict[str, Any] = Field(
+        ..., description="Workflow configuration with nodes and edges"
+    )
+    sub_agents: Optional[List[UUID]] = Field(
+        default_factory=list, description="List of IDs of sub-agents used in workflow"
+    )
+    api_key: Optional[str] = Field(
+        default_factory=generate_api_key, description="API key for the workflow agent"
     )
 
     class Config:

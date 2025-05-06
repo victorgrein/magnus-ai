@@ -57,7 +57,7 @@ class AgentBase(BaseModel):
     )
     description: Optional[str] = Field(None, description="Agent description")
     type: str = Field(
-        ..., description="Agent type (llm, sequential, parallel, loop, a2a)"
+        ..., description="Agent type (llm, sequential, parallel, loop, a2a, workflow)"
     )
     model: Optional[str] = Field(
         None, description="Agent model (required only for llm type)"
@@ -69,9 +69,7 @@ class AgentBase(BaseModel):
     agent_card_url: Optional[str] = Field(
         None, description="Agent card URL (required for a2a type)"
     )
-    config: Optional[Union[LLMConfig, Dict[str, Any]]] = Field(
-        None, description="Agent configuration based on type"
-    )
+    config: Any = Field(None, description="Agent configuration based on type")
 
     @validator("name")
     def validate_name(cls, v, values):
@@ -87,9 +85,9 @@ class AgentBase(BaseModel):
 
     @validator("type")
     def validate_type(cls, v):
-        if v not in ["llm", "sequential", "parallel", "loop", "a2a"]:
+        if v not in ["llm", "sequential", "parallel", "loop", "a2a", "workflow"]:
             raise ValueError(
-                "Invalid agent type. Must be: llm, sequential, parallel, loop or a2a"
+                "Invalid agent type. Must be: llm, sequential, parallel, loop, a2a or workflow"
             )
         return v
 
@@ -122,6 +120,10 @@ class AgentBase(BaseModel):
         if "type" not in values:
             return v
 
+        # Para agentes workflow, não fazemos nenhuma validação
+        if "type" in values and values["type"] == "workflow":
+            return v
+
         if not v and values.get("type") != "a2a":
             raise ValueError(
                 f"Configuration is required for {values.get('type')} agent type"
@@ -147,6 +149,7 @@ class AgentBase(BaseModel):
                 raise ValueError(
                     f'Agent {values["type"]} must have at least one sub-agent'
                 )
+
         return v
 
 

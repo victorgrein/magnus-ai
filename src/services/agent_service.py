@@ -147,6 +147,16 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                     detail=f"Failed to process agent card: {str(e)}",
                 )
 
+        # Para agentes workflow, não fazemos nenhuma validação específica
+        # apenas garantimos que config é um dicionário
+        elif agent.type == "workflow":
+            if not isinstance(agent.config, dict):
+                agent.config = {}
+
+            # Garantir a API key
+            if "api_key" not in agent.config or not agent.config["api_key"]:
+                agent.config["api_key"] = generate_api_key()
+
         # Additional sub-agent validation (for non-llm and non-a2a types)
         elif agent.type != "llm":
             if not isinstance(agent.config, dict):
