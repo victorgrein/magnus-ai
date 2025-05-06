@@ -7,7 +7,7 @@ import json
 import asyncio
 import time
 
-from src.schemas.a2a.types import (
+from src.schemas.a2a_types import (
     GetTaskRequest,
     SendTaskRequest,
     Message,
