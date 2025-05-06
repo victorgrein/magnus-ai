@@ -204,19 +204,23 @@ class AgentBuilder:
             raise ValueError("agent_card_url is required for a2a agents")
 
         try:
+            sub_agents = []
+            if root_agent.config.get("sub_agents"):
+                sub_agents_with_stacks = await self._get_sub_agents(
+                    root_agent.config.get("sub_agents")
+                )
+                sub_agents = [agent for agent, _ in sub_agents_with_stacks]
+
             config = root_agent.config or {}
-            poll_interval = config.get("poll_interval", 1.0)
-            max_wait_time = config.get("max_wait_time", 60)
             timeout = config.get("timeout", 300)
 
             a2a_agent = A2ACustomAgent(
                 name=root_agent.name,
                 agent_card_url=root_agent.agent_card_url,
-                poll_interval=poll_interval,
-                max_wait_time=max_wait_time,
                 timeout=timeout,
                 description=root_agent.description
                 or f"A2A Agent for {root_agent.name}",
+                sub_agents=sub_agents,
             )
 
             logger.info(

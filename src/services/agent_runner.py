@@ -72,7 +72,7 @@ async def run_agent(
         content = Content(role="user", parts=[Part(text=message)])
         logger.info("Starting agent execution")
 
-        final_response_text = None
+        final_response_text = "No final response captured."
         try:
             response_queue = asyncio.Queue()
             execution_completed = asyncio.Event()
