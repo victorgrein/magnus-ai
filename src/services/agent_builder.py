@@ -96,7 +96,7 @@ class AgentBuilder:
         # Get MCP tools from the configuration
         mcp_tools = []
         mcp_exit_stack = None
-        if agent.config.get("mcp_servers"):
+        if agent.config.get("mcp_servers") or agent.config.get("custom_mcp_servers"):
             mcp_tools, mcp_exit_stack = await self.mcp_service.build_tools(
                 agent.config, self.db
             )
