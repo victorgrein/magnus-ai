@@ -8,7 +8,7 @@ init:
 alembic-revision:
 	alembic revision --autogenerate -m "$(message)"
 
-# Command to update database to latest version
+# Command to update database to latest version (execute existing migrations)
 alembic-upgrade:
 	alembic upgrade head
 

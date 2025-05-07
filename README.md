@@ -437,7 +437,7 @@ cp .env.example .env
 5. Initialize the database and run migrations:
 
 ```bash
-make alembic-migrate message="init migrations"
+make alembic-upgrade
 ```
 
 6. Seed the database with initial data:
@@ -644,7 +644,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 # Database migrations
 make init                       # Initialize Alembic
 make alembic-revision message="description"  # Create new migration
-make alembic-upgrade            # Update database to latest version
+make alembic-upgrade            # Update database to latest version (use to execute existing migrations)
 make alembic-downgrade          # Revert latest migration
 make alembic-migrate message="description"  # Create and apply migration
 make alembic-reset              # Reset database
@@ -812,7 +812,7 @@ Authorization: Bearer your-token-jwt
 x-client-id: client-uuid
 ```
 
-## 📁 Agent Organization
+## 🤖 Agent Organization
 
 Agents can be organized into folders for better management:
 
