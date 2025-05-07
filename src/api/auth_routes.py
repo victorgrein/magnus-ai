@@ -10,6 +10,7 @@ from src.schemas.user import (
     ForgotPassword,
     PasswordReset,
     MessageResponse,
+    ChangePassword,
 )
 from src.services.user_service import (
     authenticate_user,
@@ -18,6 +19,7 @@ from src.services.user_service import (
     resend_verification,
     forgot_password,
     reset_password,
+    change_password,
 )
 from src.services.auth_service import (
     create_access_token,
@@ -240,3 +242,35 @@ async def get_current_user(
         HTTPException: If the user is not authenticated
     """
     return current_user
+
+
+@router.post("/change-password", response_model=MessageResponse)
+async def change_user_password(
+    password_data: ChangePassword,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Change the password of the authenticated user
+
+    Args:
+        password_data: Current and new password
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        MessageResponse: Success message
+
+    Raises:
+        HTTPException: If the current password is invalid
+    """
+    success, message = change_password(
+        db, current_user.id, password_data.current_password, password_data.new_password
+    )
+
+    if not success:
+        logger.warning(f"Failed to change password for user: {current_user.email}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
+
+    logger.info(f"Password changed successfully for user: {current_user.email}")
+    return {"message": message}

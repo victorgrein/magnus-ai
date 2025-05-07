@@ -437,3 +437,52 @@ def deactivate_user(db: Session, user_id: uuid.UUID) -> Tuple[bool, str]:
     except Exception as e:
         logger.error(f"Unexpected error deactivating user: {str(e)}")
         return False, f"Unexpected error: {str(e)}"
+
+
+def change_password(
+    db: Session, user_id: uuid.UUID, current_password: str, new_password: str
+) -> Tuple[bool, str]:
+    """
+    Changes the password of an authenticated user
+
+    Args:
+        db: Database session
+        user_id: ID of the user
+        current_password: Current password for verification
+        new_password: New password to set
+
+    Returns:
+        Tuple[bool, str]: Tuple with operation status and message
+    """
+    try:
+        # Search for user by ID
+        user = db.query(User).filter(User.id == user_id).first()
+
+        if not user:
+            logger.warning(
+                f"Attempt to change password for non-existent user: {user_id}"
+            )
+            return False, "User not found"
+
+        # Verify current password
+        if not verify_password(current_password, user.password_hash):
+            logger.warning(
+                f"Attempt to change password with invalid current password for user: {user.email}"
+            )
+            return False, "Current password is incorrect"
+
+        # Update password
+        user.password_hash = get_password_hash(new_password)
+
+        db.commit()
+        logger.info(f"Password changed successfully for user: {user.email}")
+        return True, "Password changed successfully"
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        logger.error(f"Error changing password: {str(e)}")
+        return False, f"Error changing password: {str(e)}"
+
+    except Exception as e:
+        logger.error(f"Unexpected error changing password: {str(e)}")
+        return False, f"Unexpected error: {str(e)}"

@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
-from src.models.models import Client
+from src.models.models import Client, User
 from src.schemas.schemas import ClientCreate
 from src.schemas.user import UserCreate
 from src.services.user_service import create_user
@@ -148,3 +148,28 @@ def create_client_with_user(
         db.rollback()
         logger.error(f"Unexpected error creating client with user: {str(e)}")
         return None, f"Unexpected error: {str(e)}"
+
+
+def get_client_user(db: Session, client_id: uuid.UUID) -> Optional[User]:
+    """
+    Search for the user associated with a client
+
+    Args:
+        db: Database session
+        client_id: ID of the client
+
+    Returns:
+        Optional[User]: User associated with the client or None
+    """
+    try:
+        user = db.query(User).filter(User.client_id == client_id).first()
+        if not user:
+            logger.warning(f"User not found for client: {client_id}")
+            return None
+        return user
+    except SQLAlchemyError as e:
+        logger.error(f"Error searching for user for client {client_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error searching for user for client",
+        )

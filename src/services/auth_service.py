@@ -57,7 +57,6 @@ async def get_current_user(
             logger.warning(f"Token expired for {email}")
             raise credentials_exception
 
-        # Create TokenData object
         token_data = TokenData(
             sub=email,
             exp=datetime.fromtimestamp(exp),
@@ -70,9 +69,9 @@ async def get_current_user(
         raise credentials_exception
 
     # Search for user in the database
-    user = get_user_by_email(db, email=token_data.sub)
+    user = get_user_by_email(db, email=email)
     if user is None:
-        logger.warning(f"User not found for email: {token_data.sub}")
+        logger.warning(f"User not found for email: {email}")
         raise credentials_exception
 
     if not user.is_active:
@@ -146,6 +145,7 @@ def create_access_token(user: User) -> str:
     # Data to be included in the token
     token_data = {
         "sub": user.email,
+        "user_id": str(user.id),
         "is_admin": user.is_admin,
     }
 

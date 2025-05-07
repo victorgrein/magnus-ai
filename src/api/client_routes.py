@@ -14,10 +14,12 @@ from src.schemas.schemas import (
     Client,
     ClientCreate,
 )
-from src.schemas.user import UserCreate
+from src.schemas.user import UserCreate, TokenResponse
 from src.services import (
     client_service,
 )
+from src.services.auth_service import create_access_token
+from src.models.models import User
 import logging
 
 logger = logging.getLogger(__name__)
@@ -138,3 +140,49 @@ async def delete_client(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
         )
+
+
+@router.post("/{client_id}/impersonate", response_model=TokenResponse)
+async def impersonate_client(
+    client_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    payload: dict = Depends(get_jwt_token),
+):
+    """
+    Allows an administrator to obtain a token to impersonate a client
+
+    Args:
+        client_id: ID of the client to impersonate
+        db: Database session
+        payload: JWT payload of the administrator
+
+    Returns:
+        TokenResponse: Access token for the client
+
+    Raises:
+        HTTPException: If the user is not an administrator or the client does not exist
+    """
+    # Verify if the user is an administrator
+    await verify_admin(payload)
+
+    # Search for the client
+    client = client_service.get_client(db, client_id)
+    if not client:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Client not found"
+        )
+
+    user = client_service.get_client_user(db, client_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User associated with the client not found",
+        )
+
+    access_token = create_access_token(user)
+
+    logger.info(
+        f"Administrator {payload.get('sub')} impersonated client {client.name} (ID: {client_id})"
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
