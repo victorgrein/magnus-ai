@@ -32,4 +32,4 @@ ENV PORT=8000 \
 # Expose port
 EXPOSE 8000
 
-CMD uvicorn src.main:app --host $HOST --port $PORT 
+CMD alembic upgrade head && uvicorn src.main:app --host $HOST --port $PORT 
