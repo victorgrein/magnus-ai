@@ -315,13 +315,13 @@ class A2ATaskManager:
             )
 
             # Collect the chunks of the agent's response
-            contact_id = task_params.sessionId
+            external_id = task_params.sessionId
             full_response = ""
 
             # We use the same streaming function used in the WebSocket
             async for chunk in run_agent_stream(
                 agent_id=str(agent.id),
-                contact_id=contact_id,
+                external_id=external_id,
                 message=query,
                 session_service=session_service,
                 artifacts_service=artifacts_service,
@@ -438,13 +438,13 @@ class A2ATaskManager:
     async def _run_agent(self, agent: Agent, query: str, session_id: str) -> str:
         """Executes the agent to process the user query."""
         try:
-            # We use the session_id as contact_id to maintain the conversation continuity
-            contact_id = session_id
+            # We use the session_id as external_id to maintain the conversation continuity
+            external_id = session_id
 
             # We call the same function used in the chat API
             final_response = await run_agent(
                 agent_id=str(agent.id),
-                contact_id=contact_id,
+                external_id=external_id,
                 message=query,
                 session_service=session_service,
                 artifacts_service=artifacts_service,

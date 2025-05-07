@@ -1,4 +1,4 @@
-.PHONY: migrate init revision upgrade downgrade run seed-admin seed-client seed-agents seed-mcp-servers seed-tools seed-contacts seed-all docker-build docker-up docker-down docker-logs lint format install install-dev venv
+.PHONY: migrate init revision upgrade downgrade run seed-admin seed-client seed-mcp-servers seed-tools seed-all docker-build docker-up docker-down docker-logs lint format install install-dev venv
 
 # Alembic commands
 init:
@@ -43,17 +43,11 @@ seed-admin:
 seed-client:
 	python -m scripts.seeders.client_seeder
 
-seed-agents:
-	python -m scripts.seeders.agent_seeder
-
 seed-mcp-servers:
 	python -m scripts.seeders.mcp_server_seeder
 
 seed-tools:
 	python -m scripts.seeders.tool_seeder
-
-seed-contacts:
-	python -m scripts.seeders.contact_seeder
 
 seed-all:
 	python -m scripts.run_seeders

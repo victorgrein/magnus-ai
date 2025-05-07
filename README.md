@@ -8,7 +8,7 @@ The Evo AI platform allows:
 
 - Creation and management of AI agents
 - Integration with different language models
-- Client and contact management
+- Client management
 - MCP server configuration
 - Custom tools management
 - JWT authentication with email verification
@@ -463,16 +463,12 @@ REDIS_PASSWORD="your-redis-password"
 # JWT settings
 JWT_SECRET_KEY="your-jwt-secret-key"
 JWT_ALGORITHM="HS256"
-JWT_EXPIRATION_TIME=30  # In minutes
+JWT_EXPIRATION_TIME=30  # In seconds
 
 # SendGrid for emails
 SENDGRID_API_KEY="your-sendgrid-api-key"
 EMAIL_FROM="noreply@yourdomain.com"
 APP_URL="https://yourdomain.com"
-
-# A2A settings
-A2A_TASK_TTL=3600
-A2A_HISTORY_TTL=86400
 ```
 
 ### Project Dependencies
@@ -645,10 +641,8 @@ make alembic-reset              # Reset database
 # Seeders
 make seed-admin                 # Create default admin
 make seed-client                # Create default client
-make seed-agents                # Create example agents
 make seed-mcp-servers           # Create example MCP servers
 make seed-tools                 # Create example tools
-make seed-contacts              # Create example contacts
 make seed-all                   # Run all seeders
 
 # Code verification

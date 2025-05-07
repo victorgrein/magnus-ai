@@ -16,7 +16,7 @@ logger = setup_logger(__name__)
 
 async def run_agent(
     agent_id: str,
-    contact_id: str,
+    external_id: str,
     message: str,
     session_service: DatabaseSessionService,
     artifacts_service: InMemoryArtifactService,
@@ -27,7 +27,9 @@ async def run_agent(
 ):
     exit_stack = None
     try:
-        logger.info(f"Starting execution of agent {agent_id} for contact {contact_id}")
+        logger.info(
+            f"Starting execution of agent {agent_id} for external_id {external_id}"
+        )
         logger.info(f"Received message: {message}")
 
         get_root_agent = get_agent(db, agent_id)
@@ -50,22 +52,22 @@ async def run_agent(
             artifact_service=artifacts_service,
             memory_service=memory_service,
         )
-        adk_session_id = contact_id + "_" + agent_id
+        adk_session_id = external_id + "_" + agent_id
         if session_id is None:
             session_id = adk_session_id
 
-        logger.info(f"Searching session for contact {contact_id}")
+        logger.info(f"Searching session for external_id {external_id}")
         session = session_service.get_session(
             app_name=agent_id,
-            user_id=contact_id,
+            user_id=external_id,
             session_id=adk_session_id,
         )
 
         if session is None:
-            logger.info(f"Creating new session for contact {contact_id}")
+            logger.info(f"Creating new session for external_id {external_id}")
             session = session_service.create_session(
                 app_name=agent_id,
-                user_id=contact_id,
+                user_id=external_id,
                 session_id=adk_session_id,
             )
 
@@ -80,7 +82,7 @@ async def run_agent(
             async def process_events():
                 try:
                     events_async = agent_runner.run_async(
-                        user_id=contact_id,
+                        user_id=external_id,
                         session_id=adk_session_id,
                         new_message=content,
                     )
@@ -139,7 +141,7 @@ async def run_agent(
             # Add the session to memory after completion
             completed_session = session_service.get_session(
                 app_name=agent_id,
-                user_id=contact_id,
+                user_id=external_id,
                 session_id=adk_session_id,
             )
 
@@ -180,7 +182,7 @@ async def run_agent(
 
 async def run_agent_stream(
     agent_id: str,
-    contact_id: str,
+    external_id: str,
     message: str,
     session_service: DatabaseSessionService,
     artifacts_service: InMemoryArtifactService,
@@ -190,7 +192,7 @@ async def run_agent_stream(
 ) -> AsyncGenerator[str, None]:
     try:
         logger.info(
-            f"Starting streaming execution of agent {agent_id} for contact {contact_id}"
+            f"Starting streaming execution of agent {agent_id} for external_id {external_id}"
         )
         logger.info(f"Received message: {message}")
 
@@ -214,22 +216,22 @@ async def run_agent_stream(
             artifact_service=artifacts_service,
             memory_service=memory_service,
         )
-        adk_session_id = contact_id + "_" + agent_id
+        adk_session_id = external_id + "_" + agent_id
         if session_id is None:
             session_id = adk_session_id
 
-        logger.info(f"Searching session for contact {contact_id}")
+        logger.info(f"Searching session for external_id {external_id}")
         session = session_service.get_session(
             app_name=agent_id,
-            user_id=contact_id,
+            user_id=external_id,
             session_id=adk_session_id,
         )
 
         if session is None:
-            logger.info(f"Creating new session for contact {contact_id}")
+            logger.info(f"Creating new session for external_id {external_id}")
             session = session_service.create_session(
                 app_name=agent_id,
-                user_id=contact_id,
+                user_id=external_id,
                 session_id=adk_session_id,
             )
 
@@ -238,7 +240,7 @@ async def run_agent_stream(
 
         try:
             events_async = agent_runner.run_async(
-                user_id=contact_id,
+                user_id=external_id,
                 session_id=adk_session_id,
                 new_message=content,
             )
@@ -252,7 +254,7 @@ async def run_agent_stream(
 
             completed_session = session_service.get_session(
                 app_name=agent_id,
-                user_id=contact_id,
+                user_id=external_id,
                 session_id=adk_session_id,
             )
 

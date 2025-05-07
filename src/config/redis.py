@@ -34,21 +34,6 @@ def get_redis_config():
     }
 
 
-def get_a2a_config():
-    """
-    Get A2A-specific cache TTL values from environment variables.
-
-    Returns:
-        dict: A2A TTL configuration parameters
-    """
-    return {
-        "task_ttl": int(os.getenv("A2A_TASK_TTL", 3600)),
-        "history_ttl": int(os.getenv("A2A_HISTORY_TTL", 86400)),
-        "push_notification_ttl": int(os.getenv("A2A_PUSH_NOTIFICATION_TTL", 3600)),
-        "sse_client_ttl": int(os.getenv("A2A_SSE_CLIENT_TTL", 300)),
-    }
-
-
 def create_redis_pool(config=None):
     """
     Create and return a Redis connection pool.

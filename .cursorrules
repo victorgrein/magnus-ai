@@ -23,7 +23,6 @@ src/
 │   ├── auth_routes.py     # Authentication routes (login, registration)
 │   ├── chat_routes.py     # Routes for chat interactions with agents
 │   ├── client_routes.py   # Routes to manage clients
-│   ├── contact_routes.py  # Routes to manage contacts
 │   ├── mcp_server_routes.py # Routes to manage MCP servers
 │   ├── session_routes.py  # Routes to manage chat sessions
 │   └── tool_routes.py     # Routes to manage tools for agents
@@ -46,7 +45,6 @@ src/
 │   ├── auth_service.py    # JWT authentication logic
 │   ├── audit_service.py   # Audit logs logic
 │   ├── client_service.py  # Business logic for clients
-│   ├── contact_service.py # Business logic for contacts
 │   ├── email_service.py   # Email sending service
 │   ├── mcp_server_service.py # Business logic for MCP servers
 │   ├── session_service.py # Business logic for chat sessions

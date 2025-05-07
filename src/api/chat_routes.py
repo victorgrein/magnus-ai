@@ -38,11 +38,11 @@ router = APIRouter(
 )
 
 
-@router.websocket("/ws/{agent_id}/{contact_id}")
+@router.websocket("/ws/{agent_id}/{external_id}")
 async def websocket_chat(
     websocket: WebSocket,
     agent_id: str,
-    contact_id: str,
+    external_id: str,
     db: Session = Depends(get_db),
 ):
     try:
@@ -81,7 +81,7 @@ async def websocket_chat(
             await verify_user_client(payload, db, agent.client_id)
 
             logger.info(
-                f"WebSocket connection established for agent {agent_id} and contact {contact_id}"
+                f"WebSocket connection established for agent {agent_id} and external_id {external_id}"
             )
 
             while True:
@@ -95,7 +95,7 @@ async def websocket_chat(
 
                     async for chunk in run_agent_stream(
                         agent_id=agent_id,
-                        contact_id=contact_id,
+                        external_id=external_id,
                         message=message,
                         session_service=session_service,
                         artifacts_service=artifacts_service,
@@ -162,7 +162,7 @@ async def chat(
     try:
         final_response_text = await run_agent(
             request.agent_id,
-            request.contact_id,
+            request.external_id,
             request.message,
             session_service,
             artifacts_service,

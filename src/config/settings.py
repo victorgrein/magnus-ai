@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     # JWT settings
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", secrets.token_urlsafe(32))
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
-    JWT_EXPIRATION_TIME: int = int(os.getenv("JWT_EXPIRATION_TIME", 30))
+    JWT_EXPIRATION_TIME: int = int(os.getenv("JWT_EXPIRATION_TIME", 3600))
 
     # SendGrid settings
     SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")

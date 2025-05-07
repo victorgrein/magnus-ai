@@ -8,8 +8,8 @@ class ChatRequest(BaseModel):
     agent_id: str = Field(
         ..., description="ID of the agent that will process the message"
     )
-    contact_id: str = Field(
-        ..., description="ID of the contact that will process the message"
+    external_id: str = Field(
+        ..., description="ID of the external_id that will process the message"
     )
     message: str = Field(..., description="User message")
 

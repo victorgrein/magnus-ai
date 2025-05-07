@@ -18,7 +18,6 @@ import src.api.admin_routes
 import src.api.chat_routes
 import src.api.session_routes
 import src.api.agent_routes
-import src.api.contact_routes
 import src.api.mcp_server_routes
 import src.api.tool_routes
 import src.api.client_routes
@@ -70,7 +69,6 @@ admin_router = src.api.admin_routes.router
 chat_router = src.api.chat_routes.router
 session_router = src.api.session_routes.router
 agent_router = src.api.agent_routes.router
-contact_router = src.api.contact_routes.router
 mcp_server_router = src.api.mcp_server_routes.router
 tool_router = src.api.tool_routes.router
 client_router = src.api.client_routes.router
@@ -85,7 +83,6 @@ app.include_router(client_router, prefix=API_PREFIX)
 app.include_router(chat_router, prefix=API_PREFIX)
 app.include_router(session_router, prefix=API_PREFIX)
 app.include_router(agent_router, prefix=API_PREFIX)
-app.include_router(contact_router, prefix=API_PREFIX)
 app.include_router(a2a_router, prefix=API_PREFIX)
 
 

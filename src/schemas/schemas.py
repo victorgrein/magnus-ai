@@ -33,24 +33,6 @@ class Client(ClientBase):
         from_attributes = True
 
 
-class ContactBase(BaseModel):
-    ext_id: Optional[str] = None
-    name: Optional[str] = None
-    meta: Optional[Dict[str, Any]] = Field(default_factory=dict)
-
-
-class ContactCreate(ContactBase):
-    client_id: UUID
-
-
-class Contact(ContactBase):
-    id: UUID
-    client_id: UUID
-
-    class Config:
-        from_attributes = True
-
-
 class AgentBase(BaseModel):
     name: Optional[str] = Field(
         None, description="Agent name (no spaces or special characters)"
