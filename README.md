@@ -1,6 +1,6 @@
 # Evo AI - AI Agents Platform
 
-Evo AI is an free platform for creating and managing AI agents, enabling integration with different AI models and services.
+Evo AI is an open-source platform for creating and managing AI agents, enabling integration with different AI models and services.
 
 ## 🚀 Overview
 
@@ -13,6 +13,7 @@ The Evo AI platform allows:
 - Custom tools management
 - JWT authentication with email verification
 - **Agent 2 Agent (A2A) Protocol Support**: Interoperability between AI agents following Google's A2A specification
+- **Workflow Agent with LangGraph**: Building complex agent workflows with LangGraph and ReactFlow
 
 ## 🤖 Agent Types and Creation
 
@@ -119,6 +120,27 @@ Executes sub-agents in a loop with a defined maximum number of iterations.
   }
 }
 ```
+
+### 6. Workflow Agent
+
+Executes sub-agents in a custom workflow defined by a graph structure. This agent type uses LangGraph for implementing complex agent workflows with conditional execution paths.
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "name": "workflow_agent",
+  "type": "workflow",
+  "config": {
+    "sub_agents": ["agent-uuid-1", "agent-uuid-2", "agent-uuid-3"],
+    "workflow": {
+      "nodes": [],
+      "edges": []
+    }
+  }
+}
+```
+
+The workflow structure is built using ReactFlow in the frontend, allowing visual creation and editing of complex agent workflows with nodes (representing agents or decision points) and edges (representing flow connections).
 
 ### Common Characteristics
 
@@ -268,6 +290,8 @@ Authorization: Bearer your-token-jwt
 - **SendGrid**: Email service for notifications
 - **Jinja2**: Template engine for email rendering
 - **Bcrypt**: Password hashing and security
+- **LangGraph**: Framework for building stateful, multi-agent workflows
+- **ReactFlow**: Library for building node-based visual workflows
 
 ## 🤖 Agent 2 Agent (A2A) Protocol Support
 
@@ -337,9 +361,25 @@ src/
 └── config/       # Configurations
 ```
 
+## 📋 Prerequisites
+
+Before starting, make sure you have the following installed:
+
+- **Python**: 3.10 or higher
+- **PostgreSQL**: 13.0 or higher
+- **Redis**: 6.0 or higher
+- **Git**: For version control
+- **Make**: For running Makefile commands (usually pre-installed on Linux/Mac, for Windows use WSL or install via chocolatey)
+
+You'll also need the following accounts/API keys:
+
+- **OpenAI API Key**: Or API key from another AI provider
+- **SendGrid Account**: For email functionality
+- **Google API Key**: If using Google's A2A protocol implementation
+
 ## 📋 Requirements
 
-- Python 3.8+
+- Python 3.10+
 - PostgreSQL
 - Redis
 - OpenAI API Key (or other AI provider)
@@ -366,6 +406,14 @@ venv\Scripts\activate  # Windows
 3. Install dependencies:
 
 ```bash
+pip install -e .        # For basic installation
+# or
+pip install -e ".[dev]" # For development dependencies
+```
+
+Or using the Makefile:
+
+```bash
 make install      # For basic installation
 # or
 make install-dev  # For development dependencies
@@ -378,11 +426,80 @@ cp .env.example .env
 # Edit the .env file with your settings
 ```
 
-5. Run migrations:
+5. Initialize the database and run migrations:
 
 ```bash
-make alembic-upgrade
+make alembic-migrate message="init migrations"
 ```
+
+6. Seed the database with initial data:
+
+```bash
+make seed-all
+```
+
+## 🚀 Getting Started
+
+After installation, follow these steps to set up your first agent:
+
+1. **Configure MCP Server**: Set up your Model Control Protocol server configuration first
+2. **Create Client or Register**: Create a new client or register a user account
+3. **Create Agents**: Set up the agents according to your needs (LLM, A2A, Sequential, Parallel, Loop, or Workflow)
+
+### Configuration (.env file)
+
+Configure your environment using the following key settings:
+
+```bash
+# Database settings
+POSTGRES_CONNECTION_STRING="postgresql://postgres:root@localhost:5432/evo_ai"
+
+# Redis settings
+REDIS_HOST="localhost"
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD="your-redis-password"
+
+# JWT settings
+JWT_SECRET_KEY="your-jwt-secret-key"
+JWT_ALGORITHM="HS256"
+JWT_EXPIRATION_TIME=30  # In minutes
+
+# SendGrid for emails
+SENDGRID_API_KEY="your-sendgrid-api-key"
+EMAIL_FROM="noreply@yourdomain.com"
+APP_URL="https://yourdomain.com"
+
+# A2A settings
+A2A_TASK_TTL=3600
+A2A_HISTORY_TTL=86400
+```
+
+### Project Dependencies
+
+The project uses modern Python packaging standards with `pyproject.toml`. Key dependencies include:
+
+```toml
+dependencies = [
+    "fastapi==0.115.12",
+    "uvicorn==0.34.2",
+    "pydantic==2.11.3",
+    "sqlalchemy==2.0.40",
+    "psycopg2==2.9.10",
+    "alembic==1.15.2",
+    "redis==5.3.0",
+    "langgraph==0.4.1",
+    # ... other dependencies
+]
+```
+
+For development, additional packages can be installed with:
+
+```bash
+pip install -e ".[dev]"
+```
+
+This includes development tools like black, flake8, pytest, and more.
 
 ## 🔐 Authentication
 
@@ -482,21 +599,37 @@ The interactive API documentation is available at:
 
 ## 🤝 Contributing
 
+We welcome contributions from the community! Here's how you can help:
+
 1. Fork the project
 2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
+3. Make your changes and add tests if possible
+4. Run tests and make sure they pass
+5. Commit your changes following conventional commits format (`feat: add amazing feature`)
+6. Push to the branch (`git push origin feature/AmazingFeature`)
+7. Open a Pull Request
+
+Please read our [Contributing Guidelines](CONTRIBUTING.md) for more details.
 
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 📊 Stargazers
+
+[![Stargazers repo roster for @your-username/evo-ai](https://reporoster.com/stars/your-username/evo-ai)](https://github.com/your-username/evo-ai/stargazers)
+
+## 🔄 Forks
+
+[![Forkers repo roster for @your-username/evo-ai](https://reporoster.com/forks/your-username/evo-ai)](https://github.com/your-username/evo-ai/network/members)
 
 ## 🙏 Acknowledgments
 
 - [FastAPI](https://fastapi.tiangolo.com/)
 - [SQLAlchemy](https://www.sqlalchemy.org/)
 - [Google ADK](https://github.com/google/adk)
+- [LangGraph](https://github.com/langchain-ai/langgraph)
+- [ReactFlow](https://reactflow.dev/)
 
 ## 👨‍💻 Development Commands
 
@@ -526,7 +659,7 @@ make clear-cache                # Clear project cache
 
 ## 🐳 Running with Docker
 
-To facilitate deployment and execution of the application, we provide Docker and Docker Compose configurations.
+For quick setup and deployment, we provide Docker and Docker Compose configurations.
 
 ### Prerequisites
 
@@ -535,7 +668,16 @@ To facilitate deployment and execution of the application, we provide Docker and
 
 ### Configuration
 
-1. Configure the necessary environment variables in the `.env` file at the root of the project (or use system environment variables)
+1. Create and configure the `.env` file:
+
+```bash
+cp .env.example .env
+# Edit the .env file with your settings, especially:
+# - POSTGRES_CONNECTION_STRING
+# - REDIS_HOST (should be "redis" when using Docker)
+# - JWT_SECRET_KEY
+# - SENDGRID_API_KEY
+```
 
 2. Build the Docker image:
 
@@ -549,19 +691,25 @@ make docker-build
 make docker-up
 ```
 
-4. Populate the database with initial data:
+4. Apply migrations (first time only):
+
+```bash
+docker-compose exec api python -m alembic upgrade head
+```
+
+5. Populate the database with initial data:
 
 ```bash
 make docker-seed
 ```
 
-5. To check application logs:
+6. To check application logs:
 
 ```bash
 make docker-logs
 ```
 
-6. To stop the services:
+7. To stop the services:
 
 ```bash
 make docker-down
@@ -587,7 +735,7 @@ Docker Compose sets up persistent volumes for:
 The main environment variables used by the API container:
 
 - `POSTGRES_CONNECTION_STRING`: PostgreSQL connection string
-- `REDIS_HOST`: Redis host
+- `REDIS_HOST`: Redis host (use "redis" when running with Docker)
 - `JWT_SECRET_KEY`: Secret key for JWT token generation
 - `SENDGRID_API_KEY`: SendGrid API key for sending emails
 - `EMAIL_FROM`: Email used as sender

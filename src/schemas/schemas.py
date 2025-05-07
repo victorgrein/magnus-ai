@@ -120,7 +120,7 @@ class AgentBase(BaseModel):
         if "type" not in values:
             return v
 
-        # Para agentes workflow, não fazemos nenhuma validação
+        # For workflow agents, we do not perform any validation
         if "type" in values and values["type"] == "workflow":
             return v
 

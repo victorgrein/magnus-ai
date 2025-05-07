@@ -4,18 +4,11 @@ from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event
 from google.genai.types import Content, Part
 
-from typing import AsyncGenerator, Dict, Any, List, TypedDict, Annotated
-import json
+from typing import AsyncGenerator, Dict, Any, List, TypedDict
 import uuid
-import asyncio
-import httpx
-import threading
 
 from google.adk.runners import Runner
 from src.services.agent_service import get_agent
-
-# Remover importação circular
-# from src.services.agent_builder import AgentBuilder
 
 from sqlalchemy.orm import Session
 
@@ -35,13 +28,13 @@ class State(TypedDict):
 
 class WorkflowAgent(BaseAgent):
     """
-    Agente que implementa fluxos de trabalho usando LangGraph.
+    Agent that implements workflow flows using LangGraph.
 
-    Este agente permite definir e executar fluxos complexos entre vários agentes
-    utilizando o LangGraph para orquestração.
+    This agent allows defining and executing complex workflows between multiple agents
+    using LangGraph for orchestration.
     """
 
-    # Declarações de campo para Pydantic
+    # Field declarations for Pydantic
     flow_json: Dict[str, Any]
     timeout: int
     db: Session
@@ -56,16 +49,16 @@ class WorkflowAgent(BaseAgent):
         **kwargs,
     ):
         """
-        Inicializa o agente de workflow.
+        Initializes the workflow agent.
 
         Args:
-            name: Nome do agente
-            flow_json: Definição do fluxo em formato JSON
-            timeout: Tempo máximo de execução (segundos)
-            sub_agents: Lista de sub-agentes a serem executados após o agente de workflow
+            name: Agent name
+            flow_json: Workflow definition in JSON format
+            timeout: Maximum execution time (seconds)
+            sub_agents: List of sub-agents to be executed after the workflow agent
             db: Session
         """
-        # Inicializar classe base
+        # Initialize base class
         super().__init__(
             name=name,
             flow_json=flow_json,
@@ -76,19 +69,19 @@ class WorkflowAgent(BaseAgent):
         )
 
         print(
-            f"Agente de workflow inicializado com {len(flow_json.get('nodes', []))} nós"
+            f"Workflow agent initialized with {len(flow_json.get('nodes', []))} nodes"
         )
 
     async def _create_node_functions(self, ctx: InvocationContext):
-        """Cria as funções para cada tipo de nó no fluxo."""
+        """Creates functions for each type of node in the flow."""
 
-        # Função para o nó inicial
+        # Function for the initial node
         async def start_node_function(
             state: State,
             node_id: str,
             node_data: Dict[str, Any],
         ) -> AsyncGenerator[State, None]:
-            print("\n🏁 NÓ INICIAL")
+            print("\n🏁 INITIAL NODE")
 
             content = state.get("content", [])
 
@@ -109,7 +102,7 @@ class WorkflowAgent(BaseAgent):
                 return
             session_id = state.get("session_id", "")
 
-            # Armazenar resultados específicos para este nó
+            # Store specific results for this node
             node_outputs = state.get("node_outputs", {})
             node_outputs[node_id] = {"started_at": datetime.now().isoformat()}
 
@@ -122,7 +115,7 @@ class WorkflowAgent(BaseAgent):
                 "conversation_history": ctx.session.events,
             }
 
-        # Função genérica para nós de agente
+        # Generic function for agent nodes
         async def agent_node_function(
             state: State, node_id: str, node_data: Dict[str, Any]
         ) -> AsyncGenerator[State, None]:
@@ -131,14 +124,14 @@ class WorkflowAgent(BaseAgent):
             agent_name = agent_config.get("name", "")
             agent_id = agent_config.get("id", "")
 
-            # Incrementar contador de ciclos
+            # Increment cycle counter
             cycle_count = state.get("cycle_count", 0) + 1
-            print(f"\n👤 AGENTE: {agent_name} (Ciclo {cycle_count})")
+            print(f"\n👤 AGENT: {agent_name} (Cycle {cycle_count})")
 
             content = state.get("content", [])
             session_id = state.get("session_id", "")
 
-            # Obter o histórico de conversa
+            # Get conversation history
             conversation_history = state.get("conversation_history", [])
 
             agent = get_agent(self.db, agent_id)
@@ -159,7 +152,7 @@ class WorkflowAgent(BaseAgent):
                 }
                 return
 
-            # Importação movida para dentro da função para evitar circular import
+            # Import moved to inside the function to avoid circular import
             from src.services.agent_builder import AgentBuilder
 
             agent_builder = AgentBuilder(self.db)
@@ -179,8 +172,10 @@ class WorkflowAgent(BaseAgent):
                 "cycle": cycle_count,
             }
 
+            content = content + new_content
+
             yield {
-                "content": new_content,
+                "content": content,
                 "status": "processed_by_agent",
                 "node_outputs": node_outputs,
                 "cycle_count": cycle_count,
@@ -191,23 +186,23 @@ class WorkflowAgent(BaseAgent):
             if exit_stack:
                 await exit_stack.aclose()
 
-        # Função para nós de condição
+        # Function for condition nodes
         async def condition_node_function(
             state: State, node_id: str, node_data: Dict[str, Any]
         ) -> AsyncGenerator[State, None]:
-            label = node_data.get("label", "Condição Sem Nome")
+            label = node_data.get("label", "No name condition")
             conditions = node_data.get("conditions", [])
             cycle_count = state.get("cycle_count", 0)
 
-            print(f"\n🔄 CONDIÇÃO: {label} (Ciclo {cycle_count})")
+            print(f"\n🔄 CONDITION: {label} (Cycle {cycle_count})")
 
             content = state.get("content", [])
-            print(f"Avaliando condição para conteúdo: '{content}'")
+            print(f"Evaluating condition for content: '{content}'")
 
             session_id = state.get("session_id", "")
             conversation_history = state.get("conversation_history", [])
 
-            # Verificar todas as condições
+            # Check all conditions
             conditions_met = []
             for condition in conditions:
                 condition_id = condition.get("id")
@@ -217,18 +212,27 @@ class WorkflowAgent(BaseAgent):
                 expected_value = condition_data.get("value")
 
                 print(
-                    f"  Verificando se {field} {operator} '{expected_value}' (valor atual: '{state.get(field, '')}')"
+                    f"  Checking if {field} {operator} '{expected_value}' (current value: '{state.get(field, '')}')"
                 )
                 if self._evaluate_condition(condition, state):
                     conditions_met.append(condition_id)
-                    print(f"  ✅ Condição {condition_id} atendida!")
+                    print(f"  ✅ Condition {condition_id} met!")
 
-            # Verificar se o ciclo atingiu o limite (segurança extra)
+            # Check if the cycle reached the limit (extra security)
             if cycle_count >= 10:
                 print(
-                    f"⚠️ ATENÇÃO: Limite de ciclos atingido ({cycle_count}). Forçando término."
+                    f"⚠️ ATTENTION: Cycle limit reached ({cycle_count}). Forcing termination."
                 )
+
+                condition_content = [
+                    Event(
+                        author="agent",
+                        content=Content(parts=[Part(text="Cycle limit reached")]),
+                    )
+                ]
+                content = content + condition_content
                 yield {
+                    "content": content,
                     "status": "cycle_limit_reached",
                     "node_outputs": state.get("node_outputs", {}),
                     "cycle_count": cycle_count,
@@ -237,7 +241,7 @@ class WorkflowAgent(BaseAgent):
                 }
                 return
 
-            # Armazenar resultados específicos para este nó
+            # Store specific results for this node
             node_outputs = state.get("node_outputs", {})
             node_outputs[node_id] = {
                 "condition_evaluated": label,
@@ -246,7 +250,22 @@ class WorkflowAgent(BaseAgent):
                 "cycle": cycle_count,
             }
 
+            condition_content = [
+                Event(
+                    author="agent",
+                    content=Content(
+                        parts=[
+                            Part(
+                                text=f"Condition evaluated: {label} with {str(conditions_met)}"
+                            )
+                        ]
+                    ),
+                )
+            ]
+            content = content + condition_content
+
             yield {
+                "content": content,
                 "status": "condition_evaluated",
                 "node_outputs": node_outputs,
                 "cycle_count": cycle_count,
@@ -261,7 +280,7 @@ class WorkflowAgent(BaseAgent):
         }
 
     def _evaluate_condition(self, condition: Dict[str, Any], state: State) -> bool:
-        """Avalia uma condição contra o estado atual."""
+        """Evaluates a condition against the current state."""
         condition_type = condition.get("type")
         condition_data = condition.get("data", {})
 
@@ -272,9 +291,9 @@ class WorkflowAgent(BaseAgent):
 
             actual_value = state.get(field, "")
 
-            # Tratamento especial para quando content é uma lista de Event
+            # Special treatment for when content is a list of Events
             if field == "content" and isinstance(actual_value, list) and actual_value:
-                # Extrai o texto de cada evento para comparação
+                # Extract text from each event for comparison
                 extracted_texts = []
                 for event in actual_value:
                     if hasattr(event, "content") and hasattr(event.content, "parts"):
@@ -284,9 +303,9 @@ class WorkflowAgent(BaseAgent):
 
                 if extracted_texts:
                     actual_value = " ".join(extracted_texts)
-                    print(f"  Texto extraído dos eventos: '{actual_value[:100]}...'")
+                    print(f"  Extracted text from events: '{actual_value[:100]}...'")
 
-            # Converter valores para string para facilitar comparações
+            # Convert values to string for easier comparisons
             if actual_value is not None:
                 actual_str = str(actual_value)
             else:
@@ -297,58 +316,58 @@ class WorkflowAgent(BaseAgent):
             else:
                 expected_str = ""
 
-            # Verificações de definição
+            # Checks for definition
             if operator == "is_defined":
                 result = actual_value is not None and actual_value != ""
-                print(f"  Verificação '{operator}': {result}")
+                print(f"  Check '{operator}': {result}")
                 return result
             elif operator == "is_not_defined":
                 result = actual_value is None or actual_value == ""
-                print(f"  Verificação '{operator}': {result}")
+                print(f"  Check '{operator}': {result}")
                 return result
 
-            # Verificações de igualdade
+            # Checks for equality
             elif operator == "equals":
                 result = actual_str == expected_str
-                print(f"  Verificação '{operator}': {result}")
+                print(f"  Check '{operator}': {result}")
                 return result
             elif operator == "not_equals":
                 result = actual_str != expected_str
-                print(f"  Verificação '{operator}': {result}")
+                print(f"  Check '{operator}': {result}")
                 return result
 
-            # Verificações de conteúdo
+            # Checks for content
             elif operator == "contains":
-                # Converter ambos para minúsculas para comparação sem diferenciação
+                # Convert both to lowercase for case-insensitive comparison
                 expected_lower = expected_str.lower()
                 actual_lower = actual_str.lower()
                 print(
-                    f"  Comparação 'contains' sem distinção de maiúsculas/minúsculas: '{expected_lower}' em '{actual_lower[:100]}...'"
+                    f"  Comparison 'contains' without case distinction: '{expected_lower}' in '{actual_lower[:100]}...'"
                 )
                 result = expected_lower in actual_lower
-                print(f"  Verificação '{operator}': {result}")
+                print(f"  Check '{operator}': {result}")
                 return result
             elif operator == "not_contains":
                 expected_lower = expected_str.lower()
                 actual_lower = actual_str.lower()
                 print(
-                    f"  Comparação 'not_contains' sem distinção de maiúsculas/minúsculas: '{expected_lower}' em '{actual_lower[:100]}...'"
+                    f"  Comparison 'not_contains' without case distinction: '{expected_lower}' in '{actual_lower[:100]}...'"
                 )
                 result = expected_lower not in actual_lower
-                print(f"  Verificação '{operator}': {result}")
+                print(f"  Check '{operator}': {result}")
                 return result
 
-            # Verificações de início e fim
+            # Checks for start and end
             elif operator == "starts_with":
                 result = actual_str.lower().startswith(expected_str.lower())
-                print(f"  Verificação '{operator}': {result}")
+                print(f"  Check '{operator}': {result}")
                 return result
             elif operator == "ends_with":
                 result = actual_str.lower().endswith(expected_str.lower())
-                print(f"  Verificação '{operator}': {result}")
+                print(f"  Check '{operator}': {result}")
                 return result
 
-            # Verificações numéricas (tentando converter para número)
+            # Numeric checks (attempting to convert to number)
             elif operator in [
                 "greater_than",
                 "greater_than_or_equal",
@@ -367,26 +386,26 @@ class WorkflowAgent(BaseAgent):
                         result = actual_num < expected_num
                     elif operator == "less_than_or_equal":
                         result = actual_num <= expected_num
-                    print(f"  Verificação numérica '{operator}': {result}")
+                    print(f"  Numeric check '{operator}': {result}")
                     return result
                 except (ValueError, TypeError):
-                    # Se não for possível converter para número, retorna falso
+                    # If it's not possible to convert to number, return false
                     print(
-                        f"  Erro ao converter valores para comparação numérica: '{actual_str[:100]}...' e '{expected_str}'"
+                        f"  Error converting values for numeric comparison: '{actual_str[:100]}...' and '{expected_str}'"
                     )
                     return False
 
-            # Verificações com expressões regulares
+            # Checks with regular expressions
             elif operator == "matches":
                 import re
 
                 try:
                     pattern = re.compile(expected_str, re.IGNORECASE)
                     result = bool(pattern.search(actual_str))
-                    print(f"  Verificação '{operator}': {result}")
+                    print(f"  Check '{operator}': {result}")
                     return result
                 except re.error:
-                    print(f"  Erro na expressão regular: '{expected_str}'")
+                    print(f"  Error in regular expression: '{expected_str}'")
                     return False
             elif operator == "not_matches":
                 import re
@@ -394,17 +413,17 @@ class WorkflowAgent(BaseAgent):
                 try:
                     pattern = re.compile(expected_str, re.IGNORECASE)
                     result = not bool(pattern.search(actual_str))
-                    print(f"  Verificação '{operator}': {result}")
+                    print(f"  Check '{operator}': {result}")
                     return result
                 except re.error:
-                    print(f"  Erro na expressão regular: '{expected_str}'")
-                    return True  # Se a regex for inválida, consideramos que não houve match
+                    print(f"  Error in regular expression: '{expected_str}'")
+                    return True  # If the regex is invalid, we consider that there was no match
 
         return False
 
     def _create_flow_router(self, flow_data: Dict[str, Any]):
-        """Cria um roteador baseado nas conexões no flow.json."""
-        # Mapear conexões para entender como os nós se conectam
+        """Creates a router based on the connections in flow.json."""
+        # Map connections to understand how nodes are connected
         edges_map = {}
 
         for edge in flow_data.get("edges", []):
@@ -415,10 +434,10 @@ class WorkflowAgent(BaseAgent):
             if source not in edges_map:
                 edges_map[source] = {}
 
-            # Armazenar o destino para cada handle específico
+            # Store the destination for each specific handle
             edges_map[source][source_handle] = target
 
-        # Mapear nós de condição e suas condições
+        # Map condition nodes and their conditions
         condition_nodes = {}
         for node in flow_data.get("nodes", []):
             if node.get("type") == "condition-node":
@@ -426,35 +445,35 @@ class WorkflowAgent(BaseAgent):
                 conditions = node.get("data", {}).get("conditions", [])
                 condition_nodes[node_id] = conditions
 
-        # Função de roteamento para cada nó específico
+        # Routing function for each specific node
         def create_router_for_node(node_id: str):
             def router(state: State) -> str:
-                print(f"Roteando a partir do nó: {node_id}")
+                print(f"Routing from node: {node_id}")
 
-                # Verificar se o limite de ciclos foi atingido
+                # Check if the cycle limit has been reached
                 cycle_count = state.get("cycle_count", 0)
                 if cycle_count >= 10:
                     print(
-                        f"⚠️ Limite de ciclos ({cycle_count}) atingido. Finalizando o fluxo."
+                        f"⚠️ Cycle limit ({cycle_count}) reached. Finalizing the flow."
                     )
                     return END
 
-                # Se for um nó de condição, avaliar as condições
+                # If it's a condition node, evaluate the conditions
                 if node_id in condition_nodes:
                     conditions = condition_nodes[node_id]
 
                     for condition in conditions:
                         condition_id = condition.get("id")
 
-                        # Verificar se a condição é atendida
+                        # Check if the condition is met
                         is_condition_met = self._evaluate_condition(condition, state)
 
                         if is_condition_met:
                             print(
-                                f"Condição {condition_id} atendida. Movendo para o próximo nó."
+                                f"Condition {condition_id} met. Moving to the next node."
                             )
 
-                            # Encontrar a conexão que usa este condition_id como handle
+                            # Find the connection that uses this condition_id as a handle
                             if (
                                 node_id in edges_map
                                 and condition_id in edges_map[node_id]
@@ -462,37 +481,31 @@ class WorkflowAgent(BaseAgent):
                                 return edges_map[node_id][condition_id]
                         else:
                             print(
-                                f"Condição {condition_id} NÃO atendida. Continuando avaliação ou usando caminho padrão."
+                                f"Condition {condition_id} not met. Continuing evaluation or using default path."
                             )
 
-                    # Se nenhuma condição for atendida, usar o bottom-handle se disponível
+                    # If no condition is met, use the bottom-handle if available
                     if node_id in edges_map and "bottom-handle" in edges_map[node_id]:
-                        print(
-                            "Nenhuma condição atendida. Usando caminho padrão (bottom-handle)."
-                        )
+                        print("No condition met. Using default path (bottom-handle).")
                         return edges_map[node_id]["bottom-handle"]
                     else:
-                        print(
-                            "Nenhuma condição atendida e não há caminho padrão. Encerrando fluxo."
-                        )
+                        print("No condition met and no default path. Closing the flow.")
                         return END
 
-                # Para nós regulares, simplesmente seguir a primeira conexão disponível
+                # For regular nodes, simply follow the first available connection
                 if node_id in edges_map:
-                    # Tentar usar o handle padrão ou bottom-handle primeiro
+                    # Try to use the default handle or bottom-handle first
                     for handle in ["default", "bottom-handle"]:
                         if handle in edges_map[node_id]:
                             return edges_map[node_id][handle]
 
-                    # Se nenhum handle específico for encontrado, usar o primeiro disponível
+                    # If no specific handle is found, use the first available
                     if edges_map[node_id]:
                         first_handle = list(edges_map[node_id].keys())[0]
                         return edges_map[node_id][first_handle]
 
-                # Se não houver conexão de saída, encerrar o fluxo
-                print(
-                    f"Nenhum caminho a seguir a partir do nó {node_id}. Encerrando fluxo."
-                )
+                # If there is no output connection, close the flow
+                print(f"No output connection from node {node_id}. Closing the flow.")
                 return END
 
             return router
@@ -502,30 +515,30 @@ class WorkflowAgent(BaseAgent):
     async def _create_graph(
         self, ctx: InvocationContext, flow_data: Dict[str, Any]
     ) -> StateGraph:
-        """Cria um StateGraph a partir dos dados do fluxo."""
-        # Extrair nós do fluxo
+        """Creates a StateGraph from the flow data."""
+        # Extract nodes from the flow
         nodes = flow_data.get("nodes", [])
 
-        # Inicializar StateGraph
+        # Initialize StateGraph
         graph_builder = StateGraph(State)
 
-        # Criar funções para cada tipo de nó
+        # Create functions for each node type
         node_functions = await self._create_node_functions(ctx)
 
-        # Dicionário para armazenar funções específicas para cada nó
+        # Dictionary to store specific functions for each node
         node_specific_functions = {}
 
-        # Adicionar nós ao grafo
+        # Add nodes to the graph
         for node in nodes:
             node_id = node.get("id")
             node_type = node.get("type")
             node_data = node.get("data", {})
 
             if node_type in node_functions:
-                # Criar uma função específica para este nó
+                # Create a specific function for this node
                 def create_node_function(node_type, node_id, node_data):
                     async def node_function(state):
-                        # Consumir o gerador assíncrono e retornar o último resultado
+                        # Consume the asynchronous generator and return the last result
                         result = None
                         async for item in node_functions[node_type](
                             state, node_id, node_data
@@ -535,106 +548,106 @@ class WorkflowAgent(BaseAgent):
 
                     return node_function
 
-                # Adicionar função específica ao dicionário
+                # Add specific function to the dictionary
                 node_specific_functions[node_id] = create_node_function(
                     node_type, node_id, node_data
                 )
 
-                # Adicionar o nó ao grafo
-                print(f"Adicionando nó {node_id} do tipo {node_type}")
+                # Add node to the graph
+                print(f"Adding node {node_id} of type {node_type}")
                 graph_builder.add_node(node_id, node_specific_functions[node_id])
 
-        # Criar função para gerar roteadores específicos
+        # Create function to generate specific routers
         create_router = self._create_flow_router(flow_data)
 
-        # Adicionar conexões condicionais para cada nó
+        # Add conditional connections for each node
         for node in nodes:
             node_id = node.get("id")
 
             if node_id in node_specific_functions:
-                # Criar dicionário de possíveis destinos
+                # Create dictionary of possible destinations
                 edge_destinations = {}
 
-                # Mapear todos os possíveis destinos
+                # Map all possible destinations
                 for edge in flow_data.get("edges", []):
                     if edge.get("source") == node_id:
                         target = edge.get("target")
                         if target in node_specific_functions:
                             edge_destinations[target] = target
 
-                # Adicionar END como possível destino
+                # Add END as a possible destination
                 edge_destinations[END] = END
 
-                # Criar roteador específico para este nó
+                # Create specific router for this node
                 node_router = create_router(node_id)
 
-                # Adicionar conexões condicionais
-                print(f"Adicionando conexões condicionais para o nó {node_id}")
-                print(f"Destinos possíveis: {edge_destinations}")
+                # Add conditional connections
+                print(f"Adding conditional connections for node {node_id}")
+                print(f"Possible destinations: {edge_destinations}")
 
                 graph_builder.add_conditional_edges(
                     node_id, node_router, edge_destinations
                 )
 
-        # Encontrar o nó inicial (geralmente o start-node)
+        # Find the initial node (usually the start-node)
         entry_point = None
         for node in nodes:
             if node.get("type") == "start-node":
                 entry_point = node.get("id")
                 break
 
-        # Se não houver start-node, usar o primeiro nó encontrado
+        # If there is no start-node, use the first node found
         if not entry_point and nodes:
             entry_point = nodes[0].get("id")
 
-        # Definir ponto de entrada
+        # Define the entry point
         if entry_point:
-            print(f"Definindo ponto de entrada: {entry_point}")
+            print(f"Defining entry point: {entry_point}")
             graph_builder.set_entry_point(entry_point)
 
-        # Compilar o grafo
+        # Compile the graph
         return graph_builder.compile()
 
     async def _run_async_impl(
         self, ctx: InvocationContext
     ) -> AsyncGenerator[Event, None]:
         """
-        Implementação do agente de workflow.
+        Implementation of the workflow agent.
 
-        Este método segue o padrão de implementação de agentes personalizados,
-        executando o fluxo de trabalho definido e retornando os resultados.
+        This method follows the pattern of custom agent implementation,
+        executing the defined workflow and returning the results.
         """
 
         try:
-            # 1. Extrair a mensagem do usuário do contexto
+            # 1. Extract the user message from the context
             user_message = None
 
-            # Procurar a mensagem do usuário nos eventos da sessão
+            # Search for the user message in the session events
             if ctx.session and hasattr(ctx.session, "events") and ctx.session.events:
                 for event in reversed(ctx.session.events):
                     if event.author == "user" and event.content and event.content.parts:
                         user_message = event.content.parts[0].text
-                        print("Mensagem encontrada nos eventos da sessão")
+                        print("Message found in session events")
                         break
 
-            # Verificar no estado da sessão se a mensagem não foi encontrada nos eventos
+            # Check in the session state if the message was not found in the events
             if not user_message and ctx.session and ctx.session.state:
                 if "user_message" in ctx.session.state:
                     user_message = ctx.session.state["user_message"]
                 elif "message" in ctx.session.state:
                     user_message = ctx.session.state["message"]
 
-            # 2. Usar o ID da sessão como identificador estável
+            # 2. Use the session ID as a stable identifier
             session_id = (
                 str(ctx.session.id)
                 if ctx.session and hasattr(ctx.session, "id")
                 else str(uuid.uuid4())
             )
 
-            # 3. Criar o grafo de fluxo de trabalho a partir do JSON fornecido
+            # 3. Create the workflow graph from the provided JSON
             graph = await self._create_graph(ctx, self.flow_json)
 
-            # 4. Preparar o estado inicial
+            # 4. Prepare the initial state
             initial_state = State(
                 content=[
                     Event(
@@ -649,28 +662,28 @@ class WorkflowAgent(BaseAgent):
                 conversation_history=ctx.session.events,
             )
 
-            # 5. Executar o grafo
-            print("\n🚀 Iniciando execução do fluxo de trabalho:")
-            print(f"Conteúdo inicial: {user_message[:100]}...")
+            # 5. Execute the graph
+            print("\n🚀 Starting workflow execution:")
+            print(f"Initial content: {user_message[:100]}...")
 
-            # Executar o grafo com limite de recursão para evitar loops infinitos
+            # Execute the graph with a recursion limit to avoid infinite loops
             result = await graph.ainvoke(initial_state, {"recursion_limit": 20})
 
-            # 6. Processar e retornar o resultado
+            # 6. Process and return the result
             final_content = result.get("content", [])
-            print(f"\n✅ RESULTADO FINAL: {final_content[:100]}...")
+            print(f"\n✅ FINAL RESULT: {final_content[:100]}...")
 
             for content in final_content:
                 yield content
 
-            # Executar sub-agentes
+            # Execute sub-agents
             for sub_agent in self.sub_agents:
                 async for event in sub_agent.run_async(ctx):
                     yield event
 
         except Exception as e:
-            # Tratar qualquer erro não capturado
-            error_msg = f"Erro ao executar o agente de workflow: {str(e)}"
+            # Handle any uncaught errors
+            error_msg = f"Error executing the workflow agent: {str(e)}"
             print(error_msg)
             yield Event(
                 author=self.name,

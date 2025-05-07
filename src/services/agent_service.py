@@ -147,13 +147,10 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                     detail=f"Failed to process agent card: {str(e)}",
                 )
 
-        # Para agentes workflow, não fazemos nenhuma validação específica
-        # apenas garantimos que config é um dicionário
         elif agent.type == "workflow":
             if not isinstance(agent.config, dict):
                 agent.config = {}
 
-            # Garantir a API key
             if "api_key" not in agent.config or not agent.config["api_key"]:
                 agent.config["api_key"] = generate_api_key()
 
@@ -199,11 +196,9 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
             logger.info("Generating automatic API key for new agent")
             config["api_key"] = generate_api_key()
 
-        # Preservar todos os campos originais
         processed_config = {}
         processed_config["api_key"] = config.get("api_key", "")
 
-        # Copiar campos originais
         if "tools" in config:
             processed_config["tools"] = config["tools"]
 
@@ -216,7 +211,6 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
         if "custom_mcp_servers" in config:
             processed_config["custom_mcp_servers"] = config["custom_mcp_servers"]
 
-        # Preservar outros campos não processados especificamente
         for key, value in config.items():
             if key not in [
                 "api_key",
@@ -228,7 +222,6 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
             ]:
                 processed_config[key] = value
 
-        # Processar apenas campos que precisam de processamento
         # Process MCP servers
         if "mcp_servers" in config and config["mcp_servers"] is not None:
             processed_servers = []
@@ -298,7 +291,6 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                 # Convert tool id to string
                 tool_id = tool["id"]
 
-                # Validar envs para garantir que não é None
                 envs = tool.get("envs", {})
                 if envs is None:
                     envs = {}
@@ -439,11 +431,9 @@ async def update_agent(
         if "config" in agent_data:
             config = agent_data["config"]
 
-            # Preservar todos os campos originais
             processed_config = {}
             processed_config["api_key"] = config.get("api_key", "")
 
-            # Copiar campos originais
             if "tools" in config:
                 processed_config["tools"] = config["tools"]
 
@@ -456,7 +446,6 @@ async def update_agent(
             if "custom_mcp_servers" in config:
                 processed_config["custom_mcp_servers"] = config["custom_mcp_servers"]
 
-            # Preservar outros campos não processados especificamente
             for key, value in config.items():
                 if key not in [
                     "api_key",
@@ -468,7 +457,6 @@ async def update_agent(
                 ]:
                     processed_config[key] = value
 
-            # Processar apenas campos que precisam de processamento
             # Process MCP servers
             if "mcp_servers" in config and config["mcp_servers"] is not None:
                 processed_servers = []
@@ -541,7 +529,6 @@ async def update_agent(
                     # Convert tool id to string
                     tool_id = tool["id"]
 
-                    # Validar envs para garantir que não é None
                     envs = tool.get("envs", {})
                     if envs is None:
                         envs = {}

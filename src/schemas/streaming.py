@@ -14,7 +14,7 @@ class Message(BaseModel):
 
 
 class TaskStatusUpdateEvent(BaseModel):
-    state: str = Field(..., description="Estado da tarefa (working, completed, failed)")
+    state: str = Field(..., description="Task state (working, completed, failed)")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     message: Optional[Message] = None
     error: Optional[Dict[str, Any]] = None

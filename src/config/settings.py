@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings
 import secrets
 from dotenv import load_dotenv
 
-# Carrega as variáveis do .env
+# Load environment variables
 load_dotenv()
 
 

@@ -9,15 +9,15 @@ class SSEUtils:
         generator: AsyncGenerator, timeout: int = 30, retry_attempts: int = 3
     ) -> AsyncGenerator:
         """
-        Adiciona timeout e retry a um gerador de eventos SSE.
+        Adds timeout and retry to an SSE event generator.
 
         Args:
-            generator: Gerador de eventos
-            timeout: Tempo máximo de espera em segundos
-            retry_attempts: Número de tentativas de reconexão
+            generator: Event generator
+            timeout: Maximum wait time in seconds
+            retry_attempts: Number of reconnection attempts
 
         Yields:
-            Eventos do gerador
+            Events from the generator
         """
         attempts = 0
         while attempts < retry_attempts:
@@ -29,33 +29,33 @@ class SSEUtils:
                 attempts += 1
                 if attempts >= retry_attempts:
                     raise HTTPException(
-                        status_code=408, detail="Timeout após múltiplas tentativas"
+                        status_code=408, detail="Timeout after multiple attempts"
                     )
-                await asyncio.sleep(1)  # Espera antes de tentar novamente
+                await asyncio.sleep(1)  # Wait before trying again
 
     @staticmethod
     def format_error_event(error: Exception) -> str:
         """
-        Formata um evento de erro SSE.
+        Formats an SSE error event.
 
         Args:
-            error: Exceção ocorrida
+            error: Occurred exception
 
         Returns:
-            String formatada do evento SSE
+            Formatted SSE error event
         """
         return f"event: error\ndata: {str(error)}\n\n"
 
     @staticmethod
     def validate_sse_headers(headers: dict) -> None:
         """
-        Valida headers necessários para SSE.
+        Validates required headers for SSE.
 
         Args:
-            headers: Dicionário de headers
+            headers: Dictionary of headers
 
         Raises:
-            HTTPException se headers inválidos
+            HTTPException if invalid headers
         """
         required_headers = {
             "Accept": "text/event-stream",
@@ -66,5 +66,5 @@ class SSEUtils:
         for header, value in required_headers.items():
             if headers.get(header) != value:
                 raise HTTPException(
-                    status_code=400, detail=f"Header {header} inválido ou ausente"
+                    status_code=400, detail=f"Invalid or missing header: {header}"
                 )

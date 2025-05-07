@@ -130,3 +130,5 @@ celerybeat-schedule
 Thumbs.db
 
 uv.lock
+
+migrations/versions/*

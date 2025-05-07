@@ -59,7 +59,6 @@ class CustomToolBuilder:
                     ):
                         query_params[param] = value
 
-                # Processa body parameters
                 body_data = {}
                 for param, param_config in parameters.get("body_params", {}).items():
                     if param in all_values:
