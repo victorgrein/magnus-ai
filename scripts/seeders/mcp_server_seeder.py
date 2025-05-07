@@ -16,7 +16,6 @@ from sqlalchemy.exc import SQLAlchemyError
 from dotenv import load_dotenv
 from src.models.models import MCPServer
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )

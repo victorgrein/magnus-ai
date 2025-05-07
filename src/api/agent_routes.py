@@ -13,11 +13,11 @@ from src.schemas.schemas import (
     AgentFolder,
     AgentFolderCreate,
     AgentFolderUpdate,
+    ApiKey,
+    ApiKeyCreate,
+    ApiKeyUpdate,
 )
-from src.services import (
-    agent_service,
-    mcp_server_service,
-)
+from src.services import agent_service, mcp_server_service, apikey_service
 import logging
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,142 @@ router = APIRouter(
 )
 
 
-# Rotas para pastas de agentes
+@router.post("/apikeys", response_model=ApiKey, status_code=status.HTTP_201_CREATED)
+async def create_api_key(
+    key: ApiKeyCreate,
+    db: Session = Depends(get_db),
+    payload: dict = Depends(get_jwt_token),
+):
+    """Create a new API key"""
+    await verify_user_client(payload, db, key.client_id)
+
+    db_key = apikey_service.create_api_key(
+        db, key.client_id, key.name, key.provider, key.key_value
+    )
+
+    return db_key
+
+
+@router.get("/apikeys", response_model=List[ApiKey])
+async def read_api_keys(
+    x_client_id: uuid.UUID = Header(..., alias="x-client-id"),
+    skip: int = 0,
+    limit: int = 100,
+    sort_by: str = Query(
+        "name", description="Field to sort: name, provider, created_at"
+    ),
+    sort_direction: str = Query("asc", description="Sort direction: asc, desc"),
+    db: Session = Depends(get_db),
+    payload: dict = Depends(get_jwt_token),
+):
+    """List API keys for a client"""
+    # Verify if the user has access to this client's data
+    await verify_user_client(payload, db, x_client_id)
+
+    keys = apikey_service.get_api_keys_by_client(
+        db, x_client_id, skip, limit, sort_by, sort_direction
+    )
+    return keys
+
+
+@router.get("/apikeys/{key_id}", response_model=ApiKey)
+async def read_api_key(
+    key_id: uuid.UUID,
+    x_client_id: uuid.UUID = Header(..., alias="x-client-id"),
+    db: Session = Depends(get_db),
+    payload: dict = Depends(get_jwt_token),
+):
+    """Get details of a specific API key"""
+    # Verify if the user has access to this client's data
+    await verify_user_client(payload, db, x_client_id)
+
+    key = apikey_service.get_api_key(db, key_id)
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="API Key not found"
+        )
+
+    # Verify if the key belongs to the specified client
+    if key.client_id != x_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="API Key does not belong to the specified client",
+        )
+
+    return key
+
+
+@router.put("/apikeys/{key_id}", response_model=ApiKey)
+async def update_api_key(
+    key_id: uuid.UUID,
+    key_data: ApiKeyUpdate,
+    x_client_id: uuid.UUID = Header(..., alias="x-client-id"),
+    db: Session = Depends(get_db),
+    payload: dict = Depends(get_jwt_token),
+):
+    """Update an API key"""
+    # Verify if the user has access to this client's data
+    await verify_user_client(payload, db, x_client_id)
+
+    # Verify if the key exists
+    key = apikey_service.get_api_key(db, key_id)
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="API Key not found"
+        )
+
+    # Verify if the key belongs to the specified client
+    if key.client_id != x_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="API Key does not belong to the specified client",
+        )
+
+    # Update the key
+    updated_key = apikey_service.update_api_key(
+        db,
+        key_id,
+        key_data.name,
+        key_data.provider,
+        key_data.key_value,
+        key_data.is_active,
+    )
+    return updated_key
+
+
+@router.delete("/apikeys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_api_key(
+    key_id: uuid.UUID,
+    x_client_id: uuid.UUID = Header(..., alias="x-client-id"),
+    db: Session = Depends(get_db),
+    payload: dict = Depends(get_jwt_token),
+):
+    """Deactivate an API key (soft delete)"""
+    # Verify if the user has access to this client's data
+    await verify_user_client(payload, db, x_client_id)
+
+    # Verify if the key exists
+    key = apikey_service.get_api_key(db, key_id)
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="API Key not found"
+        )
+
+    # Verify if the key belongs to the specified client
+    if key.client_id != x_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="API Key does not belong to the specified client",
+        )
+
+    # Deactivate the key
+    if not apikey_service.delete_api_key(db, key_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="API Key not found"
+        )
+
+
+# Agent folder routes
 @router.post(
     "/folders", response_model=AgentFolder, status_code=status.HTTP_201_CREATED
 )
@@ -77,8 +212,8 @@ async def create_folder(
     db: Session = Depends(get_db),
     payload: dict = Depends(get_jwt_token),
 ):
-    """Cria uma nova pasta para organizar agentes"""
-    # Verifica se o usuário tem acesso ao cliente da pasta
+    """Create a new folder to organize agents"""
+    # Verify if the user has access to the folder's client
     await verify_user_client(payload, db, folder.client_id)
 
     return agent_service.create_agent_folder(
@@ -94,8 +229,8 @@ async def read_folders(
     db: Session = Depends(get_db),
     payload: dict = Depends(get_jwt_token),
 ):
-    """Lista as pastas de agentes de um cliente"""
-    # Verifica se o usuário tem acesso aos dados deste cliente
+    """List agent folders for a client"""
+    # Verify if the user has access to this client's data
     await verify_user_client(payload, db, x_client_id)
 
     return agent_service.get_agent_folders_by_client(db, x_client_id, skip, limit)
@@ -108,21 +243,21 @@ async def read_folder(
     db: Session = Depends(get_db),
     payload: dict = Depends(get_jwt_token),
 ):
-    """Obtém os detalhes de uma pasta específica"""
-    # Verifica se o usuário tem acesso aos dados deste cliente
+    """Get details of a specific folder"""
+    # Verify if the user has access to this client's data
     await verify_user_client(payload, db, x_client_id)
 
     folder = agent_service.get_agent_folder(db, folder_id)
     if not folder:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
         )
 
-    # Verifica se a pasta pertence ao cliente informado
+    # Verify if the folder belongs to the specified client
     if folder.client_id != x_client_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Pasta não pertence ao cliente informado",
+            detail="Folder does not belong to the specified client",
         )
 
     return folder
@@ -136,25 +271,25 @@ async def update_folder(
     db: Session = Depends(get_db),
     payload: dict = Depends(get_jwt_token),
 ):
-    """Atualiza uma pasta de agentes"""
-    # Verifica se o usuário tem acesso aos dados deste cliente
+    """Update an agent folder"""
+    # Verify if the user has access to this client's data
     await verify_user_client(payload, db, x_client_id)
 
-    # Verifica se a pasta existe
+    # Verify if the folder exists
     folder = agent_service.get_agent_folder(db, folder_id)
     if not folder:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
         )
 
-    # Verifica se a pasta pertence ao cliente informado
+    # Verify if the folder belongs to the specified client
     if folder.client_id != x_client_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Pasta não pertence ao cliente informado",
+            detail="Folder does not belong to the specified client",
         )
 
-    # Atualiza a pasta
+    # Update the folder
     updated_folder = agent_service.update_agent_folder(
         db, folder_id, folder_data.name, folder_data.description
     )
@@ -168,28 +303,28 @@ async def delete_folder(
     db: Session = Depends(get_db),
     payload: dict = Depends(get_jwt_token),
 ):
-    """Remove uma pasta de agentes"""
-    # Verifica se o usuário tem acesso aos dados deste cliente
+    """Remove an agent folder"""
+    # Verify if the user has access to this client's data
     await verify_user_client(payload, db, x_client_id)
 
-    # Verifica se a pasta existe
+    # Verify if the folder exists
     folder = agent_service.get_agent_folder(db, folder_id)
     if not folder:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
         )
 
-    # Verifica se a pasta pertence ao cliente informado
+    # Verify if the folder belongs to the specified client
     if folder.client_id != x_client_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Pasta não pertence ao cliente informado",
+            detail="Folder does not belong to the specified client",
         )
 
-    # Deleta a pasta
+    # Delete the folder
     if not agent_service.delete_agent_folder(db, folder_id):
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
         )
 
 
@@ -202,28 +337,28 @@ async def read_folder_agents(
     db: Session = Depends(get_db),
     payload: dict = Depends(get_jwt_token),
 ):
-    """Lista os agentes em uma pasta específica"""
-    # Verifica se o usuário tem acesso aos dados deste cliente
+    """List agents in a specific folder"""
+    # Verify if the user has access to this client's data
     await verify_user_client(payload, db, x_client_id)
 
-    # Verifica se a pasta existe
+    # Verify if the folder exists
     folder = agent_service.get_agent_folder(db, folder_id)
     if not folder:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
         )
 
-    # Verifica se a pasta pertence ao cliente informado
+    # Verify if the folder belongs to the specified client
     if folder.client_id != x_client_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Pasta não pertence ao cliente informado",
+            detail="Folder does not belong to the specified client",
         )
 
-    # Lista os agentes da pasta
+    # List the agents in the folder
     agents = agent_service.get_agents_by_folder(db, folder_id, skip, limit)
 
-    # Adiciona URL do agent card quando necessário
+    # Add agent card URL when needed
     for agent in agents:
         if not agent.agent_card_url:
             agent.agent_card_url = agent.agent_card_url_property
@@ -239,39 +374,39 @@ async def assign_agent_to_folder(
     db: Session = Depends(get_db),
     payload: dict = Depends(get_jwt_token),
 ):
-    """Atribui um agente a uma pasta ou remove da pasta atual (se folder_id=None)"""
-    # Verifica se o usuário tem acesso aos dados deste cliente
+    """Assign an agent to a folder or remove from the current folder (if folder_id=None)"""
+    # Verify if the user has access to this client's data
     await verify_user_client(payload, db, x_client_id)
 
-    # Verifica se o agente existe
+    # Verify if the agent exists
     agent = agent_service.get_agent(db, agent_id)
     if not agent:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Agente não encontrado"
+            status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found"
         )
 
-    # Verifica se o agente pertence ao cliente informado
+    # Verify if the agent belongs to the specified client
     if agent.client_id != x_client_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Agente não pertence ao cliente informado",
+            detail="Agent does not belong to the specified client",
         )
 
-    # Se folder_id for fornecido, verifica se a pasta existe e pertence ao mesmo cliente
+    # If folder_id is provided, verify if the folder exists and belongs to the same client
     if folder_id:
         folder = agent_service.get_agent_folder(db, folder_id)
         if not folder:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Pasta não encontrada"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
             )
 
         if folder.client_id != x_client_id:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Pasta não pertence ao cliente informado",
+                detail="Folder does not belong to the specified client",
             )
 
-    # Atribui o agente à pasta ou remove da pasta atual
+    # Assign the agent to the folder or remove from the current folder
     updated_agent = agent_service.assign_agent_to_folder(db, agent_id, folder_id)
 
     if not updated_agent.agent_card_url:
@@ -280,22 +415,24 @@ async def assign_agent_to_folder(
     return updated_agent
 
 
-# Modificação nas rotas existentes para suportar filtro por pasta
+# Agent routes (after specific routes)
 @router.get("/", response_model=List[Agent])
 async def read_agents(
     x_client_id: uuid.UUID = Header(..., alias="x-client-id"),
     skip: int = 0,
     limit: int = 100,
-    folder_id: Optional[uuid.UUID] = Query(None, description="Filtrar por pasta"),
+    folder_id: Optional[uuid.UUID] = Query(None, description="Filter by folder"),
+    sort_by: str = Query("name", description="Field to sort: name, created_at"),
+    sort_direction: str = Query("asc", description="Sort direction: asc, desc"),
     db: Session = Depends(get_db),
     payload: dict = Depends(get_jwt_token),
 ):
     # Verify if the user has access to this client's data
     await verify_user_client(payload, db, x_client_id)
 
-    # Get agents with optional folder filter
+    # Get agents with optional folder filter and sorting
     agents = agent_service.get_agents_by_client(
-        db, x_client_id, skip, limit, True, folder_id
+        db, x_client_id, skip, limit, True, folder_id, sort_by, sort_direction
     )
 
     for agent in agents:

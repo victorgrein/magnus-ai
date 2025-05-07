@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
-from src.models.models import Agent, AgentFolder
+from src.models.models import Agent, AgentFolder, ApiKey
 from src.schemas.schemas import AgentCreate
 from typing import List, Optional, Dict, Any, Union
 from src.services.mcp_server_service import get_mcp_server
@@ -90,14 +90,28 @@ def get_agents_by_client(
     limit: int = 100,
     active_only: bool = True,
     folder_id: Optional[uuid.UUID] = None,
+    sort_by: str = "name",
+    sort_direction: str = "asc",
 ) -> List[Agent]:
     """Search for agents by client with pagination and optional folder filter"""
     try:
         query = db.query(Agent).filter(Agent.client_id == client_id)
 
-        # Filtra por pasta se especificado
+        # Filter by folder if specified
         if folder_id is not None:
             query = query.filter(Agent.folder_id == folder_id)
+
+        # Apply sorting
+        if sort_by == "name":
+            if sort_direction.lower() == "desc":
+                query = query.order_by(Agent.name.desc())
+            else:
+                query = query.order_by(Agent.name)
+        elif sort_by == "created_at":
+            if sort_direction.lower() == "desc":
+                query = query.order_by(Agent.created_at.desc())
+            else:
+                query = query.order_by(Agent.created_at)
 
         agents = query.offset(skip).limit(limit).all()
 
@@ -356,6 +370,28 @@ async def update_agent(
         if not agent:
             raise HTTPException(status_code=404, detail="Agent not found")
 
+        # Check if api_key_id is defined
+        if "api_key_id" in agent_data and agent_data["api_key_id"]:
+            # Check if the referenced API key exists
+            api_key_id = agent_data["api_key_id"]
+            if isinstance(api_key_id, str):
+                api_key_id = uuid.UUID(api_key_id)
+
+            api_key = db.query(ApiKey).filter(ApiKey.id == api_key_id).first()
+            if not api_key:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"API Key with ID {api_key_id} not found",
+                )
+
+            # Check if the key belongs to the agent's client
+            if api_key.client_id != agent.client_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="API Key does not belong to the same client as the agent",
+                )
+
+        # Continue with the original code
         if "type" in agent_data and agent_data["type"] == "a2a":
             if "agent_card_url" not in agent_data or not agent_data["agent_card_url"]:
                 raise HTTPException(
@@ -611,43 +647,43 @@ def activate_agent(db: Session, agent_id: uuid.UUID) -> bool:
         )
 
 
-# Funções para pastas de agentes
+# Functions for agent folders
 def create_agent_folder(
     db: Session, client_id: uuid.UUID, name: str, description: Optional[str] = None
 ) -> AgentFolder:
-    """Cria uma nova pasta para organizar agentes"""
+    """Create a new folder to organize agents"""
     try:
         folder = AgentFolder(client_id=client_id, name=name, description=description)
         db.add(folder)
         db.commit()
         db.refresh(folder)
-        logger.info(f"Pasta de agentes criada com sucesso: {folder.id}")
+        logger.info(f"Agent folder created successfully: {folder.id}")
         return folder
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao criar pasta de agentes: {str(e)}")
+        logger.error(f"Error creating agent folder: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao criar pasta de agentes: {str(e)}",
+            detail=f"Error creating agent folder: {str(e)}",
         )
 
 
 def get_agent_folder(db: Session, folder_id: uuid.UUID) -> Optional[AgentFolder]:
-    """Busca uma pasta de agentes pelo ID"""
+    """Search for an agent folder by ID"""
     try:
         return db.query(AgentFolder).filter(AgentFolder.id == folder_id).first()
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao buscar pasta de agentes {folder_id}: {str(e)}")
+        logger.error(f"Error searching for agent folder {folder_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao buscar pasta de agentes",
+            detail="Error searching for agent folder",
         )
 
 
 def get_agent_folders_by_client(
     db: Session, client_id: uuid.UUID, skip: int = 0, limit: int = 100
 ) -> List[AgentFolder]:
-    """Lista as pastas de agentes de um cliente"""
+    """List the agent folders of a client"""
     try:
         return (
             db.query(AgentFolder)
@@ -657,10 +693,10 @@ def get_agent_folders_by_client(
             .all()
         )
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao listar pastas de agentes: {str(e)}")
+        logger.error(f"Error listing agent folders: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao listar pastas de agentes",
+            detail="Error listing agent folders",
         )
 
 
@@ -670,7 +706,7 @@ def update_agent_folder(
     name: Optional[str] = None,
     description: Optional[str] = None,
 ) -> Optional[AgentFolder]:
-    """Atualiza uma pasta de agentes"""
+    """Update an agent folder"""
     try:
         folder = get_agent_folder(db, folder_id)
         if not folder:
@@ -683,94 +719,94 @@ def update_agent_folder(
 
         db.commit()
         db.refresh(folder)
-        logger.info(f"Pasta de agentes atualizada: {folder_id}")
+        logger.info(f"Agent folder updated: {folder_id}")
         return folder
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao atualizar pasta de agentes {folder_id}: {str(e)}")
+        logger.error(f"Error updating agent folder {folder_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao atualizar pasta de agentes",
+            detail="Error updating agent folder",
         )
 
 
 def delete_agent_folder(db: Session, folder_id: uuid.UUID) -> bool:
-    """Remove uma pasta de agentes e desvincula os agentes"""
+    """Remove an agent folder and unassign the agents"""
     try:
         folder = get_agent_folder(db, folder_id)
         if not folder:
             return False
 
-        # Desvincula os agentes da pasta (não deleta os agentes)
+        # Unassign the agents from the folder (do not delete the agents)
         agents = db.query(Agent).filter(Agent.folder_id == folder_id).all()
         for agent in agents:
             agent.folder_id = None
 
-        # Deleta a pasta
+        # Delete the folder
         db.delete(folder)
         db.commit()
-        logger.info(f"Pasta de agentes removida: {folder_id}")
+        logger.info(f"Agent folder removed: {folder_id}")
         return True
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao remover pasta de agentes {folder_id}: {str(e)}")
+        logger.error(f"Error removing agent folder {folder_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao remover pasta de agentes",
+            detail="Error removing agent folder",
         )
 
 
 def assign_agent_to_folder(
     db: Session, agent_id: uuid.UUID, folder_id: Optional[uuid.UUID]
 ) -> Optional[Agent]:
-    """Atribui um agente a uma pasta (ou remove da pasta se folder_id for None)"""
+    """Assign an agent to a folder (or remove from folder if folder_id is None)"""
     try:
         agent = get_agent(db, agent_id)
         if not agent:
             return None
 
-        # Se folder_id for None, remove o agente da pasta atual
+        # If folder_id is None, remove the agent from the current folder
         if folder_id is None:
             agent.folder_id = None
             db.commit()
             db.refresh(agent)
-            logger.info(f"Agente removido da pasta: {agent_id}")
+            logger.info(f"Agent removed from folder: {agent_id}")
             return agent
 
-        # Verifica se a pasta existe
+        # Verify if the folder exists
         folder = get_agent_folder(db, folder_id)
         if not folder:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Pasta não encontrada",
+                detail="Folder not found",
             )
 
-        # Verifica se a pasta pertence ao mesmo cliente do agente
+        # Verify if the folder belongs to the same client as the agent
         if folder.client_id != agent.client_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A pasta deve pertencer ao mesmo cliente do agente",
+                detail="The folder must belong to the same client as the agent",
             )
 
-        # Atribui o agente à pasta
+        # Assign the agent to the folder
         agent.folder_id = folder_id
         db.commit()
         db.refresh(agent)
-        logger.info(f"Agente atribuído à pasta {folder_id}: {agent_id}")
+        logger.info(f"Agent assigned to folder: {folder_id}")
         return agent
     except SQLAlchemyError as e:
         db.rollback()
-        logger.error(f"Erro ao atribuir agente à pasta: {str(e)}")
+        logger.error(f"Error assigning agent to folder: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao atribuir agente à pasta",
+            detail="Error assigning agent to folder",
         )
 
 
 def get_agents_by_folder(
     db: Session, folder_id: uuid.UUID, skip: int = 0, limit: int = 100
 ) -> List[Agent]:
-    """Lista os agentes de uma pasta específica"""
+    """List the agents of a specific folder"""
     try:
         return (
             db.query(Agent)
@@ -780,8 +816,8 @@ def get_agents_by_folder(
             .all()
         )
     except SQLAlchemyError as e:
-        logger.error(f"Erro ao listar agentes da pasta {folder_id}: {str(e)}")
+        logger.error(f"Error listing agents of folder {folder_id}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Erro ao listar agentes da pasta",
+            detail="Error listing agents of folder",
         )

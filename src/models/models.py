@@ -45,7 +45,6 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Relationship with Client (One-to-One, optional for administrators)
     client = relationship(
         "Client", backref=backref("user", uselist=False, cascade="all, delete-orphan")
     )
@@ -61,10 +60,8 @@ class AgentFolder(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Relação com o cliente
     client = relationship("Client", backref="agent_folders")
 
-    # Relação com os agentes
     agents = relationship("Agent", back_populates="folder")
 
 
@@ -77,10 +74,13 @@ class Agent(Base):
     description = Column(Text, nullable=True)
     type = Column(String, nullable=False)
     model = Column(String, nullable=True, default="")
-    api_key = Column(String, nullable=True, default="")
+    api_key_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("api_keys.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     instruction = Column(Text)
     agent_card_url = Column(String, nullable=True)
-    # Nova coluna para a pasta - opcional (nullable=True)
     folder_id = Column(
         UUID(as_uuid=True),
         ForeignKey("agent_folders.id", ondelete="SET NULL"),
@@ -97,8 +97,9 @@ class Agent(Base):
         ),
     )
 
-    # Relação com a pasta
     folder = relationship("AgentFolder", back_populates="agents")
+
+    api_key_ref = relationship("ApiKey", foreign_keys=[api_key_id])
 
     @property
     def agent_card_url_property(self) -> str:
@@ -192,7 +193,6 @@ class Tool(Base):
 
 class Session(Base):
     __tablename__ = "sessions"
-    # The directive below makes Alembic ignore this table in migrations
     __table_args__ = {"extend_existing": True, "info": {"skip_autogenerate": True}}
 
     id = Column(String, primary_key=True)
@@ -218,5 +218,19 @@ class AuditLog(Base):
     user_agent = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Relationship with User
     user = relationship("User", backref="audit_logs")
+
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"))
+    name = Column(String, nullable=False)
+    provider = Column(String, nullable=False)
+    encrypted_key = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    is_active = Column(Boolean, default=True)
+
+    client = relationship("Client", backref="api_keys")

@@ -10,11 +10,13 @@ from src.services.custom_tools import CustomToolBuilder
 from src.services.mcp_service import MCPService
 from src.services.a2a_agent import A2ACustomAgent
 from src.services.workflow_agent import WorkflowAgent
+from src.services.apikey_service import get_decrypted_api_key
 from sqlalchemy.orm import Session
 from contextlib import AsyncExitStack
 from google.adk.tools import load_memory
 
 from datetime import datetime
+import uuid
 
 logger = setup_logger(__name__)
 
@@ -120,7 +122,6 @@ class AgentBuilder:
         formatted_prompt += "<get_current_time_instructions>Use the get_current_time tool to get the current time in a city. The tool is available in the tools section of the configuration. Use 'new york' by default if no city is provided.ALWAYS use the 'get_current_time' tool when you need to use the current date and time in any type of situation, whether in interaction with the user or for calling other tools.</get_current_time_instructions>\n\n"
 
         # Check if load_memory is enabled
-        # before_model_callback_func = None
         if agent.config.get("load_memory"):
             all_tools.append(load_memory)
             formatted_prompt = (
@@ -128,10 +129,48 @@ class AgentBuilder:
                 + "\n\n<memory_instructions>ALWAYS use the load_memory tool to retrieve knowledge for your context</memory_instructions>\n\n"
             )
 
+        # Get API key from api_key_id
+        api_key = None
+
+        # Get API key from api_key_id
+        if hasattr(agent, "api_key_id") and agent.api_key_id:
+            decrypted_key = get_decrypted_api_key(self.db, agent.api_key_id)
+            if decrypted_key:
+                logger.info(f"Using stored API key for agent {agent.name}")
+                api_key = decrypted_key
+            else:
+                logger.error(
+                    f"Stored API key not found for agent {agent.name}"
+                )
+                raise ValueError(
+                    f"API key with ID {agent.api_key_id} not found or inactive"
+                )
+        else:
+            # Check if there is an API key in the config (temporary field)
+            config_api_key = agent.config.get("api_key") if agent.config else None
+            if config_api_key:
+                logger.info(f"Using config API key for agent {agent.name}")
+                # Check if it is a UUID of a stored key
+                try:
+                    key_id = uuid.UUID(config_api_key)
+                    decrypted_key = get_decrypted_api_key(self.db, key_id)
+                    if decrypted_key:
+                        logger.info(f"Config API key is a valid reference")
+                        api_key = decrypted_key
+                    else:
+                        # Use the key directly
+                        api_key = config_api_key
+                except (ValueError, TypeError):
+                    # It is not a UUID, use directly
+                    api_key = config_api_key
+            else:
+                logger.error(f"No API key configured for agent {agent.name}")
+                raise ValueError(f"Agent {agent.name} does not have a configured API key")
+
         return (
             LlmAgent(
                 name=agent.name,
-                model=LiteLlm(model=agent.model, api_key=agent.api_key),
+                model=LiteLlm(model=agent.model, api_key=api_key),
                 instruction=formatted_prompt,
                 description=agent.description,
                 tools=all_tools,

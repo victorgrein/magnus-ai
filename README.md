@@ -14,6 +14,8 @@ The Evo AI platform allows:
 - JWT authentication with email verification
 - **Agent 2 Agent (A2A) Protocol Support**: Interoperability between AI agents following Google's A2A specification
 - **Workflow Agent with LangGraph**: Building complex agent workflows with LangGraph and ReactFlow
+- **Secure API Key Management**: Encrypted storage of API keys with Fernet encryption
+- **Agent Organization**: Folder structure for organizing agents by categories
 
 ## 🤖 Agent Types and Creation
 
@@ -30,7 +32,8 @@ Agent based on language models like GPT-4, Claude, etc. Can be configured with t
   "description": "Specialized personal assistant",
   "type": "llm",
   "model": "gpt-4",
-  "api_key": "your-api-key",
+  "api_key_id": "stored-api-key-uuid",
+  "folder_id": "folder_id (optional)",
   "instruction": "Detailed instructions for agent behavior",
   "config": {
     "tools": [
@@ -69,6 +72,7 @@ Agent that implements Google's A2A protocol for agent interoperability.
   "client_id": "{{client_id}}",
   "type": "a2a",
   "agent_card_url": "http://localhost:8001/api/v1/a2a/your-agent/.well-known/agent.json",
+  "folder_id": "folder_id (optional)",
   "config": {
     "sub_agents": ["sub-agent-uuid"]
   }
@@ -84,6 +88,7 @@ Executes a sequence of sub-agents in a specific order.
   "client_id": "{{client_id}}",
   "name": "processing_flow",
   "type": "sequential",
+  "folder_id": "folder_id (optional)",
   "config": {
     "sub_agents": ["agent-uuid-1", "agent-uuid-2", "agent-uuid-3"]
   }
@@ -99,6 +104,7 @@ Executes multiple sub-agents simultaneously.
   "client_id": "{{client_id}}",
   "name": "parallel_processing",
   "type": "parallel",
+  "folder_id": "folder_id (optional)",
   "config": {
     "sub_agents": ["agent-uuid-1", "agent-uuid-2"]
   }
@@ -114,6 +120,7 @@ Executes sub-agents in a loop with a defined maximum number of iterations.
   "client_id": "{{client_id}}",
   "name": "loop_processing",
   "type": "loop",
+  "folder_id": "folder_id (optional)",
   "config": {
     "sub_agents": ["sub-agent-uuid"],
     "max_iterations": 5
@@ -130,6 +137,7 @@ Executes sub-agents in a custom workflow defined by a graph structure. This agen
   "client_id": "{{client_id}}",
   "name": "workflow_agent",
   "type": "workflow",
+  "folder_id": "folder_id (optional)",
   "config": {
     "sub_agents": ["agent-uuid-1", "agent-uuid-2", "agent-uuid-3"],
     "workflow": {
@@ -469,6 +477,9 @@ JWT_EXPIRATION_TIME=30  # In seconds
 SENDGRID_API_KEY="your-sendgrid-api-key"
 EMAIL_FROM="noreply@yourdomain.com"
 APP_URL="https://yourdomain.com"
+
+# Encryption for API keys
+ENCRYPTION_KEY="your-encryption-key"
 ```
 
 ### Project Dependencies
@@ -734,3 +745,149 @@ The main environment variables used by the API container:
 - `SENDGRID_API_KEY`: SendGrid API key for sending emails
 - `EMAIL_FROM`: Email used as sender
 - `APP_URL`: Base URL of the application
+
+## 🔒 Secure API Key Management
+
+Evo AI implements a secure API key management system that protects sensitive credentials:
+
+- **Encrypted Storage**: API keys are encrypted using Fernet symmetric encryption before storage
+- **Secure References**: Agents reference API keys by UUID (api_key_id) instead of storing raw keys
+- **Centralized Management**: API keys can be created, updated, and rotated without changing agent configurations
+- **Client Isolation**: API keys are scoped to specific clients for better security isolation
+
+### Encryption Configuration
+
+The encryption system uses a secure key defined in the `.env` file:
+
+```env
+ENCRYPTION_KEY="your-secure-encryption-key"
+```
+
+If not provided, a secure key will be generated automatically at startup.
+
+### API Key Management
+
+API keys can be managed through dedicated endpoints:
+
+```http
+# Create a new API key
+POST /api/v1/agents/apikeys
+Content-Type: application/json
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+
+{
+  "client_id": "client-uuid",
+  "name": "My OpenAI Key",
+  "provider": "openai",
+  "key_value": "sk-actual-api-key-value"
+}
+
+# List all API keys for a client
+GET /api/v1/agents/apikeys
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+
+# Get a specific API key
+GET /api/v1/agents/apikeys/{key_id}
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+
+# Update an API key
+PUT /api/v1/agents/apikeys/{key_id}
+Content-Type: application/json
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+
+{
+  "name": "Updated Key Name",
+  "provider": "anthropic",
+  "key_value": "new-key-value",
+  "is_active": true
+}
+
+# Delete an API key (soft delete)
+DELETE /api/v1/agents/apikeys/{key_id}
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+```
+
+## 📁 Agent Organization
+
+Agents can be organized into folders for better management:
+
+### Creating and Managing Folders
+
+```http
+# Create a new folder
+POST /api/v1/agents/folders
+Content-Type: application/json
+Authorization: Bearer your-token-jwt
+
+{
+  "client_id": "client-uuid",
+  "name": "Marketing Agents",
+  "description": "Agents for content marketing tasks"
+}
+
+# List all folders
+GET /api/v1/agents/folders
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+
+# Get a specific folder
+GET /api/v1/agents/folders/{folder_id}
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+
+# Update a folder
+PUT /api/v1/agents/folders/{folder_id}
+Content-Type: application/json
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+
+{
+  "name": "Updated Folder Name",
+  "description": "Updated folder description"
+}
+
+# Delete a folder
+DELETE /api/v1/agents/folders/{folder_id}
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+
+# List agents in a folder
+GET /api/v1/agents/folders/{folder_id}/agents
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+
+# Assign an agent to a folder
+PUT /api/v1/agents/{agent_id}/folder
+Content-Type: application/json
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+
+{
+  "folder_id": "folder-uuid"
+}
+
+# Remove an agent from any folder
+PUT /api/v1/agents/{agent_id}/folder
+Content-Type: application/json
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+
+{
+  "folder_id": null
+}
+```
+
+### Filtering Agents by Folder
+
+When listing agents, you can filter by folder:
+
+```http
+GET /api/v1/agents?folder_id=folder-uuid
+Authorization: Bearer your-token-jwt
+x-client-id: client-uuid
+```

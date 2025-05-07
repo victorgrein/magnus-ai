@@ -199,12 +199,9 @@ class WorkflowAgent(BaseAgent):
             content = state.get("content", [])
             conversation_history = state.get("conversation_history", [])
 
-            # Obter apenas o evento mais recente para avaliação
             latest_event = None
             if content and len(content) > 0:
-                # Ignorar eventos gerados por nós de condição para avaliação
                 for event in reversed(content):
-                    # Verificar se é um evento gerado pelo condition_node
                     if (
                         event.author != "agent"
                         or not hasattr(event.content, "parts")
@@ -214,10 +211,10 @@ class WorkflowAgent(BaseAgent):
                         break
                 if latest_event:
                     print(
-                        f"Avaliando condição apenas para o evento mais recente: '{latest_event}'"
+                        f"Evaluating condition only for the most recent event: '{latest_event}'"
                     )
 
-            # Usar apenas o evento mais recente para avaliação de condição
+            # Use only the most recent event for condition evaluation
             evaluation_state = state.copy()
             if latest_event:
                 evaluation_state["content"] = [latest_event]

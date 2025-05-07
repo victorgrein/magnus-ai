@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     JWT_EXPIRATION_TIME: int = int(os.getenv("JWT_EXPIRATION_TIME", 3600))
 
+    # Encryption settings
+    ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", secrets.token_urlsafe(32))
+
     # SendGrid settings
     SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "noreply@yourdomain.com")

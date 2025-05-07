@@ -19,7 +19,6 @@ from dotenv import load_dotenv
 from src.models.models import User, Client
 from src.utils.security import get_password_hash
 
-# Configurar logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )

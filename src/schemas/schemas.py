@@ -33,6 +33,33 @@ class Client(ClientBase):
         from_attributes = True
 
 
+class ApiKeyBase(BaseModel):
+    name: str
+    provider: str
+
+
+class ApiKeyCreate(ApiKeyBase):
+    client_id: UUID4
+    key_value: str
+
+
+class ApiKeyUpdate(BaseModel):
+    name: Optional[str] = None
+    provider: Optional[str] = None
+    key_value: Optional[str] = None
+    is_active: Optional[bool] = None
+
+
+class ApiKey(ApiKeyBase):
+    id: UUID4
+    client_id: UUID4
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    is_active: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class AgentBase(BaseModel):
     name: Optional[str] = Field(
         None, description="Agent name (no spaces or special characters)"
@@ -44,8 +71,8 @@ class AgentBase(BaseModel):
     model: Optional[str] = Field(
         None, description="Agent model (required only for llm type)"
     )
-    api_key: Optional[str] = Field(
-        None, description="Agent API Key (required only for llm type)"
+    api_key_id: Optional[UUID4] = Field(
+        None, description="Reference to a stored API Key ID"
     )
     instruction: Optional[str] = None
     agent_card_url: Optional[str] = Field(
@@ -88,11 +115,21 @@ class AgentBase(BaseModel):
             raise ValueError("Model is required for llm type agents")
         return v
 
-    @validator("api_key")
-    def validate_api_key(cls, v, values):
-        if "type" in values and values["type"] == "llm" and not v:
-            raise ValueError("API Key is required for llm type agents")
+    @validator("api_key_id")
+    def validate_api_key_id(cls, v, values):
         return v
+
+        # Código anterior (comentado temporariamente)
+        # # Se o tipo for llm, api_key_id é obrigatório
+        # if "type" in values and values["type"] == "llm" and not v:
+        #     # Verifica se tem api_key no config (retrocompatibilidade)
+        #     if "config" in values and values["config"] and "api_key" in values["config"]:
+        #         # Tem api_key no config, então aceita
+        #         return v
+        #     raise ValueError(
+        #         "api_key_id é obrigatório para agentes do tipo llm"
+        #     )
+        # return v
 
     @validator("config")
     def validate_config(cls, v, values):
@@ -215,7 +252,6 @@ class Tool(ToolBase):
         from_attributes = True
 
 
-# Schema para pasta de agentes
 class AgentFolderBase(BaseModel):
     name: str
     description: Optional[str] = None
