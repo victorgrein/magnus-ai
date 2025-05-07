@@ -39,7 +39,6 @@ docs/
 tests/
 .flake8
 requirements-dev.txt
-Makefile
 
 # Ambiente virtual
 venv/
