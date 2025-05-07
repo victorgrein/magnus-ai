@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, EmailStr, UUID4, ConfigDict
 from typing import Optional, Dict, Any, Union, List
 from datetime import datetime
 from uuid import UUID
@@ -213,3 +213,26 @@ class Tool(ToolBase):
 
     class Config:
         from_attributes = True
+
+
+# Schema para pasta de agentes
+class AgentFolderBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+
+
+class AgentFolderCreate(AgentFolderBase):
+    client_id: UUID4
+
+
+class AgentFolderUpdate(AgentFolderBase):
+    pass
+
+
+class AgentFolder(AgentFolderBase):
+    id: UUID4
+    client_id: UUID4
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)

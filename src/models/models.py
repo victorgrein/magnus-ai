@@ -51,6 +51,23 @@ class User(Base):
     )
 
 
+class AgentFolder(Base):
+    __tablename__ = "agent_folders"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"))
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relação com o cliente
+    client = relationship("Client", backref="agent_folders")
+
+    # Relação com os agentes
+    agents = relationship("Agent", back_populates="folder")
+
+
 class Agent(Base):
     __tablename__ = "agents"
 
@@ -63,6 +80,12 @@ class Agent(Base):
     api_key = Column(String, nullable=True, default="")
     instruction = Column(Text)
     agent_card_url = Column(String, nullable=True)
+    # Nova coluna para a pasta - opcional (nullable=True)
+    folder_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("agent_folders.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     config = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -73,6 +96,9 @@ class Agent(Base):
             name="check_agent_type",
         ),
     )
+
+    # Relação com a pasta
+    folder = relationship("AgentFolder", back_populates="agents")
 
     @property
     def agent_card_url_property(self) -> str:
