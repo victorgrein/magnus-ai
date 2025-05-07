@@ -204,6 +204,7 @@ class WorkflowAgent(BaseAgent):
 
             # Check all conditions
             conditions_met = []
+            condition_details = []
             for condition in conditions:
                 condition_id = condition.get("id")
                 condition_data = condition.get("data", {})
@@ -216,7 +217,14 @@ class WorkflowAgent(BaseAgent):
                 )
                 if self._evaluate_condition(condition, state):
                     conditions_met.append(condition_id)
+                    condition_details.append(
+                        f"{field} {operator} '{expected_value}' ✅"
+                    )
                     print(f"  ✅ Condition {condition_id} met!")
+                else:
+                    condition_details.append(
+                        f"{field} {operator} '{expected_value}' ❌"
+                    )
 
             # Check if the cycle reached the limit (extra security)
             if cycle_count >= 10:
@@ -247,8 +255,13 @@ class WorkflowAgent(BaseAgent):
                 "condition_evaluated": label,
                 "content_evaluated": content,
                 "conditions_met": conditions_met,
+                "condition_details": condition_details,
                 "cycle": cycle_count,
             }
+
+            # Prepare a more descriptive message about the conditions
+            conditions_result_text = "\n".join(condition_details)
+            condition_summary = f"TRUE" if conditions_met else "FALSE"
 
             condition_content = [
                 Event(
@@ -256,7 +269,7 @@ class WorkflowAgent(BaseAgent):
                     content=Content(
                         parts=[
                             Part(
-                                text=f"Condition evaluated: {label} with {str(conditions_met)}"
+                                text=f"Condition evaluated: {label}\nResult: {condition_summary}\nDetails:\n{conditions_result_text}"
                             )
                         ]
                     ),
@@ -674,7 +687,8 @@ class WorkflowAgent(BaseAgent):
             print(f"\n✅ FINAL RESULT: {final_content[:100]}...")
 
             for content in final_content:
-                yield content
+                if content.author != "user":
+                    yield content
 
             # Execute sub-agents
             for sub_agent in self.sub_agents:
