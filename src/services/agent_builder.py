@@ -139,9 +139,7 @@ class AgentBuilder:
                 logger.info(f"Using stored API key for agent {agent.name}")
                 api_key = decrypted_key
             else:
-                logger.error(
-                    f"Stored API key not found for agent {agent.name}"
-                )
+                logger.error(f"Stored API key not found for agent {agent.name}")
                 raise ValueError(
                     f"API key with ID {agent.api_key_id} not found or inactive"
                 )
@@ -155,7 +153,7 @@ class AgentBuilder:
                     key_id = uuid.UUID(config_api_key)
                     decrypted_key = get_decrypted_api_key(self.db, key_id)
                     if decrypted_key:
-                        logger.info(f"Config API key is a valid reference")
+                        logger.info("Config API key is a valid reference")
                         api_key = decrypted_key
                     else:
                         # Use the key directly
@@ -165,7 +163,9 @@ class AgentBuilder:
                     api_key = config_api_key
             else:
                 logger.error(f"No API key configured for agent {agent.name}")
-                raise ValueError(f"Agent {agent.name} does not have a configured API key")
+                raise ValueError(
+                    f"Agent {agent.name} does not have a configured API key"
+                )
 
         return (
             LlmAgent(

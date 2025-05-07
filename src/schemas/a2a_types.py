@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Literal, TypeVar
+from typing import Annotated, Any, Literal
 from uuid import uuid4
 from typing_extensions import Self
 
@@ -147,7 +147,7 @@ class TaskPushNotificationConfig(BaseModel):
     pushNotificationConfig: PushNotificationConfig
 
 
-## RPC Messages
+# RPC Messages
 
 
 class JSONRPCMessage(BaseModel):
@@ -243,7 +243,7 @@ A2ARequest = TypeAdapter(
     ]
 )
 
-## Error types
+# Error types
 
 
 class JSONParseError(JSONRPCError):

@@ -7,7 +7,6 @@ from google.genai.types import Content, Part
 from typing import AsyncGenerator, Dict, Any, List, TypedDict
 import uuid
 
-from google.adk.runners import Runner
 from src.services.agent_service import get_agent
 
 from sqlalchemy.orm import Session
@@ -280,7 +279,7 @@ class WorkflowAgent(BaseAgent):
 
             # Prepare a more descriptive message about the conditions
             conditions_result_text = "\n".join(condition_details)
-            condition_summary = f"TRUE" if conditions_met else "FALSE"
+            condition_summary = "TRUE" if conditions_met else "FALSE"
 
             condition_content = [
                 Event(

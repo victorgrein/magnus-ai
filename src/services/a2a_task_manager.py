@@ -1,8 +1,7 @@
-import json
 import logging
 import asyncio
 from collections.abc import AsyncIterable
-from typing import Any, Dict, Optional, Union, List
+from typing import Dict, Optional
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -10,19 +9,8 @@ from sqlalchemy.orm import Session
 from src.config.settings import settings
 from src.services.agent_service import (
     get_agent,
-    create_agent,
-    update_agent,
-    delete_agent,
-    get_agents_by_client,
 )
 from src.services.mcp_server_service import get_mcp_server
-from src.services.session_service import (
-    get_sessions_by_client,
-    get_sessions_by_agent,
-    get_session_by_id,
-    delete_session,
-    get_session_events,
-)
 
 from src.services.agent_runner import run_agent, run_agent_stream
 from src.services.service_providers import (
@@ -367,7 +355,7 @@ class A2ATaskManager:
             final_artifact = Artifact(parts=parts, index=0)
 
             # Update the task in the store with the final response
-            task = await self.update_store(
+            await self.update_store(
                 task_params.id,
                 TaskStatus(state=task_state, message=final_message),
                 [final_artifact],

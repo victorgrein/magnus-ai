@@ -67,7 +67,7 @@ def get_api_keys_by_client(
         query = (
             db.query(ApiKey)
             .filter(ApiKey.client_id == client_id)
-            .filter(ApiKey.is_active == True)
+            .filter(ApiKey.is_active)
         )
 
         # Apply sorting
