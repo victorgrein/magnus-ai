@@ -20,6 +20,7 @@ def create_user(
     user_data: UserCreate,
     is_admin: bool = False,
     client_id: Optional[uuid.UUID] = None,
+    auto_verify: bool = False,
 ) -> Tuple[Optional[User], str]:
     """
     Creates a new user in the system
@@ -29,6 +30,7 @@ def create_user(
         user_data: User data to be created
         is_admin: If the user is an administrator
         client_id: Associated client ID (optional, a new one will be created if not provided)
+        auto_verify: If True, user is created with email already verified and active
 
     Returns:
         Tuple[Optional[User], str]: Tuple with the created user (or None in case of error) and status message
@@ -42,9 +44,12 @@ def create_user(
             )
             return None, "Email already registered"
 
-        # Create verification token
-        verification_token = generate_token()
-        token_expiry = datetime.utcnow() + timedelta(hours=24)
+        # Create verification token if needed
+        verification_token = None
+        token_expiry = None
+        if not auto_verify:
+            verification_token = generate_token()
+            token_expiry = datetime.utcnow() + timedelta(hours=24)
 
         # Start transaction
         user = None
@@ -64,25 +69,32 @@ def create_user(
                 password_hash=get_password_hash(user_data.password),
                 client_id=local_client_id,
                 is_admin=is_admin,
-                is_active=False,  # Inactive until email is verified
-                email_verified=False,
+                is_active=auto_verify,
+                email_verified=auto_verify,
                 verification_token=verification_token,
                 verification_token_expiry=token_expiry,
             )
             db.add(user)
             db.commit()
 
-            # Send verification email
-            email_sent = send_verification_email(user.email, verification_token)
-            if not email_sent:
-                logger.error(f"Failed to send verification email to {user.email}")
-                # We don't do rollback here, we just log the error
+            # Send verification email if not auto-verified
+            if not auto_verify:
+                email_sent = send_verification_email(user.email, verification_token)
+                if not email_sent:
+                    logger.error(f"Failed to send verification email to {user.email}")
+                    # We don't do rollback here, we just log the error
 
-            logger.info(f"User created successfully: {user.email}")
-            return (
-                user,
-                "User created successfully. Check your email to activate your account.",
-            )
+                logger.info(f"User created successfully: {user.email}")
+                return (
+                    user,
+                    "User created successfully. Check your email to activate your account.",
+                )
+            else:
+                logger.info(f"User created and auto-verified: {user.email}")
+                return (
+                    user,
+                    "User created successfully.",
+                )
 
         except SQLAlchemyError as e:
             db.rollback()
@@ -388,7 +400,7 @@ def create_admin_user(db: Session, user_data: UserCreate) -> Tuple[Optional[User
     Returns:
         Tuple[Optional[User], str]: Tuple with the created user (or None in case of error) and status message
     """
-    return create_user(db, user_data, is_admin=True)
+    return create_user(db, user_data, is_admin=True, auto_verify=True)
 
 
 def deactivate_user(db: Session, user_id: uuid.UUID) -> Tuple[bool, str]:

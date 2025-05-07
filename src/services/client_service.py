@@ -124,7 +124,9 @@ def create_client_with_user(
         db.flush()  # Get client ID without committing the transaction
 
         # Use client ID to create the associated user
-        user, message = create_user(db, user_data, is_admin=False, client_id=client.id)
+        user, message = create_user(
+            db, user_data, is_admin=False, client_id=client.id, auto_verify=True
+        )
 
         if not user:
             # If there was an error creating the user, rollback
