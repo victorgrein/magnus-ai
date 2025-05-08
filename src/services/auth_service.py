@@ -57,7 +57,7 @@ async def get_current_user(
             logger.warning(f"Token expired for {email}")
             raise credentials_exception
 
-        token_data = TokenData(
+        TokenData(
             sub=email,
             exp=datetime.fromtimestamp(exp),
             is_admin=payload.get("is_admin", False),

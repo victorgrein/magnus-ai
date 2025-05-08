@@ -19,7 +19,6 @@ from src.services import (
     client_service,
 )
 from src.services.auth_service import create_access_token
-from src.models.models import User
 import logging
 
 logger = logging.getLogger(__name__)
