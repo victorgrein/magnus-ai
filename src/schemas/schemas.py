@@ -78,6 +78,9 @@ class AgentBase(BaseModel):
     agent_card_url: Optional[str] = Field(
         None, description="Agent card URL (required for a2a type)"
     )
+    folder_id: Optional[UUID4] = Field(
+        None, description="ID of the folder this agent belongs to"
+    )
     config: Any = Field(None, description="Agent configuration based on type")
 
     @validator("name")
@@ -182,6 +185,7 @@ class Agent(AgentBase):
     created_at: datetime
     updated_at: Optional[datetime] = None
     agent_card_url: Optional[str] = None
+    folder_id: Optional[UUID4] = None
 
     class Config:
         from_attributes = True
