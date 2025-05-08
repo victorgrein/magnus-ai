@@ -54,7 +54,8 @@ async def register_user(user_data: UserCreate, db: Session = Depends(get_db)):
     Raises:
         HTTPException: If there is an error in registration
     """
-    user, message = create_user(db, user_data, is_admin=False, auto_verify=False)
+    # TODO: remover o auto_verify temporariamente para teste
+    user, message = create_user(db, user_data, is_admin=False, auto_verify=True)
     if not user:
         logger.error(f"Error registering user: {message}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
