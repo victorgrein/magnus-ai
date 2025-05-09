@@ -32,8 +32,7 @@ class AgentBuilder:
         """Create an LLM agent from the agent data."""
         # Get custom tools from the configuration
         custom_tools = []
-        if agent.config.get("tools"):
-            custom_tools = self.custom_tool_builder.build_tools(agent.config["tools"])
+        custom_tools = self.custom_tool_builder.build_tools(agent.config)
 
         # Get MCP tools from the configuration
         mcp_tools = []

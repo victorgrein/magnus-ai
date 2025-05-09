@@ -18,9 +18,14 @@ class CustomToolBuilder:
         endpoint = tool_config["endpoint"]
         method = tool_config["method"]
         headers = tool_config.get("headers", {})
-        parameters = tool_config.get("parameters", {})
+        parameters = tool_config.get("parameters", {}) or {}
         values = tool_config.get("values", {})
         error_handling = tool_config.get("error_handling", {})
+
+        # Garante que todos os parâmetros são dicts
+        path_params = parameters.get("path_params") or {}
+        query_params = parameters.get("query_params") or {}
+        body_params = parameters.get("body_params") or {}
 
         def http_tool(**kwargs):
             try:
@@ -35,32 +40,30 @@ class CustomToolBuilder:
 
                 # Processes path parameters
                 url = endpoint
-                for param, value in parameters.get("path_params", {}).items():
+                for param, value in path_params.items():
                     if param in all_values:
                         url = url.replace(f"{{{param}}}", str(all_values[param]))
 
                 # Process query parameters
-                query_params = {}
-                for param, value in parameters.get("query_params", {}).items():
+                query_params_dict = {}
+                for param, value in query_params.items():
                     if isinstance(value, list):
                         # If the value is a list, join with comma
-                        query_params[param] = ",".join(value)
+                        query_params_dict[param] = ",".join(value)
                     elif param in all_values:
                         # If the parameter is in the values, use the provided value
-                        query_params[param] = all_values[param]
+                        query_params_dict[param] = all_values[param]
                     else:
                         # Otherwise, use the default value from the configuration
-                        query_params[param] = value
+                        query_params_dict[param] = value
 
                 # Adds default values to query params if they are not present
                 for param, value in values.items():
-                    if param not in query_params and param not in parameters.get(
-                        "path_params", {}
-                    ):
-                        query_params[param] = value
+                    if param not in query_params_dict and param not in path_params:
+                        query_params_dict[param] = value
 
                 body_data = {}
-                for param, param_config in parameters.get("body_params", {}).items():
+                for param, param_config in body_params.items():
                     if param in all_values:
                         body_data[param] = all_values[param]
 
@@ -68,8 +71,8 @@ class CustomToolBuilder:
                 for param, value in values.items():
                     if (
                         param not in body_data
-                        and param not in query_params
-                        and param not in parameters.get("path_params", {})
+                        and param not in query_params_dict
+                        and param not in path_params
                     ):
                         body_data[param] = value
 
@@ -78,7 +81,7 @@ class CustomToolBuilder:
                     method=method,
                     url=url,
                     headers=processed_headers,
-                    params=query_params,
+                    params=query_params_dict,
                     json=body_data if body_data else None,
                     timeout=error_handling.get("timeout", 30),
                 )
@@ -104,18 +107,18 @@ class CustomToolBuilder:
         param_docs = []
 
         # Adds path parameters
-        for param, value in parameters.get("path_params", {}).items():
+        for param, value in path_params.items():
             param_docs.append(f"{param}: {value}")
 
         # Adds query parameters
-        for param, value in parameters.get("query_params", {}).items():
+        for param, value in query_params.items():
             if isinstance(value, list):
                 param_docs.append(f"{param}: List[{', '.join(value)}]")
             else:
                 param_docs.append(f"{param}: {value}")
 
         # Adds body parameters
-        for param, param_config in parameters.get("body_params", {}).items():
+        for param, param_config in body_params.items():
             required = "Required" if param_config.get("required", False) else "Optional"
             param_docs.append(
                 f"{param} ({param_config['type']}, {required}): {param_config['description']}"
@@ -143,11 +146,26 @@ class CustomToolBuilder:
         return FunctionTool(func=http_tool)
 
     def build_tools(self, tools_config: Dict[str, Any]) -> List[FunctionTool]:
-        """Builds a list of tools based on the provided configuration."""
+        """Builds a list of tools based on the provided configuration. Accepts both 'tools' and 'custom_tools' (with http_tools)."""
         self.tools = []
 
-        # Processes HTTP tools
-        for http_tool_config in tools_config.get("http_tools", []):
+        # Permite receber tanto 'tools' quanto 'custom_tools' (com http_tools)
+        http_tools = []
+        if tools_config.get("http_tools"):
+            http_tools = tools_config.get("http_tools", [])
+        elif tools_config.get("custom_tools") and tools_config["custom_tools"].get(
+            "http_tools"
+        ):
+            http_tools = tools_config["custom_tools"].get("http_tools", [])
+        # Suporte para caso tools seja um dict com http_tools
+        elif (
+            tools_config.get("tools")
+            and isinstance(tools_config["tools"], dict)
+            and tools_config["tools"].get("http_tools")
+        ):
+            http_tools = tools_config["tools"].get("http_tools", [])
+
+        for http_tool_config in http_tools:
             self.tools.append(self._create_http_tool(http_tool_config))
 
         return self.tools

@@ -79,6 +79,9 @@ class MCPService:
         self, tools: List[Any], agent_tools: List[str]
     ) -> List[Any]:
         """Filters tools compatible with the agent."""
+        if not agent_tools or len(agent_tools) == 0:
+            return tools
+
         filtered_tools = []
         for tool in tools:
             logger.info(f"Tool: {tool.name}")
