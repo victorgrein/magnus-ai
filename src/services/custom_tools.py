@@ -22,7 +22,6 @@ class CustomToolBuilder:
         values = tool_config.get("values", {})
         error_handling = tool_config.get("error_handling", {})
 
-        # Garante que todos os parâmetros são dicts
         path_params = parameters.get("path_params") or {}
         query_params = parameters.get("query_params") or {}
         body_params = parameters.get("body_params") or {}
@@ -149,7 +148,6 @@ class CustomToolBuilder:
         """Builds a list of tools based on the provided configuration. Accepts both 'tools' and 'custom_tools' (with http_tools)."""
         self.tools = []
 
-        # Permite receber tanto 'tools' quanto 'custom_tools' (com http_tools)
         http_tools = []
         if tools_config.get("http_tools"):
             http_tools = tools_config.get("http_tools", [])
@@ -157,7 +155,6 @@ class CustomToolBuilder:
             "http_tools"
         ):
             http_tools = tools_config["custom_tools"].get("http_tools", [])
-        # Suporte para caso tools seja um dict com http_tools
         elif (
             tools_config.get("tools")
             and isinstance(tools_config["tools"], dict)
