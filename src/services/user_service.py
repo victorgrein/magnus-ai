@@ -7,7 +7,7 @@ from src.services.email_service import (
     send_verification_email,
     send_password_reset_email,
 )
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 import logging
 from typing import Optional, Tuple
@@ -295,7 +295,11 @@ def reset_password(db: Session, token: str, new_password: str) -> Tuple[bool, st
             return False, "Invalid password reset token"
 
         # Check if the token has expired
-        if user.password_reset_expiry < datetime.utcnow():
+        now = datetime.now(timezone.utc)
+        expiry = user.password_reset_expiry
+        if expiry is not None and expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        if expiry is None or expiry < now:
             logger.warning(
                 f"Attempt to reset password with expired token for user: {user.email}"
             )
