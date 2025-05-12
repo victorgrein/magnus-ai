@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from src.config.database import engine, Base
 from src.config.settings import settings
 from src.utils.logger import setup_logger
+from src.utils.otel import init_otel
 
 # Necessary for other modules
 from src.services.service_providers import session_service  # noqa: F401
@@ -84,6 +85,9 @@ app.include_router(chat_router, prefix=API_PREFIX)
 app.include_router(session_router, prefix=API_PREFIX)
 app.include_router(agent_router, prefix=API_PREFIX)
 app.include_router(a2a_router, prefix=API_PREFIX)
+
+# Inicializa o OpenTelemetry para Langfuse
+init_otel()
 
 
 @app.get("/")
