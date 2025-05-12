@@ -304,7 +304,6 @@ class WorkflowAgent(BaseAgent):
                 "session_id": session_id,
             }
 
-        # Função para message-node
         async def message_node_function(
             state: State, node_id: str, node_data: Dict[str, Any]
         ) -> AsyncGenerator[State, None]:
@@ -318,7 +317,6 @@ class WorkflowAgent(BaseAgent):
             session_id = state.get("session_id", "")
             conversation_history = state.get("conversation_history", [])
 
-            # Adiciona a mensagem como um novo Event do tipo agent
             new_event = Event(
                 author="agent",
                 content=Content(parts=[Part(text=message_content)]),
@@ -750,7 +748,7 @@ class WorkflowAgent(BaseAgent):
                 content=Content(parts=[Part(text=user_message)]),
             )
 
-            # Se o histórico estiver vazio, adiciona a mensagem do usuário
+            # If the conversation history is empty, add the user message
             conversation_history = ctx.session.events or []
             if not conversation_history or (len(conversation_history) == 0):
                 conversation_history = [user_event]
@@ -768,16 +766,17 @@ class WorkflowAgent(BaseAgent):
             print("\n🚀 Starting workflow execution:")
             print(f"Initial content: {user_message[:100]}...")
 
-            # Execute the graph with a recursion limit to avoid infinite loops
-            result = await graph.ainvoke(initial_state, {"recursion_limit": 20})
+            sent_events = 0  # Count of events already sent
 
-            # 6. Process and return the result
-            final_content = result.get("content", [])
-            print(f"\n✅ FINAL RESULT: {final_content[:100]}...")
-
-            for content in final_content:
-                if content.author != "user":
-                    yield content
+            async for state in graph.astream(initial_state, {"recursion_limit": 20}):
+                # The state can be a dict with the node name as a key
+                for node_state in state.values():
+                    content = node_state.get("content", [])
+                    # Only send new events
+                    for event in content[sent_events:]:
+                        if event.author != "user":
+                            yield event
+                    sent_events = len(content)
 
             # Execute sub-agents
             for sub_agent in self.sub_agents:

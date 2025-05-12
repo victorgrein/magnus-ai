@@ -102,9 +102,8 @@ async def websocket_chat(
                         memory_service=memory_service,
                         db=db,
                     ):
-                        # Send each chunk as a JSON message
                         await websocket.send_json(
-                            {"message": chunk, "turn_complete": False}
+                            {"message": json.loads(chunk), "turn_complete": False}
                         )
 
                     # Send signal of complete turn

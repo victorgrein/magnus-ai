@@ -10,6 +10,7 @@ from src.services.agent_builder import AgentBuilder
 from sqlalchemy.orm import Session
 from typing import Optional, AsyncGenerator
 import asyncio
+import json
 
 logger = setup_logger(__name__)
 
@@ -180,6 +181,17 @@ async def run_agent(
                 # Do not raise the exception to not obscure the original error
 
 
+def convert_sets(obj):
+    if isinstance(obj, set):
+        return list(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_sets(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_sets(i) for i in obj]
+    else:
+        return obj
+
+
 async def run_agent_stream(
     agent_id: str,
     external_id: str,
@@ -246,11 +258,9 @@ async def run_agent_stream(
             )
 
             async for event in events_async:
-                if event.content and event.content.parts:
-                    text = event.content.parts[0].text
-                    if text:
-                        yield text
-                        await asyncio.sleep(0)  # Allow other tasks to run
+                event_dict = event.dict()
+                event_dict = convert_sets(event_dict)
+                yield json.dumps(event_dict)
 
             completed_session = session_service.get_session(
                 app_name=agent_id,
