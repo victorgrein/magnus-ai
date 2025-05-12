@@ -301,6 +301,51 @@ Authorization: Bearer your-token-jwt
 - **LangGraph**: Framework for building stateful, multi-agent workflows
 - **ReactFlow**: Library for building node-based visual workflows
 
+## 📊 Langfuse Integration (Tracing & Observability)
+
+Evo AI platform natively supports integration with [Langfuse](https://langfuse.com/) for detailed tracing of agent executions, prompts, model responses, and tool calls, using the OpenTelemetry (OTel) standard.
+
+### Why use Langfuse?
+
+- Visual dashboard for agent traces, prompts, and executions
+- Detailed analytics for debugging and evaluating LLM apps
+- Easy integration with Google ADK and other frameworks
+
+### How it works
+
+- Every agent execution (including streaming) is automatically traced via OpenTelemetry spans
+- Data is sent to Langfuse, where it can be visualized and analyzed
+
+### How to configure
+
+1. **Set environment variables in your `.env`:**
+
+   ```env
+   LANGFUSE_PUBLIC_KEY="pk-lf-..."   # Your Langfuse public key
+   LANGFUSE_SECRET_KEY="sk-lf-..."   # Your Langfuse secret key
+   OTEL_EXPORTER_OTLP_ENDPOINT="https://cloud.langfuse.com/api/public/otel" # (or us.cloud... for US region)
+   ```
+
+   > **Attention:** Do not swap the keys! `pk-...` is public, `sk-...` is secret.
+
+2. **Automatic initialization**
+
+   - Tracing is automatically initialized when the application starts (`src/main.py`).
+   - Agent execution functions are already instrumented with spans (`src/services/agent_runner.py`).
+
+3. **View in the Langfuse dashboard**
+   - Access your Langfuse dashboard to see real-time traces.
+
+### Troubleshooting
+
+- **401 Error (Invalid credentials):**
+  - Check if the keys are correct and not swapped in your `.env`.
+  - Make sure the endpoint matches your region (EU or US).
+- **Context error in async generator:**
+  - The code is already adjusted to avoid OpenTelemetry context issues in async generators.
+- **Questions about integration:**
+  - See the [official Langfuse documentation - Google ADK](https://langfuse.com/docs/integrations/google-adk)
+
 ## 🤖 Agent 2 Agent (A2A) Protocol Support
 
 Evo AI implements the Google's Agent 2 Agent (A2A) protocol, enabling seamless communication and interoperability between AI agents. This implementation includes:
