@@ -84,6 +84,11 @@ class Settings(BaseSettings):
     DEMO_PASSWORD: str = os.getenv("DEMO_PASSWORD", "demo123")
     DEMO_CLIENT_NAME: str = os.getenv("DEMO_CLIENT_NAME", "Demo Client")
 
+    # Langfuse / OpenTelemetry settings
+    LANGFUSE_PUBLIC_KEY: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+    LANGFUSE_SECRET_KEY: str = os.getenv("LANGFUSE_SECRET_KEY", "")
+    OTEL_EXPORTER_OTLP_ENDPOINT: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
