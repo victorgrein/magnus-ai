@@ -304,10 +304,47 @@ class WorkflowAgent(BaseAgent):
                 "session_id": session_id,
             }
 
+        # Função para message-node
+        async def message_node_function(
+            state: State, node_id: str, node_data: Dict[str, Any]
+        ) -> AsyncGenerator[State, None]:
+            message_data = node_data.get("message", {})
+            message_type = message_data.get("type", "text")
+            message_content = message_data.get("content", "")
+
+            print(f"\n💬 MESSAGE-NODE: {message_content}")
+
+            content = state.get("content", [])
+            session_id = state.get("session_id", "")
+            conversation_history = state.get("conversation_history", [])
+
+            # Adiciona a mensagem como um novo Event do tipo agent
+            new_event = Event(
+                author="agent",
+                content=Content(parts=[Part(text=message_content)]),
+            )
+            content = content + [new_event]
+
+            node_outputs = state.get("node_outputs", {})
+            node_outputs[node_id] = {
+                "message_type": message_type,
+                "message_content": message_content,
+            }
+
+            yield {
+                "content": content,
+                "status": "message_added",
+                "node_outputs": node_outputs,
+                "cycle_count": state.get("cycle_count", 0),
+                "conversation_history": conversation_history,
+                "session_id": session_id,
+            }
+
         return {
             "start-node": start_node_function,
             "agent-node": agent_node_function,
             "condition-node": condition_node_function,
+            "message-node": message_node_function,
         }
 
     def _evaluate_condition(self, condition: Dict[str, Any], state: State) -> bool:
@@ -708,18 +745,23 @@ class WorkflowAgent(BaseAgent):
             graph = await self._create_graph(ctx, self.flow_json)
 
             # 4. Prepare the initial state
+            user_event = Event(
+                author="user",
+                content=Content(parts=[Part(text=user_message)]),
+            )
+
+            # Se o histórico estiver vazio, adiciona a mensagem do usuário
+            conversation_history = ctx.session.events or []
+            if not conversation_history or (len(conversation_history) == 0):
+                conversation_history = [user_event]
+
             initial_state = State(
-                content=[
-                    Event(
-                        author="user",
-                        content=Content(parts=[Part(text=user_message)]),
-                    )
-                ],
+                content=[user_event],
                 status="started",
                 session_id=session_id,
                 cycle_count=0,
                 node_outputs={},
-                conversation_history=ctx.session.events,
+                conversation_history=conversation_history,
             )
 
             # 5. Execute the graph

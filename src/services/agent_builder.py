@@ -2,6 +2,7 @@ from typing import List, Optional, Tuple
 from google.adk.agents.llm_agent import LlmAgent
 from google.adk.agents import SequentialAgent, ParallelAgent, LoopAgent, BaseAgent
 from google.adk.models.lite_llm import LiteLlm
+from google.adk.tools.agent_tool import AgentTool
 from src.utils.logger import setup_logger
 from src.core.exceptions import AgentNotFoundError
 from src.services.agent_service import get_agent
@@ -26,14 +27,25 @@ class AgentBuilder:
         self.custom_tool_builder = CustomToolBuilder()
         self.mcp_service = MCPService()
 
+    async def _agent_tools_builder(self, agent) -> List[AgentTool]:
+        """Build the tools for an agent."""
+        agent_tools_ids = agent.config.get("agent_tools")
+        agent_tools = []
+        if agent_tools_ids and isinstance(agent_tools_ids, list):
+            for agent_tool_id in agent_tools_ids:
+                sub_agent = get_agent(self.db, agent_tool_id)
+                llm_agent, _ = await self.build_llm_agent(sub_agent)
+                if llm_agent:
+                    agent_tools.append(AgentTool(agent=llm_agent))
+        return agent_tools
+
     async def _create_llm_agent(
         self, agent
     ) -> Tuple[LlmAgent, Optional[AsyncExitStack]]:
         """Create an LLM agent from the agent data."""
         # Get custom tools from the configuration
         custom_tools = []
-        if agent.config.get("tools"):
-            custom_tools = self.custom_tool_builder.build_tools(agent.config["tools"])
+        custom_tools = self.custom_tool_builder.build_tools(agent.config)
 
         # Get MCP tools from the configuration
         mcp_tools = []
@@ -43,8 +55,11 @@ class AgentBuilder:
                 agent.config, self.db
             )
 
+        # Get agent tools
+        agent_tools = await self._agent_tools_builder(agent)
+
         # Combine all tools
-        all_tools = custom_tools + mcp_tools
+        all_tools = custom_tools + mcp_tools + agent_tools
 
         now = datetime.now()
         current_datetime = now.strftime("%d/%m/%Y %H:%M")

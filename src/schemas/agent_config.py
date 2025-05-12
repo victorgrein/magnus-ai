@@ -137,6 +137,9 @@ class LLMConfig(BaseModel):
     custom_mcp_servers: Optional[List[CustomMCPServerConfig]] = Field(
         default=None, description="List of custom MCP servers with URL and headers"
     )
+    agent_tools: Optional[List[UUID]] = Field(
+        default=None, description="List of IDs of sub-agents"
+    )
     sub_agents: Optional[List[UUID]] = Field(
         default=None, description="List of IDs of sub-agents"
     )

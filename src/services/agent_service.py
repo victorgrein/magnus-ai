@@ -224,6 +224,9 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
         if "custom_tools" in config:
             processed_config["custom_tools"] = config["custom_tools"]
 
+        if "agent_tools" in config:
+            processed_config["agent_tools"] = config["agent_tools"]
+
         if "sub_agents" in config:
             processed_config["sub_agents"] = config["sub_agents"]
 
@@ -236,6 +239,7 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                 "tools",
                 "custom_tools",
                 "sub_agents",
+                "agent_tools",
                 "custom_mcp_servers",
                 "mcp_servers",
             ]:
@@ -301,6 +305,12 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
         if "sub_agents" in config and config["sub_agents"] is not None:
             processed_config["sub_agents"] = [
                 str(agent_id) for agent_id in config["sub_agents"]
+            ]
+
+        # Process agent tools
+        if "agent_tools" in config and config["agent_tools"] is not None:
+            processed_config["agent_tools"] = [
+                str(agent_id) for agent_id in config["agent_tools"]
             ]
 
         # Process tools
@@ -484,6 +494,9 @@ async def update_agent(
             if "sub_agents" in config:
                 processed_config["sub_agents"] = config["sub_agents"]
 
+            if "agent_tools" in config:
+                processed_config["agent_tools"] = config["agent_tools"]
+
             if "custom_mcp_servers" in config:
                 processed_config["custom_mcp_servers"] = config["custom_mcp_servers"]
 
@@ -493,6 +506,7 @@ async def update_agent(
                     "tools",
                     "custom_tools",
                     "sub_agents",
+                    "agent_tools",
                     "custom_mcp_servers",
                     "mcp_servers",
                 ]:
@@ -561,6 +575,12 @@ async def update_agent(
             if "sub_agents" in config and config["sub_agents"] is not None:
                 processed_config["sub_agents"] = [
                     str(agent_id) for agent_id in config["sub_agents"]
+                ]
+
+            # Process agent tools
+            if "agent_tools" in config and config["agent_tools"] is not None:
+                processed_config["agent_tools"] = [
+                    str(agent_id) for agent_id in config["agent_tools"]
                 ]
 
             # Process tools

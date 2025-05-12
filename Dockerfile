@@ -21,6 +21,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 RUN curl -fsSL https://get.docker.com | bash
 
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+
 COPY . .
 
 RUN pip install --no-cache-dir -e .

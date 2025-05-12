@@ -37,7 +37,7 @@ router = APIRouter(
 )
 
 
-@router.post("/", response_model=Client, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Client, status_code=status.HTTP_201_CREATED)
 async def create_user(
     registration: ClientRegistration,
     db: Session = Depends(get_db),

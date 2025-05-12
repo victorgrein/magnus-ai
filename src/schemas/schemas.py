@@ -122,18 +122,6 @@ class AgentBase(BaseModel):
     def validate_api_key_id(cls, v, values):
         return v
 
-        # Código anterior (comentado temporariamente)
-        # # Se o tipo for llm, api_key_id é obrigatório
-        # if "type" in values and values["type"] == "llm" and not v:
-        #     # Verifica se tem api_key no config (retrocompatibilidade)
-        #     if "config" in values and values["config"] and "api_key" in values["config"]:
-        #         # Tem api_key no config, então aceita
-        #         return v
-        #     raise ValueError(
-        #         "api_key_id é obrigatório para agentes do tipo llm"
-        #     )
-        # return v
-
     @validator("config")
     def validate_config(cls, v, values):
         if "type" in values and values["type"] == "a2a":
