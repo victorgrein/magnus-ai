@@ -1,7 +1,7 @@
 """
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ @author: Davidson Gomes                                                      │
-│ @file: run_seeders.py                                                        │
+│ @file: a2a_task_manager.py                                                   │
 │ Developed by: Davidson Gomes                                                 │
 │ Creation date: May 13, 2025                                                  │
 │ Contact: contato@evolution-api.com                                           │
@@ -266,29 +266,31 @@ class A2ATaskManager:
     ) -> JSONRPCResponse:
         """Processes a task using the specified agent."""
         task_params = request.params
-        query = self._extract_user_query(task_params)
-
         try:
-            # Process the query with the agent
-            result = await self._run_agent(agent, query, task_params.sessionId)
+            query = self._extract_user_query(task_params)
+            result_obj = await self._run_agent(agent, query, task_params.sessionId)
 
-            # Create the response part
-            text_part = {"type": "text", "text": result}
-            parts = [text_part]
-            agent_message = Message(role="agent", parts=parts)
-
-            # Determine the task state
-            task_state = (
-                TaskState.INPUT_REQUIRED
-                if "MISSING_INFO:" in result
-                else TaskState.COMPLETED
+            all_messages = await self._extract_messages_from_history(
+                result_obj.get("message_history", [])
             )
 
-            # Update the task in the store
+            result = result_obj["final_response"]
+            agent_message = self._create_result_message(result)
+
+            if not all_messages and result:
+                all_messages.append(agent_message)
+
+            task_state = self._determine_task_state(result)
+            artifact = Artifact(parts=agent_message.parts, index=0)
+
             task = await self.update_store(
                 task_params.id,
                 TaskStatus(state=task_state, message=agent_message),
-                [Artifact(parts=parts, index=0)],
+                [artifact],
+            )
+
+            await self._update_task_history(
+                task_params.id, task_params.message, all_messages
             )
 
             return SendTaskResponse(id=request.id, result=task)
@@ -299,12 +301,73 @@ class A2ATaskManager:
                 error=InternalError(message=f"Error processing task: {str(e)}"),
             )
 
+    async def _extract_messages_from_history(self, agent_history):
+        """Extracts messages from the agent history."""
+        all_messages = []
+        for message_event in agent_history:
+            try:
+                if (
+                    not isinstance(message_event, dict)
+                    or "content" not in message_event
+                ):
+                    continue
+
+                content = message_event.get("content", {})
+                if not isinstance(content, dict):
+                    continue
+
+                role = content.get("role", "agent")
+                if role not in ["user", "agent"]:
+                    role = "agent"
+
+                parts = content.get("parts", [])
+                if not parts:
+                    continue
+
+                if valid_parts := self._validate_message_parts(parts):
+                    agent_message = Message(role=role, parts=valid_parts)
+                    all_messages.append(agent_message)
+            except Exception as e:
+                logger.error(f"Error processing message history: {e}")
+        return all_messages
+
+    def _validate_message_parts(self, parts):
+        """Validates and formats message parts."""
+        valid_parts = []
+        for part in parts:
+            if isinstance(part, dict):
+                if "type" not in part and "text" in part:
+                    part["type"] = "text"
+                    valid_parts.append(part)
+                elif "type" in part:
+                    valid_parts.append(part)
+        return valid_parts
+
+    def _create_result_message(self, result):
+        """Creates a message from the result."""
+        text_part = {"type": "text", "text": result}
+        return Message(role="agent", parts=[text_part])
+
+    def _determine_task_state(self, result):
+        """Determines the task state based on the result."""
+        return (
+            TaskState.INPUT_REQUIRED
+            if "MISSING_INFO:" in result
+            else TaskState.COMPLETED
+        )
+
+    async def _update_task_history(self, task_id, user_message, agent_messages):
+        """Updates the task history."""
+        async with self.lock:
+            if task_id in self.tasks:
+                task = self.tasks[task_id]
+                task.history = [user_message] + agent_messages
+
     async def _stream_task_process(
         self, request: SendTaskStreamingRequest, agent: Agent
     ) -> AsyncIterable[SendTaskStreamingResponse]:
         """Processes a task in streaming mode using the specified agent."""
-        task_params = request.params
-        query = self._extract_user_query(task_params)
+        query = self._extract_user_query(request.params)
 
         try:
             # Send initial processing status
@@ -316,14 +379,14 @@ class A2ATaskManager:
 
             # Update the task with the processing message and inform the WORKING state
             await self.update_store(
-                task_params.id,
+                request.params.id,
                 TaskStatus(state=TaskState.WORKING, message=processing_message),
             )
 
             yield SendTaskStreamingResponse(
                 id=request.id,
                 result=TaskStatusUpdateEvent(
-                    id=task_params.id,
+                    id=request.params.id,
                     status=TaskStatus(
                         state=TaskState.WORKING,
                         message=processing_message,
@@ -332,11 +395,11 @@ class A2ATaskManager:
                 ),
             )
 
-            # Collect the chunks of the agent's response
-            external_id = task_params.sessionId
+            external_id = request.params.sessionId
             full_response = ""
 
-            # Use the same pattern as chat_routes.py: deserialize each chunk
+            final_message = None
+
             async for chunk in run_agent_stream(
                 agent_id=str(agent.id),
                 external_id=external_id,
@@ -352,29 +415,54 @@ class A2ATaskManager:
                     logger.warning(f"Invalid chunk received: {chunk} - {e}")
                     continue
 
-                # The chunk_data must be a dict with 'type' and 'text' (or other expected format)
-                update_message = Message(role="agent", parts=[chunk_data])
+                if (
+                    isinstance(chunk_data, dict)
+                    and "type" in chunk_data
+                    and chunk_data["type"]
+                    in [
+                        "history",
+                        "history_update",
+                        "history_complete",
+                    ]
+                ):
+                    continue
 
-                # Update the task with each intermediate message
-                await self.update_store(
-                    task_params.id,
-                    TaskStatus(state=TaskState.WORKING, message=update_message),
-                )
+                if isinstance(chunk_data, dict):
+                    if "type" not in chunk_data and "text" in chunk_data:
+                        chunk_data["type"] = "text"
 
-                yield SendTaskStreamingResponse(
-                    id=request.id,
-                    result=TaskStatusUpdateEvent(
-                        id=task_params.id,
-                        status=TaskStatus(
-                            state=TaskState.WORKING,
-                            message=update_message,
-                        ),
-                        final=False,
-                    ),
-                )
-                # If it's text, accumulate for the final response
-                if chunk_data.get("type") == "text":
-                    full_response += chunk_data.get("text", "")
+                    if "type" in chunk_data:
+                        try:
+                            update_message = Message(role="agent", parts=[chunk_data])
+
+                            await self.update_store(
+                                request.params.id,
+                                TaskStatus(
+                                    state=TaskState.WORKING, message=update_message
+                                ),
+                                update_history=False,
+                            )
+
+                            yield SendTaskStreamingResponse(
+                                id=request.id,
+                                result=TaskStatusUpdateEvent(
+                                    id=request.params.id,
+                                    status=TaskStatus(
+                                        state=TaskState.WORKING,
+                                        message=update_message,
+                                    ),
+                                    final=False,
+                                ),
+                            )
+
+                            if chunk_data.get("type") == "text":
+                                full_response += chunk_data.get("text", "")
+                                final_message = update_message
+
+                        except Exception as e:
+                            logger.error(
+                                f"Error processing chunk: {e}, chunk: {chunk_data}"
+                            )
 
             # Determine the final state of the task
             task_state = (
@@ -383,15 +471,16 @@ class A2ATaskManager:
                 else TaskState.COMPLETED
             )
 
-            # Create the final response
-            final_text_part = {"type": "text", "text": full_response}
-            parts = [final_text_part]
-            final_message = Message(role="agent", parts=parts)
-            final_artifact = Artifact(parts=parts, index=0)
+            # Create the final response if we don't have one yet
+            if not final_message:
+                final_text_part = {"type": "text", "text": full_response}
+                parts = [final_text_part]
+                final_message = Message(role="agent", parts=parts)
 
-            # Update the task with the final response
-            await self.update_store(
-                task_params.id,
+            final_artifact = Artifact(parts=final_message.parts, index=0)
+
+            task = await self.update_store(
+                request.params.id,
                 TaskStatus(state=task_state, message=final_message),
                 [final_artifact],
             )
@@ -400,7 +489,7 @@ class A2ATaskManager:
             yield SendTaskStreamingResponse(
                 id=request.id,
                 result=TaskArtifactUpdateEvent(
-                    id=task_params.id, artifact=final_artifact
+                    id=request.params.id, artifact=final_artifact
                 ),
             )
 
@@ -408,7 +497,7 @@ class A2ATaskManager:
             yield SendTaskStreamingResponse(
                 id=request.id,
                 result=TaskStatusUpdateEvent(
-                    id=task_params.id,
+                    id=request.params.id,
                     status=TaskStatus(state=task_state),
                     final=True,
                 ),
@@ -425,6 +514,7 @@ class A2ATaskManager:
         task_id: str,
         status: TaskStatus,
         artifacts: Optional[list[Artifact]] = None,
+        update_history: bool = True,
     ) -> Task:
         """Updates the status and artifacts of a task."""
         async with self.lock:
@@ -434,8 +524,8 @@ class A2ATaskManager:
             task = self.tasks[task_id]
             task.status = status
 
-            # Add message to history if it exists
-            if status.message is not None:
+            # Add message to history if it exists and update_history is True
+            if status.message is not None and update_history:
                 if task.history is None:
                     task.history = []
                 task.history.append(status.message)
@@ -458,27 +548,22 @@ class A2ATaskManager:
 
         return part.text
 
-    async def _run_agent(self, agent: Agent, query: str, session_id: str) -> str:
+    async def _run_agent(self, agent: Agent, query: str, session_id: str) -> dict:
         """Executes the agent to process the user query."""
         try:
-            # We use the session_id as external_id to maintain the conversation continuity
-            external_id = session_id
-
             # We call the same function used in the chat API
-            final_response = await run_agent(
+            return await run_agent(
                 agent_id=str(agent.id),
-                external_id=external_id,
+                external_id=session_id,
                 message=query,
                 session_service=session_service,
                 artifacts_service=artifacts_service,
                 memory_service=memory_service,
                 db=self.db,
             )
-
-            return final_response
         except Exception as e:
             logger.error(f"Error running agent: {e}")
-            raise ValueError(f"Error running agent: {str(e)}")
+            raise ValueError(f"Error running agent: {str(e)}") from e
 
     def append_task_history(self, task: Task, history_length: int | None) -> Task:
         """Returns a copy of the task with the history limited to the specified size."""
@@ -486,11 +571,16 @@ class A2ATaskManager:
         new_task = task.model_copy()
 
         # Limit the history if requested
-        if history_length is not None:
+        if history_length is not None and new_task.history:
             if history_length > 0:
-                new_task.history = (
-                    new_task.history[-history_length:] if new_task.history else []
-                )
+                if len(new_task.history) > history_length:
+                    user_message = new_task.history[0]
+                    recent_messages = (
+                        new_task.history[-(history_length - 1) :]
+                        if history_length > 1
+                        else []
+                    )
+                    new_task.history = [user_message] + recent_messages
             else:
                 new_task.history = []
 
@@ -546,112 +636,11 @@ class A2AService:
         if not agent:
             raise ValueError(f"Agent {agent_id} not found")
 
-        # Build the agent card based on the agent's information
-        capabilities = AgentCapabilities(streaming=True)
+        capabilities = AgentCapabilities(
+            streaming=True, pushNotifications=False, stateTransitionHistory=True
+        )
 
-        # List to store all skills
-        skills = []
-
-        # Check if the agent has MCP servers configured
-        if (
-            agent.config
-            and "mcp_servers" in agent.config
-            and agent.config["mcp_servers"]
-        ):
-            logger.info(
-                f"Agent {agent_id} has {len(agent.config['mcp_servers'])} MCP servers configured"
-            )
-
-            for mcp_config in agent.config["mcp_servers"]:
-                # Get the MCP server
-                mcp_server_id = mcp_config.get("id")
-                if not mcp_server_id:
-                    logger.warning("MCP server configuration missing ID")
-                    continue
-
-                logger.info(f"Processing MCP server: {mcp_server_id}")
-                mcp_server = get_mcp_server(self.db, mcp_server_id)
-                if not mcp_server:
-                    logger.warning(f"MCP server {mcp_server_id} not found")
-                    continue
-
-                # Get the available tools in the MCP server
-                mcp_tools = mcp_config.get("tools", [])
-                logger.info(f"MCP server {mcp_server.name} has tools: {mcp_tools}")
-
-                # Add server tools as skills
-                for tool_name in mcp_tools:
-                    logger.info(f"Processing tool: {tool_name}")
-
-                    tool_info = None
-                    if hasattr(mcp_server, "tools") and isinstance(
-                        mcp_server.tools, list
-                    ):
-                        for tool in mcp_server.tools:
-                            if isinstance(tool, dict) and tool.get("id") == tool_name:
-                                tool_info = tool
-                                logger.info(
-                                    f"Found tool info for {tool_name}: {tool_info}"
-                                )
-                                break
-
-                    if tool_info:
-                        # Use the information from the tool
-                        skill = AgentSkill(
-                            id=tool_info.get("id", f"{agent.id}_{tool_name}"),
-                            name=tool_info.get("name", tool_name),
-                            description=tool_info.get(
-                                "description", f"Tool: {tool_name}"
-                            ),
-                            tags=tool_info.get(
-                                "tags", [mcp_server.name, "tool", tool_name]
-                            ),
-                            examples=tool_info.get("examples", []),
-                            inputModes=tool_info.get("inputModes", ["text"]),
-                            outputModes=tool_info.get("outputModes", ["text"]),
-                        )
-                    else:
-                        # Default skill if tool info not found
-                        skill = AgentSkill(
-                            id=f"{agent.id}_{tool_name}",
-                            name=tool_name,
-                            description=f"Tool: {tool_name}",
-                            tags=[mcp_server.name, "tool", tool_name],
-                            examples=[],
-                            inputModes=["text"],
-                            outputModes=["text"],
-                        )
-
-                    skills.append(skill)
-                    logger.info(f"Added skill for tool: {tool_name}")
-
-        # Check custom tools
-        if (
-            agent.config
-            and "custom_tools" in agent.config
-            and agent.config["custom_tools"]
-        ):
-            custom_tools = agent.config["custom_tools"]
-
-            # Check HTTP tools
-            if "http_tools" in custom_tools and custom_tools["http_tools"]:
-                logger.info(f"Agent has {len(custom_tools['http_tools'])} HTTP tools")
-                for http_tool in custom_tools["http_tools"]:
-                    skill = AgentSkill(
-                        id=f"{agent.id}_http_{http_tool['name']}",
-                        name=http_tool["name"],
-                        description=http_tool.get(
-                            "description", f"HTTP Tool: {http_tool['name']}"
-                        ),
-                        tags=http_tool.get(
-                            "tags", ["http", "custom_tool", http_tool["method"]]
-                        ),
-                        examples=http_tool.get("examples", []),
-                        inputModes=http_tool.get("inputModes", ["text"]),
-                        outputModes=http_tool.get("outputModes", ["text"]),
-                    )
-                    skills.append(skill)
-                    logger.info(f"Added skill for HTTP tool: {http_tool['name']}")
+        skills = self._get_agent_skills(agent)
 
         card = AgentCard(
             name=agent.name,
@@ -674,3 +663,134 @@ class A2AService:
 
         logger.info(f"Generated agent card with {len(skills)} skills")
         return card
+
+    def _get_agent_skills(self, agent: Agent) -> list[AgentSkill]:
+        """Extracts the skills of an agent based on its configuration."""
+        skills = []
+
+        if self._has_mcp_servers(agent):
+            skills.extend(self._get_mcp_server_skills(agent))
+
+        if self._has_custom_tools(agent):
+            skills.extend(self._get_custom_tool_skills(agent))
+
+        return skills
+
+    def _has_mcp_servers(self, agent: Agent) -> bool:
+        """Checks if the agent has MCP servers configured."""
+        return (
+            agent.config
+            and "mcp_servers" in agent.config
+            and agent.config["mcp_servers"]
+        )
+
+    def _has_custom_tools(self, agent: Agent) -> bool:
+        """Checks if the agent has custom tools configured."""
+        return (
+            agent.config
+            and "custom_tools" in agent.config
+            and agent.config["custom_tools"]
+        )
+
+    def _get_mcp_server_skills(self, agent: Agent) -> list[AgentSkill]:
+        """Gets the skills of the MCP servers configured for the agent."""
+        skills = []
+        logger.info(
+            f"Agent {agent.id} has {len(agent.config['mcp_servers'])} MCP servers configured"
+        )
+
+        for mcp_config in agent.config["mcp_servers"]:
+            mcp_server_id = mcp_config.get("id")
+            if not mcp_server_id:
+                logger.warning("MCP server configuration missing ID")
+                continue
+
+            mcp_server = get_mcp_server(self.db, mcp_server_id)
+            if not mcp_server:
+                logger.warning(f"MCP server {mcp_server_id} not found")
+                continue
+
+            skills.extend(self._extract_mcp_tool_skills(agent, mcp_server, mcp_config))
+
+        return skills
+
+    def _extract_mcp_tool_skills(
+        self, agent: Agent, mcp_server, mcp_config
+    ) -> list[AgentSkill]:
+        """Extracts skills from MCP tools."""
+        skills = []
+        mcp_tools = mcp_config.get("tools", [])
+        logger.info(f"MCP server {mcp_server.name} has tools: {mcp_tools}")
+
+        for tool_name in mcp_tools:
+            tool_info = self._find_tool_info(mcp_server, tool_name)
+            skill = self._create_tool_skill(
+                agent, tool_name, tool_info, mcp_server.name
+            )
+            skills.append(skill)
+            logger.info(f"Added skill for tool: {tool_name}")
+
+        return skills
+
+    def _find_tool_info(self, mcp_server, tool_name) -> dict:
+        """Finds information about a tool in an MCP server."""
+        if not hasattr(mcp_server, "tools") or not isinstance(mcp_server.tools, list):
+            return None
+
+        for tool in mcp_server.tools:
+            if isinstance(tool, dict) and tool.get("id") == tool_name:
+                logger.info(f"Found tool info for {tool_name}: {tool}")
+                return tool
+
+        return None
+
+    def _create_tool_skill(
+        self, agent: Agent, tool_name: str, tool_info: dict, server_name: str
+    ) -> AgentSkill:
+        """Creates an AgentSkill object based on the tool information."""
+        if tool_info:
+            return AgentSkill(
+                id=tool_info.get("id", f"{agent.id}_{tool_name}"),
+                name=tool_info.get("name", tool_name),
+                description=tool_info.get("description", f"Tool: {tool_name}"),
+                tags=tool_info.get("tags", [server_name, "tool", tool_name]),
+                examples=tool_info.get("examples", []),
+                inputModes=tool_info.get("inputModes", ["text"]),
+                outputModes=tool_info.get("outputModes", ["text"]),
+            )
+        else:
+            return AgentSkill(
+                id=f"{agent.id}_{tool_name}",
+                name=tool_name,
+                description=f"Tool: {tool_name}",
+                tags=[server_name, "tool", tool_name],
+                examples=[],
+                inputModes=["text"],
+                outputModes=["text"],
+            )
+
+    def _get_custom_tool_skills(self, agent: Agent) -> list[AgentSkill]:
+        """Gets the skills of the custom tools of the agent."""
+        skills = []
+        custom_tools = agent.config["custom_tools"]
+
+        if "http_tools" in custom_tools and custom_tools["http_tools"]:
+            logger.info(f"Agent has {len(custom_tools['http_tools'])} HTTP tools")
+            for http_tool in custom_tools["http_tools"]:
+                skill = AgentSkill(
+                    id=f"{agent.id}_http_{http_tool['name']}",
+                    name=http_tool["name"],
+                    description=http_tool.get(
+                        "description", f"HTTP Tool: {http_tool['name']}"
+                    ),
+                    tags=http_tool.get(
+                        "tags", ["http", "custom_tool", http_tool["method"]]
+                    ),
+                    examples=http_tool.get("examples", []),
+                    inputModes=http_tool.get("inputModes", ["text"]),
+                    outputModes=http_tool.get("outputModes", ["text"]),
+                )
+                skills.append(skill)
+                logger.info(f"Added skill for HTTP tool: {http_tool['name']}")
+
+        return skills

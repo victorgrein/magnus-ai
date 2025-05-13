@@ -1,7 +1,7 @@
 """
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ @author: Davidson Gomes                                                      │
-│ @file: run_seeders.py                                                        │
+│ @file: user_service.py                                                       │
 │ Developed by: Davidson Gomes                                                 │
 │ Creation date: May 13, 2025                                                  │
 │ Contact: contato@evolution-api.com                                           │
@@ -374,7 +374,9 @@ def get_user_by_email(db: Session, email: str) -> Optional[User]:
         return None
 
 
-def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
+def authenticate_user(
+    db: Session, email: str, password: str
+) -> Tuple[Optional[User], str]:
     """
     Authenticates a user with email and password
 
@@ -384,16 +386,18 @@ def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
         password: User password
 
     Returns:
-        Optional[User]: Authenticated user or None
+        Tuple[Optional[User], str]: Authenticated user and reason (or None and reason)
     """
     user = get_user_by_email(db, email)
     if not user:
-        return None
+        return None, "user_not_found"
     if not verify_password(password, user.password_hash):
-        return None
+        return None, "invalid_password"
+    if not user.email_verified:
+        return None, "email_not_verified"
     if not user.is_active:
-        return None
-    return user
+        return None, "inactive_user"
+    return user, "success"
 
 
 def get_admin_users(db: Session, skip: int = 0, limit: int = 100):

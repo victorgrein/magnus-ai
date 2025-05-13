@@ -1,7 +1,7 @@
 """
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ @author: Davidson Gomes                                                      │
-│ @file: run_seeders.py                                                        │
+│ @file: agent_runner.py                                                       │
 │ Developed by: Davidson Gomes                                                 │
 │ Creation date: May 13, 2025                                                  │
 │ Contact: contato@evolution-api.com                                           │
@@ -94,7 +94,7 @@ async def run_agent(
                 artifact_service=artifacts_service,
                 memory_service=memory_service,
             )
-            adk_session_id = external_id + "_" + agent_id
+            adk_session_id = f"{external_id}_{agent_id}"
             if session_id is None:
                 session_id = adk_session_id
 
@@ -117,6 +117,8 @@ async def run_agent(
             logger.info("Starting agent execution")
 
             final_response_text = "No final response captured."
+            message_history = []
+
             try:
                 response_queue = asyncio.Queue()
                 execution_completed = asyncio.Event()
@@ -133,6 +135,11 @@ async def run_agent(
                         all_responses = []
 
                         async for event in events_async:
+                            if event.content and event.content.parts:
+                                event_dict = event.dict()
+                                event_dict = convert_sets(event_dict)
+                                message_history.append(event_dict)
+
                             if (
                                 event.content
                                 and event.content.parts
@@ -205,10 +212,13 @@ async def run_agent(
 
             except Exception as e:
                 logger.error(f"Error processing request: {str(e)}")
-                raise e
+                raise InternalServerError(str(e)) from e
 
             logger.info("Agent execution completed successfully")
-            return final_response_text
+            return {
+                "final_response": final_response_text,
+                "message_history": message_history,
+            }
         except AgentNotFoundError as e:
             logger.error(f"Error processing request: {str(e)}")
             raise e
@@ -285,7 +295,7 @@ async def run_agent_stream(
                     artifact_service=artifacts_service,
                     memory_service=memory_service,
                 )
-                adk_session_id = external_id + "_" + agent_id
+                adk_session_id = f"{external_id}_{agent_id}"
                 if session_id is None:
                     session_id = adk_session_id
 
@@ -315,9 +325,51 @@ async def run_agent_stream(
                     )
 
                     async for event in events_async:
-                        event_dict = event.dict()
-                        event_dict = convert_sets(event_dict)
-                        yield json.dumps(event_dict)
+                        try:
+                            event_dict = event.dict()
+                            event_dict = convert_sets(event_dict)
+
+                            if "content" in event_dict and event_dict["content"]:
+                                content = event_dict["content"]
+
+                                if "role" not in content or content["role"] not in [
+                                    "user",
+                                    "agent",
+                                ]:
+                                    content["role"] = "agent"
+
+                                if "parts" in content and content["parts"]:
+                                    valid_parts = []
+                                    for part in content["parts"]:
+                                        if isinstance(part, dict):
+                                            if "type" not in part and "text" in part:
+                                                part["type"] = "text"
+                                                valid_parts.append(part)
+                                            elif "type" in part:
+                                                valid_parts.append(part)
+
+                                    if valid_parts:
+                                        content["parts"] = valid_parts
+                                    else:
+                                        content["parts"] = [
+                                            {
+                                                "type": "text",
+                                                "text": "Content without valid format",
+                                            }
+                                        ]
+                                else:
+                                    content["parts"] = [
+                                        {
+                                            "type": "text",
+                                            "text": "Content without parts",
+                                        }
+                                    ]
+
+                            # Send the individual event
+                            yield json.dumps(event_dict)
+                        except Exception as e:
+                            logger.error(f"Error processing event: {e}")
+                            continue
 
                     completed_session = session_service.get_session(
                         app_name=agent_id,
@@ -328,7 +380,7 @@ async def run_agent_stream(
                     memory_service.add_session_to_memory(completed_session)
                 except Exception as e:
                     logger.error(f"Error processing request: {str(e)}")
-                    raise e
+                    raise InternalServerError(str(e)) from e
                 finally:
                     # Clean up MCP connection
                     if exit_stack:
@@ -341,7 +393,7 @@ async def run_agent_stream(
                 logger.info("Agent streaming execution completed successfully")
             except AgentNotFoundError as e:
                 logger.error(f"Error processing request: {str(e)}")
-                raise e
+                raise InternalServerError(str(e)) from e
             except Exception as e:
                 logger.error(
                     f"Internal error processing request: {str(e)}", exc_info=True
