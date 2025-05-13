@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.0.9] - 2025-05-13
 
+### Added
+
+- Add API key sharing and flexible authentication for chat routes
+
 ### Changed
 
 - Enhance user authentication with detailed error handling
