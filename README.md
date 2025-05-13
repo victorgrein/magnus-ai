@@ -428,16 +428,13 @@ Before starting, make sure you have the following installed:
 
 You'll also need the following accounts/API keys:
 
-- **OpenAI API Key**: Or API key from another AI provider
 - **SendGrid Account**: For email functionality
-- **Google API Key**: If using Google's A2A protocol implementation
 
 ## 📋 Requirements
 
 - Python 3.10+
 - PostgreSQL
 - Redis
-- OpenAI API Key (or other AI provider)
 - SendGrid Account (for email sending)
 
 ## 🔧 Installation
@@ -651,56 +648,6 @@ make run-prod    # For production with multiple workers
 ```
 
 The API will be available at `http://localhost:8000`
-
-## 📚 API Documentation
-
-The interactive API documentation is available at:
-
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
-## 📊 Logs and Audit
-
-- Logs are stored in the `logs/` directory with the following format:
-  - `{logger_name}_{date}.log`
-- The system maintains audit logs for important administrative actions
-- Each action is recorded with information such as user, IP, date/time, and details
-
-## 🤝 Contributing
-
-We welcome contributions from the community! Here's how you can help:
-
-1. Fork the project
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Make your changes and add tests if possible
-4. Run tests and make sure they pass
-5. Commit your changes following conventional commits format (`feat: add amazing feature`)
-6. Push to the branch (`git push origin feature/AmazingFeature`)
-7. Open a Pull Request
-
-Please read our [Contributing Guidelines](CONTRIBUTING.md) for more details.
-
-## 📄 License
-
-This project is licensed under the [Apache License 2.0](./LICENSE).
-
-The use of the name, logo, or trademark "Evolution API" is protected and not automatically granted by the license. See section 6 (Trademarks) of the license for details about trademark usage.
-
-## 📊 Stargazers
-
-[![Stargazers repo roster for @EvolutionAPI/evo-ai](https://reporoster.com/stars/EvolutionAPI/evo-ai)](https://github.com/EvolutionAPI/evo-ai/stargazers)
-
-## 🔄 Forks
-
-[![Forkers repo roster for @EvolutionAPI/evo-ai](https://reporoster.com/forks/EvolutionAPI/evo-ai)](https://github.com/EvolutionAPI/evo-ai/network/members)
-
-## 🙏 Acknowledgments
-
-- [FastAPI](https://fastapi.tiangolo.com/)
-- [SQLAlchemy](https://www.sqlalchemy.org/)
-- [Google ADK](https://github.com/google/adk)
-- [LangGraph](https://github.com/langchain-ai/langgraph)
-- [ReactFlow](https://reactflow.dev/)
 
 ## 👨‍💻 Development Commands
 
@@ -955,3 +902,53 @@ GET /api/v1/agents?folder_id=folder-uuid
 Authorization: Bearer your-token-jwt
 x-client-id: client-uuid
 ```
+
+## 📚 API Documentation
+
+The interactive API documentation is available at:
+
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+## 📊 Logs and Audit
+
+- Logs are stored in the `logs/` directory with the following format:
+  - `{logger_name}_{date}.log`
+- The system maintains audit logs for important administrative actions
+- Each action is recorded with information such as user, IP, date/time, and details
+
+## 🤝 Contributing
+
+We welcome contributions from the community! Here's how you can help:
+
+1. Fork the project
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+3. Make your changes and add tests if possible
+4. Run tests and make sure they pass
+5. Commit your changes following conventional commits format (`feat: add amazing feature`)
+6. Push to the branch (`git push origin feature/AmazingFeature`)
+7. Open a Pull Request
+
+Please read our [Contributing Guidelines](CONTRIBUTING.md) for more details.
+
+## 📄 License
+
+This project is licensed under the [Apache License 2.0](./LICENSE).
+
+The use of the name, logo, or trademark "Evolution API" is protected and not automatically granted by the license. See section 6 (Trademarks) of the license for details about trademark usage.
+
+## 📊 Stargazers
+
+[![Stargazers repo roster for @EvolutionAPI/evo-ai](https://reporoster.com/stars/EvolutionAPI/evo-ai)](https://github.com/EvolutionAPI/evo-ai/stargazers)
+
+## 🔄 Forks
+
+[![Forkers repo roster for @EvolutionAPI/evo-ai](https://reporoster.com/forks/EvolutionAPI/evo-ai)](https://github.com/EvolutionAPI/evo-ai/network/members)
+
+## 🙏 Acknowledgments
+
+- [FastAPI](https://fastapi.tiangolo.com/)
+- [SQLAlchemy](https://www.sqlalchemy.org/)
+- [Google ADK](https://github.com/google/adk)
+- [LangGraph](https://github.com/langchain-ai/langgraph)
+- [ReactFlow](https://reactflow.dev/)
