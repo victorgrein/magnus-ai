@@ -788,7 +788,9 @@ class WorkflowAgent(BaseAgent):
             print("\n🚀 Starting workflow execution:")
             print(f"Initial content: {user_message[:100]}...")
 
-            await self._execute_workflow(ctx, graph, initial_state)
+            # Iterar sobre o AsyncGenerator em vez de usar await
+            async for event in self._execute_workflow(ctx, graph, initial_state):
+                yield event
 
         except Exception as e:
             yield await self._handle_workflow_error(e)
