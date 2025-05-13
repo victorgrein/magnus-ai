@@ -1,5 +1,7 @@
 # Evo AI - AI Agents Platform
 
+> **License:** This project is licensed under the [Apache License 2.0](./LICENSE). The use of the "Evolution API" trademark is protected as described in section 6 (Trademarks) of the license.
+
 Evo AI is an open-source platform for creating and managing AI agents, enabling integration with different AI models and services.
 
 ## 🚀 Overview
@@ -443,7 +445,7 @@ You'll also need the following accounts/API keys:
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/your-username/evo-ai.git
+git clone https://github.com/EvolutionAPI/evo-ai.git
 cd evo-ai
 ```
 
@@ -665,15 +667,17 @@ Please read our [Contributing Guidelines](CONTRIBUTING.md) for more details.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the [Apache License 2.0](./LICENSE).
+
+The use of the name, logo, or trademark "Evolution API" is protected and not automatically granted by the license. See section 6 (Trademarks) of the license for details about trademark usage.
 
 ## 📊 Stargazers
 
-[![Stargazers repo roster for @your-username/evo-ai](https://reporoster.com/stars/your-username/evo-ai)](https://github.com/your-username/evo-ai/stargazers)
+[![Stargazers repo roster for @EvolutionAPI/evo-ai](https://reporoster.com/stars/EvolutionAPI/evo-ai)](https://github.com/EvolutionAPI/evo-ai/stargazers)
 
 ## 🔄 Forks
 
-[![Forkers repo roster for @your-username/evo-ai](https://reporoster.com/forks/your-username/evo-ai)](https://github.com/your-username/evo-ai/network/members)
+[![Forkers repo roster for @EvolutionAPI/evo-ai](https://reporoster.com/forks/EvolutionAPI/evo-ai)](https://github.com/EvolutionAPI/evo-ai/network/members)
 
 ## 🙏 Acknowledgments
 
