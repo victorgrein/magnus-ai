@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "API for executing AI agents"
 readme = "README.md"
 authors = [
-    {name = "EvoAI Team", email = "admin@evoai.com"}
+    {name = "Davidson Gomes", email = "contato@evolution-api.com"}
 ]
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
