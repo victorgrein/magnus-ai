@@ -797,7 +797,7 @@ class WorkflowAgent(BaseAgent):
 
             sent_events = 0  # Count of events already sent
 
-            async for state in graph.astream(initial_state, {"recursion_limit": 20}):
+            async for state in graph.astream(initial_state, {"recursion_limit": 100}):
                 # The state can be a dict with the node name as a key
                 for node_state in state.values():
                     content = node_state.get("content", [])
