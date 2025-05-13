@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.7] - 2025-05-14
+
+### Added
+
+- Docker image CI workflow for automated builds and pushes
+- GitHub Container Registry (GHCR) integration
+- Automated image tagging based on branch and commit
+- Docker Buildx setup for multi-platform builds
+- Cache optimization for faster builds
+- Automated image publishing on push to main and develop branches
+
 ## [0.0.6] - 2025-05-13
 
 ### Added
