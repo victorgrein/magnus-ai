@@ -1,7 +1,7 @@
 """
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ @author: Davidson Gomes                                                      │
-│ @file: run_seeders.py                                                        │
+│ @file: workflow_agent.py                                                     │
 │ Developed by: Davidson Gomes                                                 │
 │ Creation date: May 13, 2025                                                  │
 │ Contact: contato@evolution-api.com                                           │
@@ -116,7 +116,7 @@ class WorkflowAgent(BaseAgent):
             if not content:
                 content = [
                     Event(
-                        author="agent",
+                        author="workflow_agent",
                         content=Content(parts=[Part(text="Content not found")]),
                     )
                 ]
@@ -168,7 +168,7 @@ class WorkflowAgent(BaseAgent):
                 yield {
                     "content": [
                         Event(
-                            author="agent",
+                            author="workflow_agent",
                             content=Content(parts=[Part(text="Agent not found")]),
                         )
                     ],
@@ -191,7 +191,7 @@ class WorkflowAgent(BaseAgent):
                 conversation_history.append(event)
                 new_content.append(event)
 
-            print(f"New content: {str(new_content)}")
+            print(f"New content: {new_content}")
 
             node_outputs = state.get("node_outputs", {})
             node_outputs[node_id] = {
@@ -281,7 +281,7 @@ class WorkflowAgent(BaseAgent):
 
                 condition_content = [
                     Event(
-                        author="agent",
+                        author="workflow_agent",
                         content=Content(parts=[Part(text="Cycle limit reached")]),
                     )
                 ]
@@ -312,7 +312,7 @@ class WorkflowAgent(BaseAgent):
 
             condition_content = [
                 Event(
-                    author="agent",
+                    author=label,
                     content=Content(
                         parts=[
                             Part(
@@ -346,8 +346,10 @@ class WorkflowAgent(BaseAgent):
             session_id = state.get("session_id", "")
             conversation_history = state.get("conversation_history", [])
 
+            label = node_data.get("label", "message_node")
+
             new_event = Event(
-                author="agent",
+                author=label,
                 content=Content(parts=[Part(text=message_content)]),
             )
             content = content + [new_event]
@@ -380,139 +382,160 @@ class WorkflowAgent(BaseAgent):
         condition_data = condition.get("data", {})
 
         if condition_type == "previous-output":
-            field = condition_data.get("field")
-            operator = condition_data.get("operator")
-            expected_value = condition_data.get("value")
+            field, operator, expected_value, actual_value = (
+                self._extract_condition_values(condition_data, state)
+            )
 
-            actual_value = state.get(field, "")
-
-            # Special treatment for when content is a list of Events
             if field == "content" and isinstance(actual_value, list) and actual_value:
-                # Extract text from each event for comparison
-                extracted_texts = []
-                for event in actual_value:
-                    if hasattr(event, "content") and hasattr(event.content, "parts"):
-                        for part in event.content.parts:
-                            if hasattr(part, "text") and part.text:
-                                extracted_texts.append(part.text)
+                actual_value = self._extract_text_from_events(actual_value)
 
-                if extracted_texts:
-                    actual_value = " ".join(extracted_texts)
-                    print(f"  Extracted text from events: '{actual_value[:100]}...'")
+            result = self._process_condition(operator, actual_value, expected_value)
 
-            # Convert values to string for easier comparisons
-            if actual_value is not None:
-                actual_str = str(actual_value)
-            else:
-                actual_str = ""
+            print(f"  Check '{operator}': {result}")
+            return result
 
-            if expected_value is not None:
-                expected_str = str(expected_value)
-            else:
-                expected_str = ""
+        return False
 
-            # Checks for definition
-            if operator == "is_defined":
-                result = actual_value is not None and actual_value != ""
-                print(f"  Check '{operator}': {result}")
-                return result
-            elif operator == "is_not_defined":
-                result = actual_value is None or actual_value == ""
-                print(f"  Check '{operator}': {result}")
-                return result
+    def _process_condition(self, operator, actual_value, expected_value):
+        """Converts values to strings and processes the condition using the appropriate operator."""
+        actual_str = str(actual_value) if actual_value is not None else ""
+        expected_str = str(expected_value) if expected_value is not None else ""
 
-            # Checks for equality
-            elif operator == "equals":
-                result = actual_str == expected_str
-                print(f"  Check '{operator}': {result}")
-                return result
-            elif operator == "not_equals":
-                result = actual_str != expected_str
-                print(f"  Check '{operator}': {result}")
-                return result
+        return self._process_operator(operator, actual_value, actual_str, expected_str)
 
-            # Checks for content
-            elif operator == "contains":
-                # Convert both to lowercase for case-insensitive comparison
-                expected_lower = expected_str.lower()
-                actual_lower = actual_str.lower()
-                print(
-                    f"  Comparison 'contains' without case distinction: '{expected_lower}' in '{actual_lower[:100]}...'"
+    def _extract_condition_values(self, condition_data, state):
+        """Extracts field, operator, expected value and actual value from condition data."""
+        field = condition_data.get("field")
+        operator = condition_data.get("operator")
+        expected_value = condition_data.get("value")
+        actual_value = state.get(field, "")
+
+        return field, operator, expected_value, actual_value
+
+    def _extract_text_from_events(self, events):
+        """Extracts text content from a list of events for comparison."""
+        extracted_texts = []
+        for event in events:
+            if hasattr(event, "content") and hasattr(event.content, "parts"):
+                extracted_texts.extend(
+                    [
+                        part.text
+                        for part in event.content.parts
+                        if hasattr(part, "text") and part.text
+                    ]
                 )
-                result = expected_lower in actual_lower
-                print(f"  Check '{operator}': {result}")
-                return result
-            elif operator == "not_contains":
-                expected_lower = expected_str.lower()
-                actual_lower = actual_str.lower()
-                print(
-                    f"  Comparison 'not_contains' without case distinction: '{expected_lower}' in '{actual_lower[:100]}...'"
-                )
-                result = expected_lower not in actual_lower
-                print(f"  Check '{operator}': {result}")
-                return result
 
-            # Checks for start and end
-            elif operator == "starts_with":
-                result = actual_str.lower().startswith(expected_str.lower())
-                print(f"  Check '{operator}': {result}")
-                return result
-            elif operator == "ends_with":
-                result = actual_str.lower().endswith(expected_str.lower())
-                print(f"  Check '{operator}': {result}")
-                return result
+        if extracted_texts:
+            joined_text = " ".join(extracted_texts)
+            print(f"  Extracted text from events: '{joined_text[:100]}...'")
+            return joined_text
 
-            # Numeric checks (attempting to convert to number)
-            elif operator in [
-                "greater_than",
-                "greater_than_or_equal",
-                "less_than",
-                "less_than_or_equal",
-            ]:
-                try:
-                    actual_num = float(actual_str) if actual_str else 0
-                    expected_num = float(expected_str) if expected_str else 0
+        return ""
 
-                    if operator == "greater_than":
-                        result = actual_num > expected_num
-                    elif operator == "greater_than_or_equal":
-                        result = actual_num >= expected_num
-                    elif operator == "less_than":
-                        result = actual_num < expected_num
-                    elif operator == "less_than_or_equal":
-                        result = actual_num <= expected_num
-                    print(f"  Numeric check '{operator}': {result}")
-                    return result
-                except (ValueError, TypeError):
-                    # If it's not possible to convert to number, return false
-                    print(
-                        f"  Error converting values for numeric comparison: '{actual_str[:100]}...' and '{expected_str}'"
-                    )
-                    return False
+    def _process_operator(self, operator, actual_value, actual_str, expected_str):
+        """Process the operator and return the result of the comparison."""
+        # Definition checks
+        if operator in ["is_defined", "is_not_defined"]:
+            return self._check_definition(operator, actual_value)
 
-            # Checks with regular expressions
-            elif operator == "matches":
-                import re
+        # Equality checks
+        elif operator in ["equals", "not_equals"]:
+            return self._check_equality(operator, actual_str, expected_str)
 
-                try:
-                    pattern = re.compile(expected_str, re.IGNORECASE)
-                    result = bool(pattern.search(actual_str))
-                    print(f"  Check '{operator}': {result}")
-                    return result
-                except re.error:
-                    print(f"  Error in regular expression: '{expected_str}'")
-                    return False
-            elif operator == "not_matches":
-                import re
+        # Content checks
+        elif operator in ["contains", "not_contains"]:
+            return self._case_insensitive_comparison(expected_str, actual_str, operator)
 
-                try:
-                    pattern = re.compile(expected_str, re.IGNORECASE)
-                    result = not bool(pattern.search(actual_str))
-                    print(f"  Check '{operator}': {result}")
-                    return result
-                except re.error:
-                    print(f"  Error in regular expression: '{expected_str}'")
-                    return True  # If the regex is invalid, we consider that there was no match
+        # String pattern checks
+        elif operator in ["starts_with", "ends_with"]:
+            return self._check_string_pattern(operator, actual_str, expected_str)
+
+        # Numeric checks
+        elif operator in [
+            "greater_than",
+            "greater_than_or_equal",
+            "less_than",
+            "less_than_or_equal",
+        ]:
+            return self._check_numeric(operator, actual_str, expected_str)
+
+        # Regex checks
+        elif operator in ["matches", "not_matches"]:
+            return self._check_regex(operator, actual_str, expected_str)
+
+        return False
+
+    def _check_definition(self, operator, actual_value):
+        """Check if a value is defined or not."""
+        if operator == "is_defined":
+            return actual_value is not None and actual_value != ""
+        else:  # is_not_defined
+            return actual_value is None or actual_value == ""
+
+    def _check_equality(self, operator, actual_str, expected_str):
+        """Check if two strings are equal or not."""
+        return (
+            (actual_str == expected_str)
+            if operator == "equals"
+            else (actual_str != expected_str)
+        )
+
+    def _check_string_pattern(self, operator, actual_str, expected_str):
+        """Check if a string starts or ends with another string."""
+        if operator == "starts_with":
+            return actual_str.lower().startswith(expected_str.lower())
+        else:  # ends_with
+            return actual_str.lower().endswith(expected_str.lower())
+
+    def _check_numeric(self, operator, actual_str, expected_str):
+        """Compare numeric values."""
+        try:
+            actual_num = float(actual_str) if actual_str else 0
+            expected_num = float(expected_str) if expected_str else 0
+
+            if operator == "greater_than":
+                return actual_num > expected_num
+            elif operator == "greater_than_or_equal":
+                return actual_num >= expected_num
+            elif operator == "less_than":
+                return actual_num < expected_num
+            else:  # less_than_or_equal
+                return actual_num <= expected_num
+        except (ValueError, TypeError):
+            print(
+                f"  Error converting values for numeric comparison: '{actual_str[:100]}...' and '{expected_str}'"
+            )
+            return False
+
+    def _check_regex(self, operator, actual_str, expected_str):
+        """Check if a string matches a regex pattern."""
+        import re
+
+        try:
+            pattern = re.compile(expected_str, re.IGNORECASE)
+            if operator == "matches":
+                return bool(pattern.search(actual_str))
+            else:  # not_matches
+                return not bool(pattern.search(actual_str))
+        except re.error:
+            print(f"  Error in regular expression: '{expected_str}'")
+            return (
+                operator == "not_matches"
+            )  # Return True for not_matches, False for matches
+
+    def _case_insensitive_comparison(self, expected_str, actual_str, operator):
+        """Performs case-insensitive string comparison based on the specified operator."""
+        expected_lower = expected_str.lower()
+        actual_lower = actual_str.lower()
+
+        print(
+            f"  Comparison '{operator}' without case distinction: '{expected_lower}' in '{actual_lower[:100]}...'"
+        )
+
+        if operator == "contains":
+            return expected_lower in actual_lower
+        elif operator == "not_contains":
+            return expected_lower not in actual_lower
 
         return False
 
@@ -558,38 +581,15 @@ class WorkflowAgent(BaseAgent):
                     conditions = condition_nodes[node_id]
                     any_condition_met = False
 
-                    for condition in conditions:
-                        condition_id = condition.get("id")
-
-                        # Get latest event for evaluation, ignoring condition node informational events
-                        content = state.get("content", [])
-                        latest_event = None
-                        for event in reversed(content):
-                            # Skip events generated by condition nodes
-                            if (
-                                event.author != "agent"
-                                or not hasattr(event.content, "parts")
-                                or not event.content.parts
-                            ):
-                                latest_event = event
-                                break
-
-                        evaluation_state = state.copy()
-                        if latest_event:
-                            evaluation_state["content"] = [latest_event]
-
-                        # Check if the condition is met
-                        is_condition_met = self._evaluate_condition(
-                            condition, evaluation_state
-                        )
-
-                        if is_condition_met:
+                    node_outputs = state.get("node_outputs", {})
+                    if node_id in node_outputs:
+                        conditions_met = node_outputs[node_id].get("conditions_met", [])
+                        if conditions_met:
                             any_condition_met = True
+                            condition_id = conditions_met[0]
                             print(
-                                f"Condition {condition_id} met. Moving to the next node."
+                                f"Using stored condition evaluation result: Condition {condition_id} met."
                             )
-
-                            # Find the connection that uses this condition_id as a handle
                             if (
                                 node_id in edges_map
                                 and condition_id in edges_map[node_id]
@@ -597,8 +597,49 @@ class WorkflowAgent(BaseAgent):
                                 return edges_map[node_id][condition_id]
                         else:
                             print(
-                                f"Condition {condition_id} not met. Continuing evaluation or using default path."
+                                "Using stored condition evaluation result: No conditions met."
                             )
+                    else:
+                        for condition in conditions:
+                            condition_id = condition.get("id")
+
+                            # Get latest event for evaluation, ignoring condition node informational events
+                            content = state.get("content", [])
+
+                            # Filter out events generated by condition nodes or informational messages
+                            filtered_content = []
+                            for event in content:
+                                # Ignore events from condition nodes or that contain evaluation results
+                                if not hasattr(event, "author") or not (
+                                    event.author.startswith("Condition")
+                                    or "Condition evaluated:" in str(event)
+                                ):
+                                    filtered_content.append(event)
+
+                            evaluation_state = state.copy()
+                            evaluation_state["content"] = filtered_content
+
+                            # Check if the condition is met
+                            is_condition_met = self._evaluate_condition(
+                                condition, evaluation_state
+                            )
+
+                            if is_condition_met:
+                                any_condition_met = True
+                                print(
+                                    f"Condition {condition_id} met. Moving to the next node."
+                                )
+
+                                # Find the connection that uses this condition_id as a handle
+                                if (
+                                    node_id in edges_map
+                                    and condition_id in edges_map[node_id]
+                                ):
+                                    return edges_map[node_id][condition_id]
+                            else:
+                                print(
+                                    f"Condition {condition_id} not met. Continuing evaluation or using default path."
+                                )
 
                     # If no condition is met, use the bottom-handle if available
                     if not any_condition_met:
@@ -735,91 +776,94 @@ class WorkflowAgent(BaseAgent):
     async def _run_async_impl(
         self, ctx: InvocationContext
     ) -> AsyncGenerator[Event, None]:
-        """
-        Implementation of the workflow agent.
-
-        This method follows the pattern of custom agent implementation,
-        executing the defined workflow and returning the results.
-        """
-
+        """Implementation of the workflow agent executing the defined workflow and returning results."""
         try:
-            # 1. Extract the user message from the context
-            user_message = None
-
-            # Search for the user message in the session events
-            if ctx.session and hasattr(ctx.session, "events") and ctx.session.events:
-                for event in reversed(ctx.session.events):
-                    if event.author == "user" and event.content and event.content.parts:
-                        user_message = event.content.parts[0].text
-                        print("Message found in session events")
-                        break
-
-            # Check in the session state if the message was not found in the events
-            if not user_message and ctx.session and ctx.session.state:
-                if "user_message" in ctx.session.state:
-                    user_message = ctx.session.state["user_message"]
-                elif "message" in ctx.session.state:
-                    user_message = ctx.session.state["message"]
-
-            # 2. Use the session ID as a stable identifier
-            session_id = (
-                str(ctx.session.id)
-                if ctx.session and hasattr(ctx.session, "id")
-                else str(uuid.uuid4())
-            )
-
-            # 3. Create the workflow graph from the provided JSON
+            user_message = await self._extract_user_message(ctx)
+            session_id = self._get_session_id(ctx)
             graph = await self._create_graph(ctx, self.flow_json)
-
-            # 4. Prepare the initial state
-            user_event = Event(
-                author="user",
-                content=Content(parts=[Part(text=user_message)]),
+            initial_state = await self._prepare_initial_state(
+                ctx, user_message, session_id
             )
 
-            # If the conversation history is empty, add the user message
-            conversation_history = ctx.session.events or []
-            if not conversation_history or (len(conversation_history) == 0):
-                conversation_history = [user_event]
-
-            initial_state = State(
-                content=[user_event],
-                status="started",
-                session_id=session_id,
-                cycle_count=0,
-                node_outputs={},
-                conversation_history=conversation_history,
-            )
-
-            # 5. Execute the graph
             print("\n🚀 Starting workflow execution:")
             print(f"Initial content: {user_message[:100]}...")
 
-            sent_events = 0  # Count of events already sent
-
-            async for state in graph.astream(initial_state, {"recursion_limit": 100}):
-                # The state can be a dict with the node name as a key
-                for node_state in state.values():
-                    content = node_state.get("content", [])
-                    # Only send new events
-                    for event in content[sent_events:]:
-                        if event.author != "user":
-                            yield event
-                    sent_events = len(content)
-
-            # Execute sub-agents
-            for sub_agent in self.sub_agents:
-                async for event in sub_agent.run_async(ctx):
-                    yield event
+            await self._execute_workflow(ctx, graph, initial_state)
 
         except Exception as e:
-            # Handle any uncaught errors
-            error_msg = f"Error executing the workflow agent: {str(e)}"
-            print(error_msg)
-            yield Event(
-                author=self.name,
-                content=Content(
-                    role="agent",
-                    parts=[Part(text=error_msg)],
-                ),
-            )
+            yield await self._handle_workflow_error(e)
+
+    async def _extract_user_message(self, ctx: InvocationContext) -> str:
+        """Extracts the user message from context session events or state."""
+        # Try to find message in session events
+        if ctx.session and hasattr(ctx.session, "events") and ctx.session.events:
+            for event in reversed(ctx.session.events):
+                if event.author == "user" and event.content and event.content.parts:
+                    print("Message found in session events")
+                    return event.content.parts[0].text
+
+        # Try to find message in session state
+        if ctx.session and ctx.session.state:
+            if "user_message" in ctx.session.state:
+                return ctx.session.state["user_message"]
+            elif "message" in ctx.session.state:
+                return ctx.session.state["message"]
+
+        return ""
+
+    def _get_session_id(self, ctx: InvocationContext) -> str:
+        """Gets or generates a session ID."""
+        if ctx.session and hasattr(ctx.session, "id"):
+            return str(ctx.session.id)
+        return str(uuid.uuid4())
+
+    async def _prepare_initial_state(
+        self, ctx: InvocationContext, user_message: str, session_id: str
+    ) -> State:
+        """Prepares the initial state for workflow execution."""
+        user_event = Event(
+            author="user",
+            content=Content(parts=[Part(text=user_message)]),
+        )
+
+        conversation_history = ctx.session.events or [user_event]
+
+        return State(
+            content=[user_event],
+            status="started",
+            session_id=session_id,
+            cycle_count=0,
+            node_outputs={},
+            conversation_history=conversation_history,
+        )
+
+    async def _execute_workflow(
+        self, ctx: InvocationContext, graph: StateGraph, initial_state: State
+    ) -> AsyncGenerator[Event, None]:
+        """Executes the workflow graph and yields events."""
+        sent_events = 0
+
+        async for state in graph.astream(initial_state, {"recursion_limit": 100}):
+            for node_state in state.values():
+                content = node_state.get("content", [])
+                for event in content[sent_events:]:
+                    if event.author != "user":
+                        yield event
+                sent_events = len(content)
+
+        # Execute sub-agents if any
+        for sub_agent in self.sub_agents:
+            async for event in sub_agent.run_async(ctx):
+                yield event
+
+    async def _handle_workflow_error(self, error: Exception) -> Event:
+        """Creates an error event for workflow execution errors."""
+        error_msg = f"Error executing the workflow agent: {str(error)}"
+        print(error_msg)
+        return Event(
+            author=self.name,
+            content=Content(
+                role="agent",
+                parts=[Part(text=error_msg)],
+            ),
+        )

@@ -1,7 +1,7 @@
 """
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ @author: Davidson Gomes                                                      │
-│ @file: run_seeders.py                                                        │
+│ @file: chat_routes.py                                                        │
 │ Developed by: Davidson Gomes                                                 │
 │ Creation date: May 13, 2025                                                  │
 │ Contact: contato@evolution-api.com                                           │
@@ -84,8 +84,8 @@ async def websocket_chat(
             auth_data = await websocket.receive_json()
             logger.info(f"Received authentication data: {auth_data}")
 
-            if not auth_data.get("type") == "authorization" or not auth_data.get(
-                "token"
+            if not (
+                auth_data.get("type") == "authorization" and auth_data.get("token")
             ):
                 logger.warning("Invalid authentication message")
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
@@ -188,7 +188,7 @@ async def chat(
     await verify_user_client(payload, db, agent.client_id)
 
     try:
-        final_response_text = await run_agent(
+        final_response = await run_agent(
             request.agent_id,
             request.external_id,
             request.message,
@@ -199,14 +199,15 @@ async def chat(
         )
 
         return {
-            "response": final_response_text,
+            "response": final_response["final_response"],
+            "message_history": final_response["message_history"],
             "status": "success",
             "timestamp": datetime.now().isoformat(),
         }
 
     except AgentNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
-        )
+        ) from e
