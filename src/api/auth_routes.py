@@ -191,14 +191,36 @@ async def login_for_access_token(form_data: UserLogin, db: Session = Depends(get
     Raises:
         HTTPException: If credentials are invalid
     """
-    user = authenticate_user(db, form_data.email, form_data.password)
+    user, reason = authenticate_user(db, form_data.email, form_data.password)
     if not user:
-        logger.warning(f"Login attempt with invalid credentials: {form_data.email}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        if reason == "user_not_found" or reason == "invalid_password":
+            logger.warning(f"Login attempt with invalid credentials: {form_data.email}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        elif reason == "email_not_verified":
+            logger.warning(f"Login attempt with unverified email: {form_data.email}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Email not verified",
+            )
+        elif reason == "inactive_user":
+            logger.warning(f"Login attempt with inactive user: {form_data.email}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is inactive",
+            )
+        else:
+            logger.warning(
+                f"Login attempt failed for {form_data.email} (reason: {reason})"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
     access_token = create_access_token(user)
     logger.info(f"Login successful for user: {user.email}")
