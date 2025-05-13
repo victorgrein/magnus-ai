@@ -1,6 +1,5 @@
 import sendgrid
 from sendgrid.helpers.mail import Mail, Email, To, Content
-from src.config.settings import settings
 import logging
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -51,12 +50,12 @@ def send_verification_email(email: str, token: str) -> bool:
         bool: True if the email was sent successfully, False otherwise
     """
     try:
-        sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
-        from_email = Email(settings.EMAIL_FROM)
+        sg = sendgrid.SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY"))
+        from_email = Email(os.getenv("EMAIL_FROM"))
         to_email = To(email)
         subject = "Email Verification - Evo AI"
 
-        verification_link = f"{settings.APP_URL}/api/v1/auth/verify-email/{token}"
+        verification_link = f"{os.getenv('APP_URL')}/security/verify-email?code={token}"
 
         html_content = _render_template(
             "verification_email",
@@ -100,12 +99,12 @@ def send_password_reset_email(email: str, token: str) -> bool:
         bool: True if the email was sent successfully, False otherwise
     """
     try:
-        sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
-        from_email = Email(settings.EMAIL_FROM)
+        sg = sendgrid.SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY"))
+        from_email = Email(os.getenv("EMAIL_FROM"))
         to_email = To(email)
         subject = "Password Reset - Evo AI"
 
-        reset_link = f"{settings.APP_URL}/reset-password?token={token}"
+        reset_link = f"{os.getenv('APP_URL')}/security/reset-password?token={token}"
 
         html_content = _render_template(
             "password_reset",
@@ -149,12 +148,12 @@ def send_welcome_email(email: str, user_name: str = None) -> bool:
         bool: True if the email was sent successfully, False otherwise
     """
     try:
-        sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
-        from_email = Email(settings.EMAIL_FROM)
+        sg = sendgrid.SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY"))
+        from_email = Email(os.getenv("EMAIL_FROM"))
         to_email = To(email)
         subject = "Welcome to Evo AI"
 
-        dashboard_link = f"{settings.APP_URL}/dashboard"
+        dashboard_link = f"{os.getenv('APP_URL')}/dashboard"
 
         html_content = _render_template(
             "welcome_email",
@@ -200,12 +199,14 @@ def send_account_locked_email(
         bool: True if the email was sent successfully, False otherwise
     """
     try:
-        sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
-        from_email = Email(settings.EMAIL_FROM)
+        sg = sendgrid.SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY"))
+        from_email = Email(os.getenv("EMAIL_FROM"))
         to_email = To(email)
         subject = "Security Alert - Account Locked"
 
-        reset_link = f"{settings.APP_URL}/reset-password?token={reset_token}"
+        reset_link = (
+            f"{os.getenv('APP_URL')}/security/reset-password?token={reset_token}"
+        )
 
         html_content = _render_template(
             "account_locked",

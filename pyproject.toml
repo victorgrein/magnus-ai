@@ -11,11 +11,11 @@ authors = [
     {name = "EvoAI Team", email = "admin@evoai.com"}
 ]
 requires-python = ">=3.10"
-license = {text = "Proprietary"}
+license = {text = "Apache-2.0"}
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
-    "License :: Other/Proprietary License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
 
