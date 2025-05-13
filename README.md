@@ -493,6 +493,21 @@ make alembic-upgrade
 make seed-all
 ```
 
+## 🖥️ Frontend Installation
+
+After installing Evo AI (the backend), you need to install the frontend to access the web interface:
+
+1. Clone the frontend repository:
+
+```bash
+git clone https://github.com/EvolutionAPI/evo-ai-frontend.git
+cd evo-ai-frontend
+```
+
+2. Follow the installation instructions in the frontend repository's README to set up and run the web interface.
+
+> The backend (API) and frontend are separate projects. Make sure both are running for full platform functionality.
+
 ## 🚀 Getting Started
 
 After installation, follow these steps to set up your first agent:
