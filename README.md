@@ -1,7 +1,5 @@
 # Evo AI - AI Agents Platform
 
-> **License:** This project is licensed under the [Apache License 2.0](./LICENSE). The use of the "Evolution API" trademark is protected as described in section 6 (Trademarks) of the license.
-
 Evo AI is an open-source platform for creating and managing AI agents, enabling integration with different AI models and services.
 
 ## 🚀 Overview
