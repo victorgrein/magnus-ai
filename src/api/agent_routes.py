@@ -560,3 +560,64 @@ async def delete_agent(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found"
         )
+
+
+@router.post("/{agent_id}/share", response_model=Dict[str, str])
+async def share_agent(
+    agent_id: uuid.UUID,
+    x_client_id: uuid.UUID = Header(..., alias="x-client-id"),
+    db: Session = Depends(get_db),
+    payload: dict = Depends(get_jwt_token),
+):
+    """Returns the agent's API key for sharing"""
+    await verify_user_client(payload, db, x_client_id)
+
+    # Verify if the agent exists
+    agent = agent_service.get_agent(db, agent_id)
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found"
+        )
+
+    # Verify if the agent belongs to the specified client
+    if agent.client_id != x_client_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Agent does not belong to the specified client",
+        )
+
+    # Verify if API key exists
+    if not agent.config or not agent.config.get("api_key"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This agent does not have an API key",
+        )
+
+    return {"api_key": agent.config["api_key"]}
+
+
+@router.get("/{agent_id}/shared", response_model=Agent)
+async def get_shared_agent(
+    agent_id: uuid.UUID,
+    api_key: str = Header(..., alias="x-api-key"),
+    db: Session = Depends(get_db),
+):
+    """Get agent details using only API key authentication"""
+    # Verify if the agent exists
+    agent = agent_service.get_agent(db, agent_id)
+    if not agent or not agent.config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found"
+        )
+
+    # Verify if the API key matches
+    if not agent.config.get("api_key") or agent.config.get("api_key") != api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key"
+        )
+
+    # Add agent card URL if not present
+    if not agent.agent_card_url:
+        agent.agent_card_url = agent.agent_card_url_property
+
+    return agent

@@ -27,6 +27,7 @@
 └──────────────────────────────────────────────────────────────────────────────┘
 """
 
+import uuid
 from fastapi import (
     APIRouter,
     Depends,
@@ -34,6 +35,7 @@ from fastapi import (
     status,
     WebSocket,
     WebSocketDisconnect,
+    Header,
 )
 from sqlalchemy.orm import Session
 from src.config.database import get_db
@@ -57,6 +59,7 @@ from src.services.service_providers import (
 from datetime import datetime
 import logging
 import json
+from typing import Optional, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +68,59 @@ router = APIRouter(
     tags=["chat"],
     responses={404: {"description": "Not found"}},
 )
+
+
+async def get_agent_by_api_key(
+    agent_id: str,
+    api_key: Optional[str] = Header(None, alias="x-api-key"),
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Flexible authentication for chat routes, allowing JWT or API key"""
+    if authorization:
+        # Try to authenticate with JWT token first
+        try:
+            # Extract token from Authorization header if needed
+            token = (
+                authorization.replace("Bearer ", "")
+                if authorization.startswith("Bearer ")
+                else authorization
+            )
+            payload = await get_jwt_token(token)
+            agent = agent_service.get_agent(db, agent_id)
+            if not agent:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Agent not found",
+                )
+
+            # Verify if the user has access to the agent's client
+            await verify_user_client(payload, db, agent.client_id)
+            return agent
+        except Exception as e:
+            logger.warning(f"JWT authentication failed: {str(e)}")
+            # If JWT fails, continue to try with API key
+
+    # Try to authenticate with API key
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required (JWT or API key)",
+        )
+
+    agent = agent_service.get_agent(db, agent_id)
+    if not agent or not agent.config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found"
+        )
+
+    # Verify if the API key matches
+    if not agent.config.get("api_key") or agent.config.get("api_key") != api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key"
+        )
+
+    return agent
 
 
 @router.websocket("/ws/{agent_id}/{external_id}")
@@ -82,32 +138,49 @@ async def websocket_chat(
         # Wait for authentication message
         try:
             auth_data = await websocket.receive_json()
-            logger.info(f"Received authentication data: {auth_data}")
+            logger.info(f"Authentication data received: {auth_data}")
 
             if not (
-                auth_data.get("type") == "authorization" and auth_data.get("token")
+                auth_data.get("type") == "authorization"
+                and (auth_data.get("token") or auth_data.get("api_key"))
             ):
                 logger.warning("Invalid authentication message")
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                 return
 
-            token = auth_data["token"]
-            # Verify the token
-            payload = await get_jwt_token_ws(token)
-            if not payload:
-                logger.warning("Invalid token")
-                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-                return
-
-            # Verify if the agent belongs to the user's client
+            # Verify if the agent exists
             agent = agent_service.get_agent(db, agent_id)
             if not agent:
                 logger.warning(f"Agent {agent_id} not found")
                 await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
                 return
 
-            # Verify if the user has access to the agent (via client)
-            await verify_user_client(payload, db, agent.client_id)
+            # Verify authentication
+            is_authenticated = False
+
+            # Try with JWT token
+            if auth_data.get("token"):
+                try:
+                    payload = await get_jwt_token_ws(auth_data["token"])
+                    if payload:
+                        # Verify if the user has access to the agent
+                        await verify_user_client(payload, db, agent.client_id)
+                        is_authenticated = True
+                except Exception as e:
+                    logger.warning(f"JWT authentication failed: {str(e)}")
+
+            # If JWT fails, try with API key
+            if not is_authenticated and auth_data.get("api_key"):
+                if agent.config and agent.config.get("api_key") == auth_data.get(
+                    "api_key"
+                ):
+                    is_authenticated = True
+                else:
+                    logger.warning("Invalid API key")
+
+            if not is_authenticated:
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
 
             logger.info(
                 f"WebSocket connection established for agent {agent_id} and external_id {external_id}"
@@ -174,19 +247,9 @@ async def websocket_chat(
 )
 async def chat(
     request: ChatRequest,
+    _=Depends(get_agent_by_api_key),
     db: Session = Depends(get_db),
-    payload: dict = Depends(get_jwt_token),
 ):
-    # Verify if the agent belongs to the user's client
-    agent = agent_service.get_agent(db, request.agent_id)
-    if not agent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Agent not found"
-        )
-
-    # Verify if the user has access to the agent (via client)
-    await verify_user_client(payload, db, agent.client_id)
-
     try:
         final_response = await run_agent(
             request.agent_id,
