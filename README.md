@@ -196,7 +196,7 @@ Task Agent is ideal for scenarios where you need to execute a specific, well-def
 
 ### MCP Server Configuration
 
-Agents can be integrated with MCP (Model Control Protocol) servers for distributed processing:
+Agents can be integrated with MCP (Model Context Protocol) servers for distributed processing:
 
 ```json
 {
@@ -543,7 +543,7 @@ cd evo-ai-frontend
 
 After installation, follow these steps to set up your first agent:
 
-1. **Configure MCP Server**: Set up your Model Control Protocol server configuration first
+1. **Configure MCP Server**: Set up your Model Context Protocol server configuration first
 2. **Create Client or Register**: Create a new client or register a user account
 3. **Create Agents**: Set up the agents according to your needs (LLM, A2A, Sequential, Parallel, Loop, or Workflow)
 
