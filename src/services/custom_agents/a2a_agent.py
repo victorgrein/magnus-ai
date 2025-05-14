@@ -202,7 +202,6 @@ class A2ACustomAgent(BaseAgent):
                 print("Agent supports streaming, using streaming API")
                 # Process with streaming
                 try:
-                    # Criar a requisição usando o método correto de tasks/sendSubscribe
                     request = SendTaskStreamingRequest(
                         method="tasks/sendSubscribe", params=task_params
                     )
@@ -217,7 +216,6 @@ class A2ACustomAgent(BaseAgent):
                             )
                             response.raise_for_status()
 
-                            # Processar manualmente a resposta SSE
                             async for line in response.aiter_lines():
                                 if line.startswith("data:"):
                                     data = line[5:].strip()
@@ -279,8 +277,6 @@ class A2ACustomAgent(BaseAgent):
                         print(
                             f"Error in direct streaming: {str(stream_error)}, falling back to regular API"
                         )
-                        # If streaming fails, fall back to regular API
-                        # Criar a requisição usando o método correto de tasks/send
                         fallback_request = SendTaskRequest(
                             method="tasks/send", params=task_params
                         )
@@ -340,7 +336,6 @@ class A2ACustomAgent(BaseAgent):
                 print("Agent does not support streaming, using regular API")
                 # Process with regular request
                 try:
-                    # Criar a requisição usando o método correto de tasks/send
                     request = SendTaskRequest(method="tasks/send", params=task_params)
 
                     async with httpx.AsyncClient() as client:
