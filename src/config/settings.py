@@ -81,9 +81,22 @@ class Settings(BaseSettings):
     # Encryption settings
     ENCRYPTION_KEY: str = os.getenv("ENCRYPTION_KEY", secrets.token_urlsafe(32))
 
+    # Email provider settings
+    EMAIL_PROVIDER: str = os.getenv("EMAIL_PROVIDER", "sendgrid")
+    
     # SendGrid settings
     SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "noreply@yourdomain.com")
+    
+    # SMTP settings
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", 587))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
+    SMTP_USE_SSL: bool = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
+    SMTP_FROM: str = os.getenv("SMTP_FROM", "")
+    
     APP_URL: str = os.getenv("APP_URL", "http://localhost:8000")
 
     # Server settings
