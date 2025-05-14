@@ -202,7 +202,7 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
             if "api_key" not in agent.config or not agent.config["api_key"]:
                 agent.config["api_key"] = generate_api_key()
 
-        elif agent.type == "crew_ai":
+        elif agent.type == "crew_ai" or agent.type == "task":
             if not isinstance(agent.config, dict):
                 agent.config = {}
                 raise HTTPException(
@@ -213,7 +213,7 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
             if "tasks" not in agent.config:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid configuration: tasks is required for crew_ai agents",
+                    detail=f"Invalid configuration: tasks is required for {agent.type} agents",
                 )
 
             if not agent.config["tasks"]:
@@ -682,14 +682,14 @@ async def update_agent(
         if "config" not in agent_data:
             agent_data["config"] = agent_config
 
-        if ("type" in agent_data and agent_data["type"] == "crew_ai") or (
-            agent.type == "crew_ai" and "config" in agent_data
+        if ("type" in agent_data and agent_data["type"] in ["crew_ai", "task"]) or (
+            agent.type in ["crew_ai", "task"] and "config" in agent_data
         ):
             config = agent_data.get("config", {})
             if "tasks" not in config:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Invalid configuration: tasks is required for crew_ai agents",
+                    detail=f"Invalid configuration: tasks is required for {agent_data.get('type', agent.type)} agents",
                 )
 
             if not config["tasks"]:

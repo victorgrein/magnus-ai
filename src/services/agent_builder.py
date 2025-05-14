@@ -41,6 +41,7 @@ from src.services.mcp_service import MCPService
 from src.services.custom_agents.a2a_agent import A2ACustomAgent
 from src.services.custom_agents.workflow_agent import WorkflowAgent
 from src.services.custom_agents.crew_ai_agent import CrewAIAgent
+from src.services.custom_agents.task_agent import TaskAgent
 from src.services.apikey_service import get_decrypted_api_key
 from sqlalchemy.orm import Session
 from contextlib import AsyncExitStack
@@ -314,6 +315,55 @@ class AgentBuilder:
             logger.error(f"Error building Workflow agent: {str(e)}")
             raise ValueError(f"Error building Workflow agent: {str(e)}")
 
+    async def build_task_agent(
+        self, root_agent
+    ) -> Tuple[TaskAgent, Optional[AsyncExitStack]]:
+        """Build a task agent with its sub-agents."""
+        logger.info(f"Creating Task agent: {root_agent.name}")
+
+        agent_config = root_agent.config or {}
+
+        if not agent_config.get("tasks"):
+            raise ValueError("tasks are required for Task agents")
+
+        try:
+            # Get sub-agents if there are any
+            sub_agents = []
+            if root_agent.config.get("sub_agents"):
+                sub_agents_with_stacks = await self._get_sub_agents(
+                    root_agent.config.get("sub_agents")
+                )
+                sub_agents = [agent for agent, _ in sub_agents_with_stacks]
+
+            # Additional configurations
+            config = root_agent.config or {}
+
+            # Convert tasks to the expected format by TaskAgent
+            tasks = []
+            for task_config in config.get("tasks", []):
+                task = CrewAITask(
+                    agent_id=task_config.get("agent_id"),
+                    description=task_config.get("description", ""),
+                    expected_output=task_config.get("expected_output", ""),
+                )
+                tasks.append(task)
+
+            # Create the Task agent
+            task_agent = TaskAgent(
+                name=root_agent.name,
+                tasks=tasks,
+                db=self.db,
+                sub_agents=sub_agents,
+            )
+
+            logger.info(f"Task agent created successfully: {root_agent.name}")
+
+            return task_agent, None
+
+        except Exception as e:
+            logger.error(f"Error building Task agent: {str(e)}")
+            raise ValueError(f"Error building CrewAI agent: {str(e)}")
+
     async def build_crew_ai_agent(
         self, root_agent: Agent
     ) -> Tuple[CrewAIAgent, Optional[AsyncExitStack]]:
@@ -434,7 +484,8 @@ class AgentBuilder:
         | LoopAgent
         | A2ACustomAgent
         | WorkflowAgent
-        | CrewAIAgent,
+        | CrewAIAgent
+        | TaskAgent,
         Optional[AsyncExitStack],
     ]:
         """Build the appropriate agent based on the type of the root agent."""
@@ -446,5 +497,7 @@ class AgentBuilder:
             return await self.build_workflow_agent(root_agent)
         elif root_agent.type == "crew_ai":
             return await self.build_crew_ai_agent(root_agent)
+        elif root_agent.type == "task":
+            return await self.build_task_agent(root_agent)
         else:
             return await self.build_composite_agent(root_agent)

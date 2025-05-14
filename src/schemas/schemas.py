@@ -98,7 +98,7 @@ class AgentBase(BaseModel):
     goal: Optional[str] = Field(None, description="Agent goal or objective")
     type: str = Field(
         ...,
-        description="Agent type (llm, sequential, parallel, loop, a2a, workflow, crew_ai)",
+        description="Agent type (llm, sequential, parallel, loop, a2a, workflow, crew_ai, task)",
     )
     model: Optional[str] = Field(
         None, description="Agent model (required only for llm type)"
@@ -137,9 +137,10 @@ class AgentBase(BaseModel):
             "a2a",
             "workflow",
             "crew_ai",
+            "task",
         ]:
             raise ValueError(
-                "Invalid agent type. Must be: llm, sequential, parallel, loop, a2a, workflow or crew_ai"
+                "Invalid agent type. Must be: llm, sequential, parallel, loop, a2a, workflow, crew_ai or task"
             )
         return v
 
@@ -199,7 +200,7 @@ class AgentBase(BaseModel):
                 raise ValueError(
                     f'Agent {values["type"]} must have at least one sub-agent'
                 )
-        elif values["type"] == "crew_ai":
+        elif values["type"] == "crew_ai" or values["type"] == "task":
             if not isinstance(v, dict):
                 raise ValueError(f'Invalid configuration for agent {values["type"]}')
             if "tasks" not in v:

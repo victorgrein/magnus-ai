@@ -1,7 +1,7 @@
 """
 ┌──────────────────────────────────────────────────────────────────────────────┐
 │ @author: Davidson Gomes                                                      │
-│ @file: crew_ai_agent.py                                                      │
+│ @file: task_agent.py                                                         │
 │ Developed by: Davidson Gomes                                                 │
 │ Creation date: May 14, 2025                                                  │
 │ Contact: contato@evolution-api.com                                           │
@@ -41,14 +41,12 @@ from typing import AsyncGenerator, List
 
 from src.schemas.agent_config import CrewAITask
 
-from crewai import Agent, Task, Crew, LLM
 
-
-class CrewAIAgent(BaseAgent):
+class TaskAgent(BaseAgent):
     """
-    Custom agent that implements the CrewAI protocol directly.
+    Custom agent that implements the Task function.
 
-    This agent implements the interaction with an external CrewAI service.
+    This agent implements the interaction with an external Task service.
     """
 
     # Field declarations for Pydantic
@@ -64,13 +62,13 @@ class CrewAIAgent(BaseAgent):
         **kwargs,
     ):
         """
-        Initialize the CrewAI agent.
+        Initialize the Task agent.
 
         Args:
             name: Agent name
             tasks: List of tasks to be executed
             db: Database session
-            sub_agents: List of sub-agents to be executed after the CrewAI agent
+            sub_agents: List of sub-agents to be executed after the Task agent
         """
         # Initialize base class
         super().__init__(
@@ -81,81 +79,16 @@ class CrewAIAgent(BaseAgent):
             **kwargs,
         )
 
-    def _generate_llm(self, model: str, api_key: str):
-        """
-        Generate the LLM for the CrewAI agent.
-        """
-
-        return LLM(model=model, api_key=api_key)
-
-    def _agent_builder(self, agent_id: str):
-        """
-        Build the CrewAI agent.
-        """
-        agent = get_agent(self.db, agent_id)
-
-        if not agent:
-            raise ValueError(f"Agent with id {agent_id} not found")
-
-        api_key = None
-
-        decrypted_key = get_decrypted_api_key(self.db, agent.api_key_id)
-        if decrypted_key:
-            api_key = decrypted_key
-        else:
-            raise ValueError(
-                f"API key with ID {agent.api_key_id} not found or inactive"
-            )
-
-        if not api_key:
-            raise ValueError(f"API key for agent {agent.name} not found")
-
-        return Agent(
-            role=agent.role,
-            goal=agent.goal,
-            backstory=agent.instruction,
-            llm=self._generate_llm(agent.model, api_key),
-            verbose=True,
-        )
-
-    def _tasks_and_agents_builder(self):
-        """
-        Build the CrewAI tasks.
-        """
-        tasks = []
-        agents = []
-        for task in self.tasks:
-            agent = self._agent_builder(task.agent_id)
-            agents.append(agent)
-            tasks.append(
-                Task(
-                    description=task.description,
-                    expected_output=task.expected_output,
-                    agent=agent,
-                )
-            )
-        return tasks, agents
-
-    def _crew_builder(self):
-        """
-        Build the CrewAI crew.
-        """
-        tasks, agents = self._tasks_and_agents_builder()
-        return Crew(
-            agents=agents,
-            tasks=tasks,
-            verbose=True,
-        )
-
     async def _run_async_impl(
         self, ctx: InvocationContext
     ) -> AsyncGenerator[Event, None]:
         """
-        Implementation of the CrewAI.
+        Implementation of the Task agent.
 
         This method follows the pattern of implementing custom agents,
-        sending the user's message to the CrewAI service and monitoring the response.
+        sending the user's message to the Task service and monitoring the response.
         """
+        exit_stack = None
 
         try:
             # Extract the user's message from the context
@@ -186,61 +119,76 @@ class CrewAIAgent(BaseAgent):
                 )
                 return
 
+            # Start the agent status
+            yield Event(
+                author=self.name,
+                content=Content(
+                    role="agent",
+                    parts=[Part(text=f"Starting {self.name} task processing...")],
+                ),
+            )
+
             try:
                 # Replace any {content} in the task descriptions with the user's input
-                for task in self.tasks:
-                    task.description = task.description.replace(
-                        "{content}", user_message
+                task = self.tasks[0]
+                task.description = task.description.replace("{content}", user_message)
+
+                agent = get_agent(self.db, task.agent_id)
+
+                if not agent:
+                    yield Event(
+                        author=self.name,
+                        content=Content(parts=[Part(text="Agent not found")]),
                     )
+                    return
 
-                # Build the Crew
-                crew = self._crew_builder()
+                # Prepare task instructions
+                task_message_instructions = f"""
+                <task>
+                    <instructions>
+                        Execute the following task:
+                    </instructions>
+                    <description>{task.description}</description>
+                    <expected_output>{task.expected_output}</expected_output>
+                </task>
+                """
 
-                # Start the agent status
+                # Send task instructions as an event
                 yield Event(
-                    author=self.name,
+                    author=f"{self.name} - Task executor",
                     content=Content(
                         role="agent",
-                        parts=[Part(text=f"Starting CrewAI processing...")],
+                        parts=[Part(text=task_message_instructions)],
                     ),
                 )
 
-                # Prepare inputs (if there are placeholders to replace)
-                inputs = {"user_message": user_message}
+                from src.services.agent_builder import AgentBuilder
 
-                # Notify the user that the processing is in progress
-                yield Event(
-                    author=self.name,
-                    content=Content(
-                        role="agent",
-                        parts=[Part(text=f"Processing your request...")],
-                    ),
-                )
+                print(f"Building agent in Task agent: {agent.name}")
+                agent_builder = AgentBuilder(self.db)
+                root_agent, exit_stack = await agent_builder.build_agent(agent)
 
-                # Try first with kickoff() normally
+                # Store task instructions in context for reference by sub-agents
+                ctx.session.state["task_instructions"] = task_message_instructions
+
+                # Process the agent responses
                 try:
-                    # If it fails, try with kickoff_async
-                    result = await crew.kickoff_async(inputs=inputs)
-                    print(f"Result of crew.kickoff_async(): {result}")
-                except Exception as e:
-                    print(f"Error executing crew.kickoff_async(): {str(e)}")
-                    print("Trying alternative with crew.kickoff()")
-                    result = crew.kickoff(inputs=inputs)
-                    print(f"Result of crew.kickoff(): {result}")
-
-                # Create an event for the final result
-                final_event = Event(
-                    author=self.name,
-                    content=Content(role="agent", parts=[Part(text=str(result))]),
-                )
-
-                # Transmit the event to the client
-                yield final_event
-
-                # Execute sub-agents
-                for sub_agent in self.sub_agents:
-                    async for event in sub_agent.run_async(ctx):
+                    async for event in root_agent.run_async(ctx):
                         yield event
+                except GeneratorExit:
+                    print("Generator was closed prematurely, handling cleanup...")
+                    # Allow the exception to propagate after cleanup
+                    raise
+                except Exception as e:
+                    error_msg = f"Error during agent execution: {str(e)}"
+                    print(error_msg)
+                    yield Event(
+                        author=self.name,
+                        content=Content(
+                            role="agent",
+                            parts=[Part(text=error_msg)],
+                        ),
+                    )
 
             except Exception as e:
                 error_msg = f"Error sending request: {str(e)}"
@@ -252,15 +200,32 @@ class CrewAIAgent(BaseAgent):
                     author=self.name,
                     content=Content(role="agent", parts=[Part(text=error_msg)]),
                 )
-                return
 
         except Exception as e:
             # Handle any uncaught error
-            print(f"Error executing CrewAI agent: {str(e)}")
+            print(f"Error executing Task agent: {str(e)}")
             yield Event(
                 author=self.name,
                 content=Content(
                     role="agent",
-                    parts=[Part(text=f"Error interacting with CrewAI agent: {str(e)}")],
+                    parts=[Part(text=f"Error interacting with Task agent: {str(e)}")],
                 ),
             )
+        finally:
+            # Ensure we close the exit_stack in the same task context where it was created
+            if exit_stack:
+                try:
+                    await exit_stack.aclose()
+                    print("Exit stack closed successfully")
+                except Exception as e:
+                    print(f"Error closing exit_stack: {str(e)}")
+
+            # Execute sub-agents only if no exception occurred
+            try:
+                if "e" not in locals():
+                    for sub_agent in self.sub_agents:
+                        async for event in sub_agent.run_async(ctx):
+                            yield event
+            except Exception as sub_e:
+                print(f"Error executing sub-agents: {str(sub_e)}")
+                # We don't yield a new event here to avoid raising during cleanup

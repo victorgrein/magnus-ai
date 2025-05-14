@@ -187,6 +187,39 @@ Allows organizing agents into a "crew" with specific tasks assigned to each agen
 }
 ```
 
+### 8. Task Agent
+
+Executes a specific task using a target agent. Task Agent provides a streamlined approach for structured task execution, where the agent_id specifies which agent will process the task, and the task description can include dynamic content placeholders.
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "name": "web_search_task",
+  "type": "task",
+  "folder_id": "folder_id (optional)",
+  "config": {
+    "tasks": [
+      {
+        "agent_id": "search-agent-uuid",
+        "description": "Search the web for information about {content}",
+        "expected_output": "Comprehensive search results with relevant information"
+      }
+    ],
+    "sub_agents": ["post-processing-agent-uuid"]
+  }
+}
+```
+
+Key features of Task Agent:
+
+- Passes structured task instructions to the designated agent
+- Supports variable content using {content} placeholder in the task description
+- Provides clear task definition with instructions and expected output format
+- Can execute sub-agents after the main task is completed
+- Simplifies orchestration for single-focused task execution
+
+Task Agent is ideal for scenarios where you need to execute a specific, well-defined task with clear instructions and expectations.
+
 ### Common Characteristics
 
 - All agent types can have sub-agents

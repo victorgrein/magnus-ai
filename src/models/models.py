@@ -123,7 +123,7 @@ class Agent(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "type IN ('llm', 'sequential', 'parallel', 'loop', 'a2a', 'workflow', 'crew_ai')",
+            "type IN ('llm', 'sequential', 'parallel', 'loop', 'a2a', 'workflow', 'crew_ai', 'task')",
             name="check_agent_type",
         ),
     )
