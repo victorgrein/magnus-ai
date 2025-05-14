@@ -33,7 +33,7 @@ from datetime import datetime
 from uuid import UUID
 import uuid
 import re
-from src.schemas.agent_config import LLMConfig, CrewAIConfig
+from src.schemas.agent_config import LLMConfig, AgentConfig
 
 
 class ClientBase(BaseModel):
@@ -98,7 +98,7 @@ class AgentBase(BaseModel):
     goal: Optional[str] = Field(None, description="Agent goal or objective")
     type: str = Field(
         ...,
-        description="Agent type (llm, sequential, parallel, loop, a2a, workflow, crew_ai, task)",
+        description="Agent type (llm, sequential, parallel, loop, a2a, workflow, task)",
     )
     model: Optional[str] = Field(
         None, description="Agent model (required only for llm type)"
@@ -136,11 +136,10 @@ class AgentBase(BaseModel):
             "loop",
             "a2a",
             "workflow",
-            "crew_ai",
             "task",
         ]:
             raise ValueError(
-                "Invalid agent type. Must be: llm, sequential, parallel, loop, a2a, workflow, crew_ai or task"
+                "Invalid agent type. Must be: llm, sequential, parallel, loop, a2a, workflow or task"
             )
         return v
 
@@ -200,7 +199,7 @@ class AgentBase(BaseModel):
                 raise ValueError(
                     f'Agent {values["type"]} must have at least one sub-agent'
                 )
-        elif values["type"] == "crew_ai" or values["type"] == "task":
+        elif values["type"] == "task":
             if not isinstance(v, dict):
                 raise ValueError(f'Invalid configuration for agent {values["type"]}')
             if "tasks" not in v:
@@ -217,7 +216,6 @@ class AgentBase(BaseModel):
                     if field not in task:
                         raise ValueError(f"Task missing required field: {field}")
 
-            # Validar sub_agents, se existir
             if "sub_agents" in v and v["sub_agents"] is not None:
                 if not isinstance(v["sub_agents"], list):
                     raise ValueError("sub_agents must be a list")

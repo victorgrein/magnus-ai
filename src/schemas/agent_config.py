@@ -238,11 +238,14 @@ class WorkflowConfig(BaseModel):
         from_attributes = True
 
 
-class CrewAITask(BaseModel):
-    """Task configuration for Crew AI agents"""
+class AgentTask(BaseModel):
+    """Task configuration for agents"""
 
     agent_id: Union[UUID, str] = Field(
         ..., description="ID of the agent assigned to this task"
+    )
+    enabled_tools: Optional[List[str]] = Field(
+        default_factory=list, description="List of tool names to be used in the task"
     )
     description: str = Field(..., description="Description of the task to be performed")
     expected_output: str = Field(..., description="Expected output from this task")
@@ -260,17 +263,17 @@ class CrewAITask(BaseModel):
         from_attributes = True
 
 
-class CrewAIConfig(BaseModel):
-    """Configuration for Crew AI agents"""
+class AgentConfig(BaseModel):
+    """Configuration for agents"""
 
-    tasks: List[CrewAITask] = Field(
-        ..., description="List of tasks to be performed by the crew"
+    tasks: List[AgentTask] = Field(
+        ..., description="List of tasks to be performed by the agent"
     )
     api_key: Optional[str] = Field(
-        default_factory=generate_api_key, description="API key for the Crew AI agent"
+        default_factory=generate_api_key, description="API key for the agent"
     )
     sub_agents: Optional[List[UUID]] = Field(
-        default_factory=list, description="List of IDs of sub-agents used in crew"
+        default_factory=list, description="List of IDs of sub-agents used in agent"
     )
 
     class Config:

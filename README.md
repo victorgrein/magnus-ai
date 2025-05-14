@@ -15,7 +15,6 @@ The Evo AI platform allows:
 - JWT authentication with email verification
 - **[Agent 2 Agent (A2A) Protocol Support](https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/)**: Interoperability between AI agents following Google's A2A specification
 - **[Workflow Agent with LangGraph](https://www.langchain.com/langgraph)**: Building complex agent workflows with LangGraph and ReactFlow
-- **[CrewAI Agent Support](https://www.crewai.com/)**: Organizing agents into specialized crews with assigned tasks
 - **Secure API Key Management**: Encrypted storage of API keys with Fernet encryption
 - **Agent Organization**: Folder structure for organizing agents by categories
 
@@ -154,40 +153,7 @@ Executes sub-agents in a custom workflow defined by a graph structure. This agen
 
 The workflow structure is built using ReactFlow in the frontend, allowing visual creation and editing of complex agent workflows with nodes (representing agents or decision points) and edges (representing flow connections).
 
-### 7. CrewAI Agent
-
-Allows organizing agents into a "crew" with specific tasks assigned to each agent. Based on the CrewAI concept, where each agent has a specific responsibility to perform a more complex task collaboratively.
-
-```json
-{
-  "client_id": "{{client_id}}",
-  "name": "research_crew",
-  "type": "crew_ai",
-  "folder_id": "folder_id (optional)",
-  "config": {
-    "tasks": [
-      {
-        "agent_id": "agent-uuid-1",
-        "description": "Search for recent information on the topic",
-        "expected_output": "Search report in JSON format"
-      },
-      {
-        "agent_id": "agent-uuid-2",
-        "description": "Analyze data and create visualizations",
-        "expected_output": "Charts and analyses in HTML format"
-      },
-      {
-        "agent_id": "agent-uuid-3",
-        "description": "Write final report combining results",
-        "expected_output": "Markdown document with complete analysis"
-      }
-    ],
-    "sub_agents": ["agent-uuid-4", "agent-uuid-5"]
-  }
-}
-```
-
-### 8. Task Agent
+### 7. Task Agent
 
 Executes a specific task using a target agent. Task Agent provides a streamlined approach for structured task execution, where the agent_id specifies which agent will process the task, and the task description can include dynamic content placeholders.
 

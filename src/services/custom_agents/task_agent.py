@@ -33,13 +33,12 @@ from google.adk.agents.invocation_context import InvocationContext
 from google.adk.events import Event
 from google.genai.types import Content, Part
 from src.services.agent_service import get_agent
-from src.services.apikey_service import get_decrypted_api_key
 
 from sqlalchemy.orm import Session
 
 from typing import AsyncGenerator, List
 
-from src.schemas.agent_config import CrewAITask
+from src.schemas.agent_config import AgentTask
 
 
 class TaskAgent(BaseAgent):
@@ -50,13 +49,13 @@ class TaskAgent(BaseAgent):
     """
 
     # Field declarations for Pydantic
-    tasks: List[CrewAITask]
+    tasks: List[AgentTask]
     db: Session
 
     def __init__(
         self,
         name: str,
-        tasks: List[CrewAITask],
+        tasks: List[AgentTask],
         db: Session,
         sub_agents: List[BaseAgent] = [],
         **kwargs,
@@ -132,6 +131,7 @@ class TaskAgent(BaseAgent):
                 # Replace any {content} in the task descriptions with the user's input
                 task = self.tasks[0]
                 task.description = task.description.replace("{content}", user_message)
+                task.enabled_tools = task.enabled_tools or []
 
                 agent = get_agent(self.db, task.agent_id)
 
@@ -166,7 +166,9 @@ class TaskAgent(BaseAgent):
 
                 print(f"Building agent in Task agent: {agent.name}")
                 agent_builder = AgentBuilder(self.db)
-                root_agent, exit_stack = await agent_builder.build_agent(agent)
+                root_agent, exit_stack = await agent_builder.build_agent(
+                    agent, task.enabled_tools
+                )
 
                 # Store task instructions in context for reference by sub-agents
                 ctx.session.state["task_instructions"] = task_message_instructions
