@@ -204,6 +204,7 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
 
         elif agent.type == "crew_ai":
             if not isinstance(agent.config, dict):
+                agent.config = {}
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid configuration: must be an object with tasks",
@@ -221,7 +222,6 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                     detail="Invalid configuration: tasks cannot be empty",
                 )
 
-            # Validar se todos os agent_id nas tasks existem
             for task in agent.config["tasks"]:
                 if "agent_id" not in task:
                     raise HTTPException(
@@ -237,7 +237,6 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                         detail=f"Agent not found for task: {agent_id}",
                     )
 
-            # Validar sub_agents se existir
             if "sub_agents" in agent.config and agent.config["sub_agents"]:
                 if not validate_sub_agents(db, agent.config["sub_agents"]):
                     raise HTTPException(
@@ -245,7 +244,6 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                         detail="One or more sub-agents do not exist",
                     )
 
-            # Gerar API key se não existir
             if "api_key" not in agent.config or not agent.config["api_key"]:
                 agent.config["api_key"] = generate_api_key()
 
@@ -684,7 +682,6 @@ async def update_agent(
         if "config" not in agent_data:
             agent_data["config"] = agent_config
 
-        # Validar configuração de crew_ai, se aplicável
         if ("type" in agent_data and agent_data["type"] == "crew_ai") or (
             agent.type == "crew_ai" and "config" in agent_data
         ):
@@ -701,7 +698,6 @@ async def update_agent(
                     detail="Invalid configuration: tasks cannot be empty",
                 )
 
-            # Validar se todos os agent_id nas tasks existem
             for task in config["tasks"]:
                 if "agent_id" not in task:
                     raise HTTPException(

@@ -221,11 +221,7 @@ class AgentBase(BaseModel):
                 if not isinstance(v["sub_agents"], list):
                     raise ValueError("sub_agents must be a list")
 
-            try:
-                # Convert the dictionary to CrewAIConfig
-                v = CrewAIConfig(**v)
-            except Exception as e:
-                raise ValueError(f"Invalid Crew AI configuration for agent: {str(e)}")
+            return v
 
         return v
 
