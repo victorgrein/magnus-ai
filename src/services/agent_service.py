@@ -103,6 +103,14 @@ def get_agent(db: Session, agent_id: Union[uuid.UUID, str]) -> Optional[Agent]:
             logger.warning(f"Agent not found: {agent_id}")
             return None
 
+        # Sanitize agent name if it contains spaces or special characters
+        if agent.name and any(c for c in agent.name if not (c.isalnum() or c == "_")):
+            agent.name = "".join(
+                c if c.isalnum() or c == "_" else "_" for c in agent.name
+            )
+            # Update in database
+            db.commit()
+
         return agent
     except SQLAlchemyError as e:
         logger.error(f"Error searching for agent {agent_id}: {str(e)}")
@@ -144,6 +152,17 @@ def get_agents_by_client(
 
         agents = query.offset(skip).limit(limit).all()
 
+        # Sanitize agent names if they contain spaces or special characters
+        for agent in agents:
+            if agent.name and any(
+                c for c in agent.name if not (c.isalnum() or c == "_")
+            ):
+                agent.name = "".join(
+                    c if c.isalnum() or c == "_" else "_" for c in agent.name
+                )
+                # Update in database
+                db.commit()
+
         return agents
     except SQLAlchemyError as e:
         logger.error(f"Error searching for client agents {client_id}: {str(e)}")
@@ -176,7 +195,15 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                     agent_card = response.json()
 
                 # Update agent with information from agent card
-                agent.name = agent_card.get("name", "Unknown Agent")
+                # Only update name if not provided or empty, or sanitize it
+                if not agent.name or agent.name.strip() == "":
+                    # Sanitize name: remove spaces and special characters
+                    card_name = agent_card.get("name", "Unknown Agent")
+                    sanitized_name = "".join(
+                        c if c.isalnum() or c == "_" else "_" for c in card_name
+                    )
+                    agent.name = sanitized_name
+
                 agent.description = agent_card.get("description", "")
 
                 if agent.config is None:
@@ -499,7 +526,14 @@ async def update_agent(
                         )
                     agent_card = response.json()
 
-                agent_data["name"] = agent_card.get("name", "Unknown Agent")
+                # Only update name if the original update doesn't specify a name
+                if "name" not in agent_data or not agent_data["name"].strip():
+                    # Sanitize name: remove spaces and special characters
+                    card_name = agent_card.get("name", "Unknown Agent")
+                    sanitized_name = "".join(
+                        c if c.isalnum() or c == "_" else "_" for c in card_name
+                    )
+                    agent_data["name"] = sanitized_name
                 agent_data["description"] = agent_card.get("description", "")
 
                 if "config" not in agent_data or agent_data["config"] is None:
@@ -537,7 +571,14 @@ async def update_agent(
                         )
                     agent_card = response.json()
 
-                agent_data["name"] = agent_card.get("name", "Unknown Agent")
+                # Only update name if the original update doesn't specify a name
+                if "name" not in agent_data or not agent_data["name"].strip():
+                    # Sanitize name: remove spaces and special characters
+                    card_name = agent_card.get("name", "Unknown Agent")
+                    sanitized_name = "".join(
+                        c if c.isalnum() or c == "_" else "_" for c in card_name
+                    )
+                    agent_data["name"] = sanitized_name
                 agent_data["description"] = agent_card.get("description", "")
 
                 if "config" not in agent_data or agent_data["config"] is None:
