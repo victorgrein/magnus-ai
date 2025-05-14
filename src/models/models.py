@@ -100,6 +100,8 @@ class Agent(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     client_id = Column(UUID(as_uuid=True), ForeignKey("clients.id", ondelete="CASCADE"))
     name = Column(String, nullable=False)
+    role = Column(String, nullable=True)
+    goal = Column(Text, nullable=True)
     description = Column(Text, nullable=True)
     type = Column(String, nullable=False)
     model = Column(String, nullable=True, default="")
@@ -121,7 +123,7 @@ class Agent(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "type IN ('llm', 'sequential', 'parallel', 'loop', 'a2a', 'workflow')",
+            "type IN ('llm', 'sequential', 'parallel', 'loop', 'a2a', 'workflow', 'crew_ai')",
             name="check_agent_type",
         ),
     )

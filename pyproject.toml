@@ -51,6 +51,7 @@ dependencies = [
     "langgraph==0.4.1",
     "opentelemetry-sdk==1.33.0",
     "opentelemetry-exporter-otlp==1.33.0",
+    "crewai==0.119.0",
 ]
 
 [project.optional-dependencies]

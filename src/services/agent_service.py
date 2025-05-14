@@ -202,6 +202,53 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
             if "api_key" not in agent.config or not agent.config["api_key"]:
                 agent.config["api_key"] = generate_api_key()
 
+        elif agent.type == "crew_ai":
+            if not isinstance(agent.config, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid configuration: must be an object with tasks",
+                )
+
+            if "tasks" not in agent.config:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid configuration: tasks is required for crew_ai agents",
+                )
+
+            if not agent.config["tasks"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid configuration: tasks cannot be empty",
+                )
+
+            # Validar se todos os agent_id nas tasks existem
+            for task in agent.config["tasks"]:
+                if "agent_id" not in task:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Each task must have an agent_id",
+                    )
+
+                agent_id = task["agent_id"]
+                task_agent = get_agent(db, agent_id)
+                if not task_agent:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Agent not found for task: {agent_id}",
+                    )
+
+            # Validar sub_agents se existir
+            if "sub_agents" in agent.config and agent.config["sub_agents"]:
+                if not validate_sub_agents(db, agent.config["sub_agents"]):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="One or more sub-agents do not exist",
+                    )
+
+            # Gerar API key se não existir
+            if "api_key" not in agent.config or not agent.config["api_key"]:
+                agent.config["api_key"] = generate_api_key()
+
         # Additional sub-agent validation (for non-llm and non-a2a types)
         elif agent.type != "llm":
             if not isinstance(agent.config, dict):
@@ -636,6 +683,47 @@ async def update_agent(
         agent_config = agent.config or {}
         if "config" not in agent_data:
             agent_data["config"] = agent_config
+
+        # Validar configuração de crew_ai, se aplicável
+        if ("type" in agent_data and agent_data["type"] == "crew_ai") or (
+            agent.type == "crew_ai" and "config" in agent_data
+        ):
+            config = agent_data.get("config", {})
+            if "tasks" not in config:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid configuration: tasks is required for crew_ai agents",
+                )
+
+            if not config["tasks"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid configuration: tasks cannot be empty",
+                )
+
+            # Validar se todos os agent_id nas tasks existem
+            for task in config["tasks"]:
+                if "agent_id" not in task:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Each task must have an agent_id",
+                    )
+
+                agent_id = task["agent_id"]
+                task_agent = get_agent(db, agent_id)
+                if not task_agent:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Agent not found for task: {agent_id}",
+                    )
+
+            # Validar sub_agents se existir
+            if "sub_agents" in config and config["sub_agents"]:
+                if not validate_sub_agents(db, config["sub_agents"]):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="One or more sub-agents do not exist",
+                    )
 
         if not agent_config.get("api_key") and (
             "config" not in agent_data or not agent_data["config"].get("api_key")

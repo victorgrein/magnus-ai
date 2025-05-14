@@ -24,6 +24,8 @@
 │ For any future changes to the code in this file, it is recommended to        │
 │ include, together with the modification, the information of the developer    │
 │ who changed it and the date of modification.                                 │
+│                                                                              │
+│ @update: May 14, 2025 - Added support for crew_ai agent type                 │
 └──────────────────────────────────────────────────────────────────────────────┘
 """
 

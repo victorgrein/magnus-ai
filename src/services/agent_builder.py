@@ -32,13 +32,15 @@ from google.adk.agents.llm_agent import LlmAgent
 from google.adk.agents import SequentialAgent, ParallelAgent, LoopAgent, BaseAgent
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools.agent_tool import AgentTool
+from src.schemas.schemas import Agent
 from src.utils.logger import setup_logger
 from src.core.exceptions import AgentNotFoundError
 from src.services.agent_service import get_agent
 from src.services.custom_tools import CustomToolBuilder
 from src.services.mcp_service import MCPService
-from src.services.a2a_agent import A2ACustomAgent
-from src.services.workflow_agent import WorkflowAgent
+from src.services.custom_agents.a2a_agent import A2ACustomAgent
+from src.services.custom_agents.workflow_agent import WorkflowAgent
+from src.services.custom_agents.crew_ai_agent import CrewAIAgent
 from src.services.apikey_service import get_decrypted_api_key
 from sqlalchemy.orm import Session
 from contextlib import AsyncExitStack
@@ -46,6 +48,8 @@ from google.adk.tools import load_memory
 
 from datetime import datetime
 import uuid
+
+from src.schemas.agent_config import CrewAITask
 
 logger = setup_logger(__name__)
 
@@ -103,6 +107,18 @@ class AgentBuilder:
             current_date_iso=current_date_iso,
             current_time=current_time,
         )
+
+        # add role on beginning of the prompt
+        if agent.role:
+            formatted_prompt = (
+                f"<agent_role>{agent.role}</agent_role>\n\n{formatted_prompt}"
+            )
+
+        # add goal on beginning of the prompt
+        if agent.goal:
+            formatted_prompt = (
+                f"<agent_goal>{agent.goal}</agent_goal>\n\n{formatted_prompt}"
+            )
 
         # Check if load_memory is enabled
         if agent.config.get("load_memory"):
@@ -298,6 +314,56 @@ class AgentBuilder:
             logger.error(f"Error building Workflow agent: {str(e)}")
             raise ValueError(f"Error building Workflow agent: {str(e)}")
 
+    async def build_crew_ai_agent(
+        self, root_agent: Agent
+    ) -> Tuple[CrewAIAgent, Optional[AsyncExitStack]]:
+        """Build a CrewAI agent with its sub-agents."""
+        logger.info(f"Creating CrewAI agent: {root_agent.name}")
+
+        agent_config = root_agent.config or {}
+
+        # Verify if we have tasks configured
+        if not agent_config.get("tasks"):
+            raise ValueError("tasks are required for CrewAI agents")
+
+        try:
+            # Get sub-agents if there are any
+            sub_agents = []
+            if root_agent.config.get("sub_agents"):
+                sub_agents_with_stacks = await self._get_sub_agents(
+                    root_agent.config.get("sub_agents")
+                )
+                sub_agents = [agent for agent, _ in sub_agents_with_stacks]
+
+            # Additional configurations
+            config = root_agent.config or {}
+
+            # Convert tasks to the expected format by CrewAIAgent
+            tasks = []
+            for task_config in config.get("tasks", []):
+                task = CrewAITask(
+                    agent_id=task_config.get("agent_id"),
+                    description=task_config.get("description", ""),
+                    expected_output=task_config.get("expected_output", ""),
+                )
+                tasks.append(task)
+
+            # Create the CrewAI agent
+            crew_ai_agent = CrewAIAgent(
+                name=root_agent.name,
+                tasks=tasks,
+                db=self.db,
+                sub_agents=sub_agents,
+            )
+
+            logger.info(f"CrewAI agent created successfully: {root_agent.name}")
+
+            return crew_ai_agent, None
+
+        except Exception as e:
+            logger.error(f"Error building CrewAI agent: {str(e)}")
+            raise ValueError(f"Error building CrewAI agent: {str(e)}")
+
     async def build_composite_agent(
         self, root_agent
     ) -> Tuple[SequentialAgent | ParallelAgent | LoopAgent, Optional[AsyncExitStack]]:
@@ -367,7 +433,8 @@ class AgentBuilder:
         | ParallelAgent
         | LoopAgent
         | A2ACustomAgent
-        | WorkflowAgent,
+        | WorkflowAgent
+        | CrewAIAgent,
         Optional[AsyncExitStack],
     ]:
         """Build the appropriate agent based on the type of the root agent."""
@@ -377,5 +444,7 @@ class AgentBuilder:
             return await self.build_a2a_agent(root_agent)
         elif root_agent.type == "workflow":
             return await self.build_workflow_agent(root_agent)
+        elif root_agent.type == "crew_ai":
+            return await self.build_crew_ai_agent(root_agent)
         else:
             return await self.build_composite_agent(root_agent)

@@ -11,9 +11,11 @@ The Evo AI platform allows:
 - Client management
 - MCP server configuration
 - Custom tools management
+- **[Google Agent Development Kit (ADK)](https://google.github.io/adk-docs/)**: Base framework for agent development, providing support for LLM Agents, Sequential Agents, Loop Agents, Parallel Agents and Custom Agents
 - JWT authentication with email verification
-- **Agent 2 Agent (A2A) Protocol Support**: Interoperability between AI agents following Google's A2A specification
-- **Workflow Agent with LangGraph**: Building complex agent workflows with LangGraph and ReactFlow
+- **[Agent 2 Agent (A2A) Protocol Support](https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/)**: Interoperability between AI agents following Google's A2A specification
+- **[Workflow Agent with LangGraph](https://www.langchain.com/langgraph)**: Building complex agent workflows with LangGraph and ReactFlow
+- **[CrewAI Agent Support](https://www.crewai.com/)**: Organizing agents into specialized crews with assigned tasks
 - **Secure API Key Management**: Encrypted storage of API keys with Fernet encryption
 - **Agent Organization**: Folder structure for organizing agents by categories
 
@@ -30,6 +32,8 @@ Agent based on language models like GPT-4, Claude, etc. Can be configured with t
   "client_id": "{{client_id}}",
   "name": "personal_assistant",
   "description": "Specialized personal assistant",
+  "role": "Personal Assistant",
+  "goal": "Help users with daily tasks and provide relevant information",
   "type": "llm",
   "model": "gpt-4",
   "api_key_id": "stored-api-key-uuid",
@@ -149,6 +153,39 @@ Executes sub-agents in a custom workflow defined by a graph structure. This agen
 ```
 
 The workflow structure is built using ReactFlow in the frontend, allowing visual creation and editing of complex agent workflows with nodes (representing agents or decision points) and edges (representing flow connections).
+
+### 7. CrewAI Agent
+
+Allows organizing agents into a "crew" with specific tasks assigned to each agent. Based on the CrewAI concept, where each agent has a specific responsibility to perform a more complex task collaboratively.
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "name": "research_crew",
+  "type": "crew_ai",
+  "folder_id": "folder_id (optional)",
+  "config": {
+    "tasks": [
+      {
+        "agent_id": "agent-uuid-1",
+        "description": "Search for recent information on the topic",
+        "expected_output": "Search report in JSON format"
+      },
+      {
+        "agent_id": "agent-uuid-2",
+        "description": "Analyze data and create visualizations",
+        "expected_output": "Charts and analyses in HTML format"
+      },
+      {
+        "agent_id": "agent-uuid-3",
+        "description": "Write final report combining results",
+        "expected_output": "Markdown document with complete analysis"
+      }
+    ],
+    "sub_agents": ["agent-uuid-4", "agent-uuid-5"]
+  }
+}
+```
 
 ### Common Characteristics
 
@@ -355,7 +392,7 @@ Evo AI implements the Google's Agent 2 Agent (A2A) protocol, enabling seamless c
 - **Standardized Communication**: Agents can communicate using a common protocol regardless of their underlying implementation
 - **Interoperability**: Support for agents built with different frameworks and technologies
 - **Well-Known Endpoints**: Standardized endpoints for agent discovery and interaction
-- **Task Management**: Support for task-based interactions between agents
+- **Task Management**: Support for task creation, execution, and status tracking
 - **State Management**: Tracking of agent states and conversation history
 - **Authentication**: Secure API key-based authentication for agent interactions
 
