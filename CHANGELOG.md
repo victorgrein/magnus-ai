@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add Task Agent for structured single-task execution
 - Improve context management in agent execution
+- Add file support for A2A protocol (Agent-to-Agent) endpoints
+- Implement multimodal content processing in A2A messages
 
 ## [0.0.9] - 2025-05-13
 

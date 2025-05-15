@@ -28,6 +28,7 @@
 """
 
 import uuid
+import base64
 from fastapi import (
     APIRouter,
     Depends,
@@ -47,7 +48,7 @@ from src.core.jwt_middleware import (
 from src.services import (
     agent_service,
 )
-from src.schemas.chat import ChatRequest, ChatResponse, ErrorResponse
+from src.schemas.chat import ChatRequest, ChatResponse, ErrorResponse, FileData
 from src.services.agent_runner import run_agent, run_agent_stream
 from src.core.exceptions import AgentNotFoundError
 from src.services.service_providers import (
@@ -59,7 +60,7 @@ from src.services.service_providers import (
 from datetime import datetime
 import logging
 import json
-from typing import Optional, Dict
+from typing import Optional, Dict, List, Any
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +196,29 @@ async def websocket_chat(
                     if not message:
                         continue
 
+                    files = None
+                    if data.get("files") and isinstance(data.get("files"), list):
+                        try:
+                            files = []
+                            for file_data in data.get("files"):
+                                if (
+                                    isinstance(file_data, dict)
+                                    and file_data.get("filename")
+                                    and file_data.get("content_type")
+                                    and file_data.get("data")
+                                ):
+                                    files.append(
+                                        FileData(
+                                            filename=file_data.get("filename"),
+                                            content_type=file_data.get("content_type"),
+                                            data=file_data.get("data"),
+                                        )
+                                    )
+                            logger.info(f"Processed {len(files)} files via WebSocket")
+                        except Exception as e:
+                            logger.error(f"Error processing files: {str(e)}")
+                            files = None
+
                     async for chunk in run_agent_stream(
                         agent_id=agent_id,
                         external_id=external_id,
@@ -203,6 +227,7 @@ async def websocket_chat(
                         artifacts_service=artifacts_service,
                         memory_service=memory_service,
                         db=db,
+                        files=files,
                     ):
                         await websocket.send_json(
                             {"message": json.loads(chunk), "turn_complete": False}
@@ -259,6 +284,7 @@ async def chat(
             artifacts_service,
             memory_service,
             db,
+            files=request.files,
         )
 
         return {

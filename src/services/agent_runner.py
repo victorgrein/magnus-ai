@@ -28,7 +28,7 @@
 """
 
 from google.adk.runners import Runner
-from google.genai.types import Content, Part
+from google.genai.types import Content, Part, Blob
 from google.adk.sessions import DatabaseSessionService
 from google.adk.memory import InMemoryMemoryService
 from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
@@ -42,6 +42,7 @@ import asyncio
 import json
 from src.utils.otel import get_tracer
 from opentelemetry import trace
+import base64
 
 logger = setup_logger(__name__)
 
@@ -56,6 +57,7 @@ async def run_agent(
     db: Session,
     session_id: Optional[str] = None,
     timeout: float = 60.0,
+    files: Optional[list] = None,
 ):
     tracer = get_tracer()
     with tracer.start_as_current_span(
@@ -65,6 +67,7 @@ async def run_agent(
             "external_id": external_id,
             "session_id": session_id or f"{external_id}_{agent_id}",
             "message": message,
+            "has_files": files is not None and len(files) > 0,
         },
     ):
         exit_stack = None
@@ -73,6 +76,9 @@ async def run_agent(
                 f"Starting execution of agent {agent_id} for external_id {external_id}"
             )
             logger.info(f"Received message: {message}")
+
+            if files and len(files) > 0:
+                logger.info(f"Received {len(files)} files with message")
 
             get_root_agent = get_agent(db, agent_id)
             logger.info(
@@ -113,7 +119,63 @@ async def run_agent(
                     session_id=adk_session_id,
                 )
 
-            content = Content(role="user", parts=[Part(text=message)])
+            file_parts = []
+            if files and len(files) > 0:
+                for file_data in files:
+                    try:
+                        file_bytes = base64.b64decode(file_data.data)
+
+                        logger.info(f"DEBUG - Processing file: {file_data.filename}")
+                        logger.info(f"DEBUG - File size: {len(file_bytes)} bytes")
+                        logger.info(f"DEBUG - MIME type: '{file_data.content_type}'")
+                        logger.info(f"DEBUG - First 20 bytes: {file_bytes[:20]}")
+
+                        try:
+                            file_part = Part(
+                                inline_data=Blob(
+                                    mime_type=file_data.content_type, data=file_bytes
+                                )
+                            )
+                            logger.info(f"DEBUG - Part created successfully")
+                        except Exception as part_error:
+                            logger.error(
+                                f"DEBUG - Error creating Part: {str(part_error)}"
+                            )
+                            logger.error(
+                                f"DEBUG - Error type: {type(part_error).__name__}"
+                            )
+                            import traceback
+
+                            logger.error(
+                                f"DEBUG - Stack trace: {traceback.format_exc()}"
+                            )
+                            raise
+
+                        # Save the file in the ArtifactService
+                        version = artifacts_service.save_artifact(
+                            app_name=agent_id,
+                            user_id=external_id,
+                            session_id=adk_session_id,
+                            filename=file_data.filename,
+                            artifact=file_part,
+                        )
+                        logger.info(
+                            f"Saved file {file_data.filename} as version {version}"
+                        )
+
+                        # Add the Part to the list of parts for the message content
+                        file_parts.append(file_part)
+                    except Exception as e:
+                        logger.error(
+                            f"Error processing file {file_data.filename}: {str(e)}"
+                        )
+
+            # Create the content with the text message and the files
+            parts = [Part(text=message)]
+            if file_parts:
+                parts.extend(file_parts)
+
+            content = Content(role="user", parts=parts)
             logger.info("Starting agent execution")
 
             final_response_text = "No final response captured."
@@ -256,6 +318,7 @@ async def run_agent_stream(
     memory_service: InMemoryMemoryService,
     db: Session,
     session_id: Optional[str] = None,
+    files: Optional[list] = None,
 ) -> AsyncGenerator[str, None]:
     tracer = get_tracer()
     span = tracer.start_span(
@@ -265,6 +328,7 @@ async def run_agent_stream(
             "external_id": external_id,
             "session_id": session_id or f"{external_id}_{agent_id}",
             "message": message,
+            "has_files": files is not None and len(files) > 0,
         },
     )
     try:
@@ -274,6 +338,9 @@ async def run_agent_stream(
                     f"Starting streaming execution of agent {agent_id} for external_id {external_id}"
                 )
                 logger.info(f"Received message: {message}")
+
+                if files and len(files) > 0:
+                    logger.info(f"Received {len(files)} files with message")
 
                 get_root_agent = get_agent(db, agent_id)
                 logger.info(
@@ -314,7 +381,72 @@ async def run_agent_stream(
                         session_id=adk_session_id,
                     )
 
-                content = Content(role="user", parts=[Part(text=message)])
+                # Process the received files
+                file_parts = []
+                if files and len(files) > 0:
+                    for file_data in files:
+                        try:
+                            # Decode the base64 file
+                            file_bytes = base64.b64decode(file_data.data)
+
+                            # Detailed debug
+                            logger.info(
+                                f"DEBUG - Processing file: {file_data.filename}"
+                            )
+                            logger.info(f"DEBUG - File size: {len(file_bytes)} bytes")
+                            logger.info(
+                                f"DEBUG - MIME type: '{file_data.content_type}'"
+                            )
+                            logger.info(f"DEBUG - First 20 bytes: {file_bytes[:20]}")
+
+                            # Create a Part for the file using the default constructor
+                            try:
+                                file_part = Part(
+                                    inline_data=Blob(
+                                        mime_type=file_data.content_type,
+                                        data=file_bytes,
+                                    )
+                                )
+                                logger.info(f"DEBUG - Part created successfully")
+                            except Exception as part_error:
+                                logger.error(
+                                    f"DEBUG - Error creating Part: {str(part_error)}"
+                                )
+                                logger.error(
+                                    f"DEBUG - Error type: {type(part_error).__name__}"
+                                )
+                                import traceback
+
+                                logger.error(
+                                    f"DEBUG - Stack trace: {traceback.format_exc()}"
+                                )
+                                raise
+
+                            # Save the file in the ArtifactService
+                            version = artifacts_service.save_artifact(
+                                app_name=agent_id,
+                                user_id=external_id,
+                                session_id=adk_session_id,
+                                filename=file_data.filename,
+                                artifact=file_part,
+                            )
+                            logger.info(
+                                f"Saved file {file_data.filename} as version {version}"
+                            )
+
+                            # Add the Part to the list of parts for the message content
+                            file_parts.append(file_part)
+                        except Exception as e:
+                            logger.error(
+                                f"Error processing file {file_data.filename}: {str(e)}"
+                            )
+
+                # Create the content with the text message and the files
+                parts = [Part(text=message)]
+                if file_parts:
+                    parts.extend(file_parts)
+
+                content = Content(role="user", parts=parts)
                 logger.info("Starting agent streaming execution")
 
                 try:
