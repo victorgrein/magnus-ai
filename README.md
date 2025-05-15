@@ -11,9 +11,10 @@ The Evo AI platform allows:
 - Client management
 - MCP server configuration
 - Custom tools management
+- **[Google Agent Development Kit (ADK)](https://google.github.io/adk-docs/)**: Base framework for agent development, providing support for LLM Agents, Sequential Agents, Loop Agents, Parallel Agents and Custom Agents
 - JWT authentication with email verification
-- **Agent 2 Agent (A2A) Protocol Support**: Interoperability between AI agents following Google's A2A specification
-- **Workflow Agent with LangGraph**: Building complex agent workflows with LangGraph and ReactFlow
+- **[Agent 2 Agent (A2A) Protocol Support](https://developers.googleblog.com/en/a2a-a-new-era-of-agent-interoperability/)**: Interoperability between AI agents following Google's A2A specification
+- **[Workflow Agent with LangGraph](https://www.langchain.com/langgraph)**: Building complex agent workflows with LangGraph and ReactFlow
 - **Secure API Key Management**: Encrypted storage of API keys with Fernet encryption
 - **Agent Organization**: Folder structure for organizing agents by categories
 
@@ -30,6 +31,8 @@ Agent based on language models like GPT-4, Claude, etc. Can be configured with t
   "client_id": "{{client_id}}",
   "name": "personal_assistant",
   "description": "Specialized personal assistant",
+  "role": "Personal Assistant",
+  "goal": "Help users with daily tasks and provide relevant information",
   "type": "llm",
   "model": "gpt-4",
   "api_key_id": "stored-api-key-uuid",
@@ -150,6 +153,39 @@ Executes sub-agents in a custom workflow defined by a graph structure. This agen
 
 The workflow structure is built using ReactFlow in the frontend, allowing visual creation and editing of complex agent workflows with nodes (representing agents or decision points) and edges (representing flow connections).
 
+### 7. Task Agent
+
+Executes a specific task using a target agent. Task Agent provides a streamlined approach for structured task execution, where the agent_id specifies which agent will process the task, and the task description can include dynamic content placeholders.
+
+```json
+{
+  "client_id": "{{client_id}}",
+  "name": "web_search_task",
+  "type": "task",
+  "folder_id": "folder_id (optional)",
+  "config": {
+    "tasks": [
+      {
+        "agent_id": "search-agent-uuid",
+        "description": "Search the web for information about {content}",
+        "expected_output": "Comprehensive search results with relevant information"
+      }
+    ],
+    "sub_agents": ["post-processing-agent-uuid"]
+  }
+}
+```
+
+Key features of Task Agent:
+
+- Passes structured task instructions to the designated agent
+- Supports variable content using {content} placeholder in the task description
+- Provides clear task definition with instructions and expected output format
+- Can execute sub-agents after the main task is completed
+- Simplifies orchestration for single-focused task execution
+
+Task Agent is ideal for scenarios where you need to execute a specific, well-defined task with clear instructions and expectations.
+
 ### Common Characteristics
 
 - All agent types can have sub-agents
@@ -160,7 +196,7 @@ The workflow structure is built using ReactFlow in the frontend, allowing visual
 
 ### MCP Server Configuration
 
-Agents can be integrated with MCP (Model Control Protocol) servers for distributed processing:
+Agents can be integrated with MCP (Model Context Protocol) servers for distributed processing:
 
 ```json
 {
@@ -355,7 +391,7 @@ Evo AI implements the Google's Agent 2 Agent (A2A) protocol, enabling seamless c
 - **Standardized Communication**: Agents can communicate using a common protocol regardless of their underlying implementation
 - **Interoperability**: Support for agents built with different frameworks and technologies
 - **Well-Known Endpoints**: Standardized endpoints for agent discovery and interaction
-- **Task Management**: Support for task-based interactions between agents
+- **Task Management**: Support for task creation, execution, and status tracking
 - **State Management**: Tracking of agent states and conversation history
 - **Authentication**: Secure API key-based authentication for agent interactions
 
@@ -507,7 +543,7 @@ cd evo-ai-frontend
 
 After installation, follow these steps to set up your first agent:
 
-1. **Configure MCP Server**: Set up your Model Control Protocol server configuration first
+1. **Configure MCP Server**: Set up your Model Context Protocol server configuration first
 2. **Create Client or Register**: Create a new client or register a user account
 3. **Create Agents**: Set up the agents according to your needs (LLM, A2A, Sequential, Parallel, Loop, or Workflow)
 

@@ -29,7 +29,7 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, Union, Dict, List, Optional
 from uuid import uuid4
 from typing_extensions import Self
 

@@ -33,7 +33,7 @@ from datetime import datetime
 from uuid import UUID
 import uuid
 import re
-from src.schemas.agent_config import LLMConfig
+from src.schemas.agent_config import LLMConfig, AgentConfig
 
 
 class ClientBase(BaseModel):
@@ -94,8 +94,11 @@ class AgentBase(BaseModel):
         None, description="Agent name (no spaces or special characters)"
     )
     description: Optional[str] = Field(None, description="Agent description")
+    role: Optional[str] = Field(None, description="Agent role in the system")
+    goal: Optional[str] = Field(None, description="Agent goal or objective")
     type: str = Field(
-        ..., description="Agent type (llm, sequential, parallel, loop, a2a, workflow)"
+        ...,
+        description="Agent type (llm, sequential, parallel, loop, a2a, workflow, task)",
     )
     model: Optional[str] = Field(
         None, description="Agent model (required only for llm type)"
@@ -126,9 +129,17 @@ class AgentBase(BaseModel):
 
     @validator("type")
     def validate_type(cls, v):
-        if v not in ["llm", "sequential", "parallel", "loop", "a2a", "workflow"]:
+        if v not in [
+            "llm",
+            "sequential",
+            "parallel",
+            "loop",
+            "a2a",
+            "workflow",
+            "task",
+        ]:
             raise ValueError(
-                "Invalid agent type. Must be: llm, sequential, parallel, loop, a2a or workflow"
+                "Invalid agent type. Must be: llm, sequential, parallel, loop, a2a, workflow or task"
             )
         return v
 
@@ -188,6 +199,28 @@ class AgentBase(BaseModel):
                 raise ValueError(
                     f'Agent {values["type"]} must have at least one sub-agent'
                 )
+        elif values["type"] == "task":
+            if not isinstance(v, dict):
+                raise ValueError(f'Invalid configuration for agent {values["type"]}')
+            if "tasks" not in v:
+                raise ValueError(f'Agent {values["type"]} must have tasks')
+            if not isinstance(v["tasks"], list):
+                raise ValueError("tasks must be a list")
+            if not v["tasks"]:
+                raise ValueError(f'Agent {values["type"]} must have at least one task')
+            for task in v["tasks"]:
+                if not isinstance(task, dict):
+                    raise ValueError("Each task must be a dictionary")
+                required_fields = ["agent_id", "description", "expected_output"]
+                for field in required_fields:
+                    if field not in task:
+                        raise ValueError(f"Task missing required field: {field}")
+
+            if "sub_agents" in v and v["sub_agents"] is not None:
+                if not isinstance(v["sub_agents"], list):
+                    raise ValueError("sub_agents must be a list")
+
+            return v
 
         return v
 

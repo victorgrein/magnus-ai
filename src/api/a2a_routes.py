@@ -31,6 +31,7 @@
 Routes for the A2A (Agent-to-Agent) protocol.
 
 This module implements the standard A2A routes according to the specification.
+Supports both text messages and file uploads through the message parts mechanism.
 """
 
 import uuid
@@ -92,7 +93,39 @@ async def process_a2a_request(
     db: Session = Depends(get_db),
     a2a_service: A2AService = Depends(get_a2a_service),
 ):
-    """Processes an A2A request."""
+    """
+    Processes an A2A request.
+
+    Supports both text messages and file uploads. For file uploads,
+    include file parts in the message following the A2A protocol format:
+
+    {
+        "jsonrpc": "2.0",
+        "id": "request-id",
+        "method": "tasks/send",
+        "params": {
+            "id": "task-id",
+            "sessionId": "session-id",
+            "message": {
+                "role": "user",
+                "parts": [
+                    {
+                        "type": "text",
+                        "text": "Analyze this image"
+                    },
+                    {
+                        "type": "file",
+                        "file": {
+                            "name": "example.jpg",
+                            "mimeType": "image/jpeg",
+                            "bytes": "base64-encoded-content"
+                        }
+                    }
+                ]
+            }
+        }
+    }
+    """
     # Verify the API key
     if not verify_api_key(db, x_api_key):
         raise HTTPException(status_code=401, detail="Invalid API key")
@@ -100,10 +133,60 @@ async def process_a2a_request(
     # Process the request
     try:
         request_body = await request.json()
+
+        debug_request_body = {}
+        if "method" in request_body:
+            debug_request_body["method"] = request_body["method"]
+        if "id" in request_body:
+            debug_request_body["id"] = request_body["id"]
+
+        logger.info(f"A2A request received: {debug_request_body}")
+
+        # Log if request contains file parts for debugging
+        if isinstance(request_body, dict) and "params" in request_body:
+            params = request_body.get("params", {})
+            message = params.get("message", {})
+            parts = message.get("parts", [])
+
+            logger.info(f"A2A message contains {len(parts)} parts")
+            for i, part in enumerate(parts):
+                if not isinstance(part, dict):
+                    logger.warning(f"Part {i+1} is not a dictionary: {type(part)}")
+                    continue
+
+                part_type = part.get("type")
+                logger.info(f"Part {i+1} type: {part_type}")
+
+                if part_type == "file":
+                    file_info = part.get("file", {})
+                    logger.info(
+                        f"File part found: {file_info.get('name')} ({file_info.get('mimeType')})"
+                    )
+                    if "bytes" in file_info:
+                        bytes_data = file_info.get("bytes", "")
+                        bytes_size = len(bytes_data) * 0.75
+                        logger.info(f"File size: ~{bytes_size/1024:.2f} KB")
+                        if bytes_data:
+                            sample = (
+                                bytes_data[:10] + "..."
+                                if len(bytes_data) > 10
+                                else bytes_data
+                            )
+                            logger.info(f"Sample of base64 data: {sample}")
+                elif part_type == "text":
+                    text_content = part.get("text", "")
+                    preview = (
+                        text_content[:30] + "..."
+                        if len(text_content) > 30
+                        else text_content
+                    )
+                    logger.info(f"Text part found: '{preview}'")
+
         result = await a2a_service.process_request(agent_id, request_body)
 
         # If the response is a streaming response, return as EventSourceResponse
         if hasattr(result, "__aiter__"):
+            logger.info("Returning streaming response")
 
             async def event_generator():
                 async for item in result:
@@ -115,11 +198,15 @@ async def process_a2a_request(
             return EventSourceResponse(event_generator())
 
         # Otherwise, return as JSONResponse
+        logger.info("Returning standard JSON response")
         if hasattr(result, "model_dump"):
             return JSONResponse(result.model_dump(exclude_none=True))
         return JSONResponse(result)
     except Exception as e:
         logger.error(f"Error processing A2A request: {e}")
+        import traceback
+
+        logger.error(f"Full traceback: {traceback.format_exc()}")
         return JSONResponse(
             status_code=500,
             content={

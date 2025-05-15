@@ -32,13 +32,15 @@ from google.adk.agents.llm_agent import LlmAgent
 from google.adk.agents import SequentialAgent, ParallelAgent, LoopAgent, BaseAgent
 from google.adk.models.lite_llm import LiteLlm
 from google.adk.tools.agent_tool import AgentTool
+from src.schemas.schemas import Agent
 from src.utils.logger import setup_logger
 from src.core.exceptions import AgentNotFoundError
 from src.services.agent_service import get_agent
 from src.services.custom_tools import CustomToolBuilder
 from src.services.mcp_service import MCPService
-from src.services.a2a_agent import A2ACustomAgent
-from src.services.workflow_agent import WorkflowAgent
+from src.services.custom_agents.a2a_agent import A2ACustomAgent
+from src.services.custom_agents.workflow_agent import WorkflowAgent
+from src.services.custom_agents.task_agent import TaskAgent
 from src.services.apikey_service import get_decrypted_api_key
 from sqlalchemy.orm import Session
 from contextlib import AsyncExitStack
@@ -46,6 +48,8 @@ from google.adk.tools import load_memory
 
 from datetime import datetime
 import uuid
+
+from src.schemas.agent_config import AgentTask
 
 logger = setup_logger(__name__)
 
@@ -69,7 +73,7 @@ class AgentBuilder:
         return agent_tools
 
     async def _create_llm_agent(
-        self, agent
+        self, agent, enabled_tools: List[str] = []
     ) -> Tuple[LlmAgent, Optional[AsyncExitStack]]:
         """Create an LLM agent from the agent data."""
         # Get custom tools from the configuration
@@ -90,6 +94,10 @@ class AgentBuilder:
         # Combine all tools
         all_tools = custom_tools + mcp_tools + agent_tools
 
+        if enabled_tools:
+            all_tools = [tool for tool in all_tools if tool.name in enabled_tools]
+            logger.info(f"Enabled tools enabled. Total tools: {len(all_tools)}")
+
         now = datetime.now()
         current_datetime = now.strftime("%d/%m/%Y %H:%M")
         current_day_of_week = now.strftime("%A")
@@ -103,6 +111,18 @@ class AgentBuilder:
             current_date_iso=current_date_iso,
             current_time=current_time,
         )
+
+        # add role on beginning of the prompt
+        if agent.role:
+            formatted_prompt = (
+                f"<agent_role>{agent.role}</agent_role>\n\n{formatted_prompt}"
+            )
+
+        # add goal on beginning of the prompt
+        if agent.goal:
+            formatted_prompt = (
+                f"<agent_goal>{agent.goal}</agent_goal>\n\n{formatted_prompt}"
+            )
 
         # Check if load_memory is enabled
         if agent.config.get("load_memory"):
@@ -183,6 +203,8 @@ class AgentBuilder:
                 sub_agent, exit_stack = await self.build_a2a_agent(agent)
             elif agent.type == "workflow":
                 sub_agent, exit_stack = await self.build_workflow_agent(agent)
+            elif agent.type == "task":
+                sub_agent, exit_stack = await self.build_task_agent(agent)
             elif agent.type == "sequential":
                 sub_agent, exit_stack = await self.build_composite_agent(agent)
             elif agent.type == "parallel":
@@ -201,7 +223,7 @@ class AgentBuilder:
         return sub_agents
 
     async def build_llm_agent(
-        self, root_agent
+        self, root_agent, enabled_tools: List[str] = []
     ) -> Tuple[LlmAgent, Optional[AsyncExitStack]]:
         """Build an LLM agent with its sub-agents."""
         logger.info("Creating LLM agent")
@@ -213,7 +235,9 @@ class AgentBuilder:
             )
             sub_agents = [agent for agent, _ in sub_agents_with_stacks]
 
-        root_llm_agent, exit_stack = await self._create_llm_agent(root_agent)
+        root_llm_agent, exit_stack = await self._create_llm_agent(
+            root_agent, enabled_tools
+        )
         if sub_agents:
             root_llm_agent.sub_agents = sub_agents
 
@@ -298,6 +322,56 @@ class AgentBuilder:
             logger.error(f"Error building Workflow agent: {str(e)}")
             raise ValueError(f"Error building Workflow agent: {str(e)}")
 
+    async def build_task_agent(
+        self, root_agent
+    ) -> Tuple[TaskAgent, Optional[AsyncExitStack]]:
+        """Build a task agent with its sub-agents."""
+        logger.info(f"Creating Task agent: {root_agent.name}")
+
+        agent_config = root_agent.config or {}
+
+        if not agent_config.get("tasks"):
+            raise ValueError("tasks are required for Task agents")
+
+        try:
+            # Get sub-agents if there are any
+            sub_agents = []
+            if root_agent.config.get("sub_agents"):
+                sub_agents_with_stacks = await self._get_sub_agents(
+                    root_agent.config.get("sub_agents")
+                )
+                sub_agents = [agent for agent, _ in sub_agents_with_stacks]
+
+            # Additional configurations
+            config = root_agent.config or {}
+
+            # Convert tasks to the expected format by TaskAgent
+            tasks = []
+            for task_config in config.get("tasks", []):
+                task = AgentTask(
+                    agent_id=task_config.get("agent_id"),
+                    description=task_config.get("description", ""),
+                    expected_output=task_config.get("expected_output", ""),
+                    enabled_tools=task_config.get("enabled_tools", []),
+                )
+                tasks.append(task)
+
+            # Create the Task agent
+            task_agent = TaskAgent(
+                name=root_agent.name,
+                tasks=tasks,
+                db=self.db,
+                sub_agents=sub_agents,
+            )
+
+            logger.info(f"Task agent created successfully: {root_agent.name}")
+
+            return task_agent, None
+
+        except Exception as e:
+            logger.error(f"Error building Task agent: {str(e)}")
+            raise ValueError(f"Error building Task agent: {str(e)}")
+
     async def build_composite_agent(
         self, root_agent
     ) -> Tuple[SequentialAgent | ParallelAgent | LoopAgent, Optional[AsyncExitStack]]:
@@ -361,21 +435,24 @@ class AgentBuilder:
         else:
             raise ValueError(f"Invalid agent type: {root_agent.type}")
 
-    async def build_agent(self, root_agent) -> Tuple[
+    async def build_agent(self, root_agent, enabled_tools: List[str] = []) -> Tuple[
         LlmAgent
         | SequentialAgent
         | ParallelAgent
         | LoopAgent
         | A2ACustomAgent
-        | WorkflowAgent,
+        | WorkflowAgent
+        | TaskAgent,
         Optional[AsyncExitStack],
     ]:
         """Build the appropriate agent based on the type of the root agent."""
         if root_agent.type == "llm":
-            return await self.build_llm_agent(root_agent)
+            return await self.build_llm_agent(root_agent, enabled_tools)
         elif root_agent.type == "a2a":
             return await self.build_a2a_agent(root_agent)
         elif root_agent.type == "workflow":
             return await self.build_workflow_agent(root_agent)
+        elif root_agent.type == "task":
+            return await self.build_task_agent(root_agent)
         else:
             return await self.build_composite_agent(root_agent)

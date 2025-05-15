@@ -103,6 +103,14 @@ def get_agent(db: Session, agent_id: Union[uuid.UUID, str]) -> Optional[Agent]:
             logger.warning(f"Agent not found: {agent_id}")
             return None
 
+        # Sanitize agent name if it contains spaces or special characters
+        if agent.name and any(c for c in agent.name if not (c.isalnum() or c == "_")):
+            agent.name = "".join(
+                c if c.isalnum() or c == "_" else "_" for c in agent.name
+            )
+            # Update in database
+            db.commit()
+
         return agent
     except SQLAlchemyError as e:
         logger.error(f"Error searching for agent {agent_id}: {str(e)}")
@@ -144,6 +152,17 @@ def get_agents_by_client(
 
         agents = query.offset(skip).limit(limit).all()
 
+        # Sanitize agent names if they contain spaces or special characters
+        for agent in agents:
+            if agent.name and any(
+                c for c in agent.name if not (c.isalnum() or c == "_")
+            ):
+                agent.name = "".join(
+                    c if c.isalnum() or c == "_" else "_" for c in agent.name
+                )
+                # Update in database
+                db.commit()
+
         return agents
     except SQLAlchemyError as e:
         logger.error(f"Error searching for client agents {client_id}: {str(e)}")
@@ -176,7 +195,15 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
                     agent_card = response.json()
 
                 # Update agent with information from agent card
-                agent.name = agent_card.get("name", "Unknown Agent")
+                # Only update name if not provided or empty, or sanitize it
+                if not agent.name or agent.name.strip() == "":
+                    # Sanitize name: remove spaces and special characters
+                    card_name = agent_card.get("name", "Unknown Agent")
+                    sanitized_name = "".join(
+                        c if c.isalnum() or c == "_" else "_" for c in card_name
+                    )
+                    agent.name = sanitized_name
+
                 agent.description = agent_card.get("description", "")
 
                 if agent.config is None:
@@ -198,6 +225,51 @@ async def create_agent(db: Session, agent: AgentCreate) -> Agent:
         elif agent.type == "workflow":
             if not isinstance(agent.config, dict):
                 agent.config = {}
+
+            if "api_key" not in agent.config or not agent.config["api_key"]:
+                agent.config["api_key"] = generate_api_key()
+
+        elif agent.type == "task":
+            if not isinstance(agent.config, dict):
+                agent.config = {}
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid configuration: must be an object with tasks",
+                )
+
+            if "tasks" not in agent.config:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid configuration: tasks is required for {agent.type} agents",
+                )
+
+            if not agent.config["tasks"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid configuration: tasks cannot be empty",
+                )
+
+            for task in agent.config["tasks"]:
+                if "agent_id" not in task:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Each task must have an agent_id",
+                    )
+
+                agent_id = task["agent_id"]
+                task_agent = get_agent(db, agent_id)
+                if not task_agent:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Agent not found for task: {agent_id}",
+                    )
+
+            if "sub_agents" in agent.config and agent.config["sub_agents"]:
+                if not validate_sub_agents(db, agent.config["sub_agents"]):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="One or more sub-agents do not exist",
+                    )
 
             if "api_key" not in agent.config or not agent.config["api_key"]:
                 agent.config["api_key"] = generate_api_key()
@@ -454,7 +526,14 @@ async def update_agent(
                         )
                     agent_card = response.json()
 
-                agent_data["name"] = agent_card.get("name", "Unknown Agent")
+                # Only update name if the original update doesn't specify a name
+                if "name" not in agent_data or not agent_data["name"].strip():
+                    # Sanitize name: remove spaces and special characters
+                    card_name = agent_card.get("name", "Unknown Agent")
+                    sanitized_name = "".join(
+                        c if c.isalnum() or c == "_" else "_" for c in card_name
+                    )
+                    agent_data["name"] = sanitized_name
                 agent_data["description"] = agent_card.get("description", "")
 
                 if "config" not in agent_data or agent_data["config"] is None:
@@ -492,7 +571,14 @@ async def update_agent(
                         )
                     agent_card = response.json()
 
-                agent_data["name"] = agent_card.get("name", "Unknown Agent")
+                # Only update name if the original update doesn't specify a name
+                if "name" not in agent_data or not agent_data["name"].strip():
+                    # Sanitize name: remove spaces and special characters
+                    card_name = agent_card.get("name", "Unknown Agent")
+                    sanitized_name = "".join(
+                        c if c.isalnum() or c == "_" else "_" for c in card_name
+                    )
+                    agent_data["name"] = sanitized_name
                 agent_data["description"] = agent_card.get("description", "")
 
                 if "config" not in agent_data or agent_data["config"] is None:
@@ -636,6 +722,45 @@ async def update_agent(
         agent_config = agent.config or {}
         if "config" not in agent_data:
             agent_data["config"] = agent_config
+
+        if ("type" in agent_data and agent_data["type"] in ["task"]) or (
+            agent.type in ["task"] and "config" in agent_data
+        ):
+            config = agent_data.get("config", {})
+            if "tasks" not in config:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid configuration: tasks is required for {agent_data.get('type', agent.type)} agents",
+                )
+
+            if not config["tasks"]:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid configuration: tasks cannot be empty",
+                )
+
+            for task in config["tasks"]:
+                if "agent_id" not in task:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Each task must have an agent_id",
+                    )
+
+                agent_id = task["agent_id"]
+                task_agent = get_agent(db, agent_id)
+                if not task_agent:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Agent not found for task: {agent_id}",
+                    )
+
+            # Validar sub_agents se existir
+            if "sub_agents" in config and config["sub_agents"]:
+                if not validate_sub_agents(db, config["sub_agents"]):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="One or more sub-agents do not exist",
+                    )
 
         if not agent_config.get("api_key") and (
             "config" not in agent_data or not agent_data["config"].get("api_key")
