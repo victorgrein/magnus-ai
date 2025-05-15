@@ -10,7 +10,7 @@ env:
   GHCR_REGISTRY: ghcr.io
   DOCKERHUB_REGISTRY: docker.io
   IMAGE_NAME: ${{ github.repository }}
-  DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
+  DOCKERHUB_IMAGE: evoapicloud/evo-ai
 
 jobs:
   build-and-push:
