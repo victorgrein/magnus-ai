@@ -331,7 +331,7 @@ Authorization: Bearer your-token-jwt
 - **Uvicorn**: ASGI server
 - **Redis**: Cache and session management
 - **JWT**: Secure token authentication
-- **SendGrid**: Email service for notifications
+- **SendGrid/SMTP**: Email service for notifications (configurable)
 - **Jinja2**: Template engine for email rendering
 - **Bcrypt**: Password hashing and security
 - **LangGraph**: Framework for building stateful, multi-agent workflows
@@ -469,7 +469,9 @@ You'll also need the following accounts/API keys:
 - Python 3.10+
 - PostgreSQL
 - Redis
-- SendGrid Account (for email sending)
+- Email provider:
+  - SendGrid Account (if using SendGrid email provider)
+  - SMTP Server (if using SMTP email provider)
 
 ## 🔧 Installation
 
@@ -566,10 +568,22 @@ JWT_SECRET_KEY="your-jwt-secret-key"
 JWT_ALGORITHM="HS256"
 JWT_EXPIRATION_TIME=30  # In seconds
 
-# SendGrid for emails
+# Email provider configuration
+EMAIL_PROVIDER="sendgrid"  # Options: "sendgrid" or "smtp"
+
+# SendGrid (if EMAIL_PROVIDER=sendgrid)
 SENDGRID_API_KEY="your-sendgrid-api-key"
 EMAIL_FROM="noreply@yourdomain.com"
 APP_URL="https://yourdomain.com"
+
+# SMTP (if EMAIL_PROVIDER=smtp)
+SMTP_FROM="noreply-smtp@yourdomain.com"
+SMTP_USER="your-smtp-username"
+SMTP_PASSWORD="your-smtp-password"
+SMTP_HOST="your-smtp-host"
+SMTP_PORT=587
+SMTP_USE_TLS=true
+SMTP_USE_SSL=false
 
 # Encryption for API keys
 ENCRYPTION_KEY="your-encryption-key"
@@ -787,8 +801,12 @@ The main environment variables used by the API container:
 - `POSTGRES_CONNECTION_STRING`: PostgreSQL connection string
 - `REDIS_HOST`: Redis host (use "redis" when running with Docker)
 - `JWT_SECRET_KEY`: Secret key for JWT token generation
-- `SENDGRID_API_KEY`: SendGrid API key for sending emails
-- `EMAIL_FROM`: Email used as sender
+- `EMAIL_PROVIDER`: Email provider to use ("sendgrid" or "smtp")
+- `SENDGRID_API_KEY`: SendGrid API key (if using SendGrid)
+- `EMAIL_FROM`: Email used as sender (for SendGrid)
+- `SMTP_FROM`: Email used as sender (for SMTP)
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`: SMTP server configuration
+- `SMTP_USE_TLS`, `SMTP_USE_SSL`: SMTP security settings
 - `APP_URL`: Base URL of the application
 
 ## 🔒 Secure API Key Management
