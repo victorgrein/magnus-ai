@@ -2,6 +2,7 @@ version: "3.8"
 
 services:
   api:
+    image: evo-ai-api:latest
     build: .
     container_name: evo-ai-api
     depends_on:
