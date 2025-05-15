@@ -33,7 +33,11 @@ import logging
 from datetime import datetime
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from pathlib import Path
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +71,110 @@ def _render_template(template_name: str, context: dict) -> str:
         return f"<p>Could not display email content. Please access {context.get('verification_link', '') or context.get('reset_link', '')}</p>"
 
 
+def _send_email_sendgrid(to_email: str, subject: str, html_content: str) -> bool:
+    """
+    Send an email using SendGrid provider
+
+    Args:
+        to_email: Recipient's email
+        subject: Email subject
+        html_content: HTML content of the email
+
+    Returns:
+        bool: True if the email was sent successfully, False otherwise
+    """
+    try:
+        sg = sendgrid.SendGridAPIClient(api_key=settings.SENDGRID_API_KEY)
+        from_email = Email(settings.EMAIL_FROM)
+        to_email = To(to_email)
+        content = Content("text/html", html_content)
+
+        mail = Mail(from_email, to_email, subject, content)
+        response = sg.client.mail.send.post(request_body=mail.get())
+
+        if response.status_code >= 200 and response.status_code < 300:
+            logger.info(f"Email sent via SendGrid to {to_email}")
+            return True
+        else:
+            logger.error(
+                f"Failed to send email via SendGrid to {to_email}. Status: {response.status_code}"
+            )
+            return False
+
+    except Exception as e:
+        logger.error(f"Error sending email via SendGrid to {to_email}: {str(e)}")
+        return False
+
+
+def _send_email_smtp(to_email: str, subject: str, html_content: str) -> bool:
+    """
+    Send an email using SMTP provider
+
+    Args:
+        to_email: Recipient's email
+        subject: Email subject
+        html_content: HTML content of the email
+
+    Returns:
+        bool: True if the email was sent successfully, False otherwise
+    """
+    try:
+        # Create message container
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = settings.SMTP_FROM or settings.EMAIL_FROM
+        msg['To'] = to_email
+
+        # Attach HTML content
+        part = MIMEText(html_content, 'html')
+        msg.attach(part)
+
+        # Setup SMTP server
+        if settings.SMTP_USE_SSL:
+            server = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT)
+        else:
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT)
+            if settings.SMTP_USE_TLS:
+                server.starttls()
+
+        # Login if credentials are provided
+        if settings.SMTP_USER and settings.SMTP_PASSWORD:
+            server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+
+        # Send email
+        server.sendmail(
+            settings.SMTP_FROM or settings.EMAIL_FROM,
+            to_email,
+            msg.as_string()
+        )
+        server.quit()
+
+        logger.info(f"Email sent via SMTP to {to_email}")
+        return True
+
+    except Exception as e:
+        logger.error(f"Error sending email via SMTP to {to_email}: {str(e)}")
+        return False
+
+
+def send_email(to_email: str, subject: str, html_content: str) -> bool:
+    """
+    Send an email using the configured provider
+
+    Args:
+        to_email: Recipient's email
+        subject: Email subject
+        html_content: HTML content of the email
+
+    Returns:
+        bool: True if the email was sent successfully, False otherwise
+    """
+    if settings.EMAIL_PROVIDER.lower() == "smtp":
+        return _send_email_smtp(to_email, subject, html_content)
+    else:  # Default to SendGrid
+        return _send_email_sendgrid(to_email, subject, html_content)
+
+
 def send_verification_email(email: str, token: str) -> bool:
     """
     Send a verification email to the user
@@ -79,40 +187,22 @@ def send_verification_email(email: str, token: str) -> bool:
         bool: True if the email was sent successfully, False otherwise
     """
     try:
-        sg = sendgrid.SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY"))
-        from_email = Email(os.getenv("EMAIL_FROM"))
-        to_email = To(email)
         subject = "Email Verification - Evo AI"
-
-        verification_link = f"{os.getenv('APP_URL')}/security/verify-email?code={token}"
+        verification_link = f"{settings.APP_URL}/security/verify-email?code={token}"
 
         html_content = _render_template(
             "verification_email",
             {
                 "verification_link": verification_link,
-                "user_name": email.split("@")[
-                    0
-                ],  # Use part of the email as temporary name
+                "user_name": email.split("@")[0],  # Use part of the email as temporary name
                 "current_year": datetime.now().year,
             },
         )
 
-        content = Content("text/html", html_content)
-
-        mail = Mail(from_email, to_email, subject, content)
-        response = sg.client.mail.send.post(request_body=mail.get())
-
-        if response.status_code >= 200 and response.status_code < 300:
-            logger.info(f"Verification email sent to {email}")
-            return True
-        else:
-            logger.error(
-                f"Failed to send verification email to {email}. Status: {response.status_code}"
-            )
-            return False
+        return send_email(email, subject, html_content)
 
     except Exception as e:
-        logger.error(f"Error sending verification email to {email}: {str(e)}")
+        logger.error(f"Error preparing verification email to {email}: {str(e)}")
         return False
 
 
@@ -128,40 +218,22 @@ def send_password_reset_email(email: str, token: str) -> bool:
         bool: True if the email was sent successfully, False otherwise
     """
     try:
-        sg = sendgrid.SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY"))
-        from_email = Email(os.getenv("EMAIL_FROM"))
-        to_email = To(email)
         subject = "Password Reset - Evo AI"
-
-        reset_link = f"{os.getenv('APP_URL')}/security/reset-password?token={token}"
+        reset_link = f"{settings.APP_URL}/security/reset-password?token={token}"
 
         html_content = _render_template(
             "password_reset",
             {
                 "reset_link": reset_link,
-                "user_name": email.split("@")[
-                    0
-                ],  # Use part of the email as temporary name
+                "user_name": email.split("@")[0],  # Use part of the email as temporary name
                 "current_year": datetime.now().year,
             },
         )
 
-        content = Content("text/html", html_content)
-
-        mail = Mail(from_email, to_email, subject, content)
-        response = sg.client.mail.send.post(request_body=mail.get())
-
-        if response.status_code >= 200 and response.status_code < 300:
-            logger.info(f"Password reset email sent to {email}")
-            return True
-        else:
-            logger.error(
-                f"Failed to send password reset email to {email}. Status: {response.status_code}"
-            )
-            return False
+        return send_email(email, subject, html_content)
 
     except Exception as e:
-        logger.error(f"Error sending password reset email to {email}: {str(e)}")
+        logger.error(f"Error preparing password reset email to {email}: {str(e)}")
         return False
 
 
@@ -177,12 +249,8 @@ def send_welcome_email(email: str, user_name: str = None) -> bool:
         bool: True if the email was sent successfully, False otherwise
     """
     try:
-        sg = sendgrid.SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY"))
-        from_email = Email(os.getenv("EMAIL_FROM"))
-        to_email = To(email)
         subject = "Welcome to Evo AI"
-
-        dashboard_link = f"{os.getenv('APP_URL')}/dashboard"
+        dashboard_link = f"{settings.APP_URL}/dashboard"
 
         html_content = _render_template(
             "welcome_email",
@@ -193,22 +261,10 @@ def send_welcome_email(email: str, user_name: str = None) -> bool:
             },
         )
 
-        content = Content("text/html", html_content)
-
-        mail = Mail(from_email, to_email, subject, content)
-        response = sg.client.mail.send.post(request_body=mail.get())
-
-        if response.status_code >= 200 and response.status_code < 300:
-            logger.info(f"Welcome email sent to {email}")
-            return True
-        else:
-            logger.error(
-                f"Failed to send welcome email to {email}. Status: {response.status_code}"
-            )
-            return False
+        return send_email(email, subject, html_content)
 
     except Exception as e:
-        logger.error(f"Error sending welcome email to {email}: {str(e)}")
+        logger.error(f"Error preparing welcome email to {email}: {str(e)}")
         return False
 
 
@@ -228,14 +284,8 @@ def send_account_locked_email(
         bool: True if the email was sent successfully, False otherwise
     """
     try:
-        sg = sendgrid.SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY"))
-        from_email = Email(os.getenv("EMAIL_FROM"))
-        to_email = To(email)
         subject = "Security Alert - Account Locked"
-
-        reset_link = (
-            f"{os.getenv('APP_URL')}/security/reset-password?token={reset_token}"
-        )
+        reset_link = f"{settings.APP_URL}/security/reset-password?token={reset_token}"
 
         html_content = _render_template(
             "account_locked",
@@ -248,20 +298,8 @@ def send_account_locked_email(
             },
         )
 
-        content = Content("text/html", html_content)
-
-        mail = Mail(from_email, to_email, subject, content)
-        response = sg.client.mail.send.post(request_body=mail.get())
-
-        if response.status_code >= 200 and response.status_code < 300:
-            logger.info(f"Account locked email sent to {email}")
-            return True
-        else:
-            logger.error(
-                f"Failed to send account locked email to {email}. Status: {response.status_code}"
-            )
-            return False
+        return send_email(email, subject, html_content)
 
     except Exception as e:
-        logger.error(f"Error sending account locked email to {email}: {str(e)}")
+        logger.error(f"Error preparing account locked email to {email}: {str(e)}")
         return False
