@@ -388,6 +388,7 @@ class A2ATaskManager:
         self, request: SendTaskStreamingRequest, agent: Agent
     ) -> AsyncIterable[SendTaskStreamingResponse]:
         """Processes a task in streaming mode using the specified agent."""
+        # Extrair e processar arquivos da mesma forma que no método _process_task
         query = self._extract_user_query(request.params)
 
         try:
@@ -447,6 +448,23 @@ class A2ATaskManager:
                     ),
                 )
 
+            # Use os arquivos processados do _extract_user_query
+            files = getattr(self, "_last_processed_files", None)
+
+            # Log sobre os arquivos processados
+            if files:
+                logger.info(
+                    f"Streaming: Passando {len(files)} arquivos processados para run_agent_stream"
+                )
+                for file_info in files:
+                    logger.info(
+                        f"Streaming: Arquivo sendo enviado: {file_info.filename} ({file_info.content_type})"
+                    )
+            else:
+                logger.warning(
+                    "Streaming: Nenhum arquivo processado disponível para enviar ao agente"
+                )
+
             async for chunk in run_agent_stream(
                 agent_id=str(agent.id),
                 external_id=external_id,
@@ -455,6 +473,7 @@ class A2ATaskManager:
                 artifacts_service=artifacts_service,
                 memory_service=memory_service,
                 db=self.db,
+                files=files,  # Passar os arquivos processados para o streaming
             ):
                 try:
                     chunk_data = json.loads(chunk)
