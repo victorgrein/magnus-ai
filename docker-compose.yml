@@ -3,19 +3,15 @@ version: "3.8"
 services:
   api:
     image: evo-ai-api:latest
-    build: .
-    container_name: evo-ai-api
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - postgres
+      - redis
     ports:
       - "8000:8000"
     environment:
       POSTGRES_CONNECTION_STRING: postgresql://postgres:${POSTGRES_PASSWORD:-postgres}@postgres:5432/evo_ai
       REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_PORT: ${REDIS_PORT:-6379}
       REDIS_PASSWORD: ${REDIS_PASSWORD:-""}
       REDIS_SSL: "false"
       REDIS_KEY_PREFIX: "a2a:"
@@ -29,7 +25,6 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./static:/app/static
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
@@ -41,12 +36,9 @@ services:
         limits:
           cpus: "1"
           memory: 1G
-    networks:
-      - evo-network
 
   postgres:
     image: postgres:14-alpine
-    container_name: evo-ai-postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -55,15 +47,12 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
-    networks:
-      - evo-network
     deploy:
       resources:
         limits:
@@ -72,8 +61,12 @@ services:
 
   redis:
     image: redis:alpine
-    container_name: evo-ai-redis
-    command: redis-server --appendonly yes ${REDIS_PASSWORD:+--requirepass ${REDIS_PASSWORD}}
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - "${REDIS_PASSWORD}"
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
@@ -83,9 +76,6 @@ services:
       interval: 5s
       timeout: 30s
       retries: 50
-    restart: unless-stopped
-    networks:
-      - evo-network
     deploy:
       resources:
         limits:
@@ -97,8 +87,3 @@ volumes:
     name: ${POSTGRES_VOLUME_NAME:-evo-ai-postgres-data}
   redis_data:
     name: ${REDIS_VOLUME_NAME:-evo-ai-redis-data}
-
-networks:
-  evo-network:
-    name: ${NETWORK_NAME:-evo-network}
-    driver: bridge
