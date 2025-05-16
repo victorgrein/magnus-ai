@@ -34,4 +34,4 @@ ENV PORT=8000 \
 # Expose port
 EXPOSE 8000
 
-CMD alembic upgrade head && uvicorn src.main:app --host $HOST --port $PORT 
+CMD alembic upgrade head && python -m scripts.run_seeders && uvicorn src.main:app --host $HOST --port $PORT 
