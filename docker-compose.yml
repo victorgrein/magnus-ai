@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   api:
-    image: evo-ai-api:latest
+    image: evoapicloud/evo-ai:latest
     depends_on:
       - postgres
       - redis
