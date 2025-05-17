@@ -6,6 +6,9 @@
 │ Creation date: May 13, 2025                                                  │
 │ Contact: contato@evolution-api.com                                           │
 ├──────────────────────────────────────────────────────────────────────────────┤
+│ @contributors:                                                               │
+│ Victor Calazans - delay node implementation (May 17, 2025)                   │
+├──────────────────────────────────────────────────────────────────────────────┤
 │ @copyright © Evolution API 2025. All rights reserved.                        │
 │ Licensed under the Apache License, Version 2.0                               │
 │                                                                              │
