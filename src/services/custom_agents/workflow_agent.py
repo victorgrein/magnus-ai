@@ -389,17 +389,6 @@ class WorkflowAgent(BaseAgent):
             session_id = state.get("session_id", "")
             conversation_history = state.get("conversation_history", [])
 
-            # Add a message indicating the delay
-            delay_message = f"Aguardando {delay_value} {delay_unit}..."
-            if delay_description:
-                delay_message += f" ({delay_description})"
-                
-            new_event = Event(
-                author=label,
-                content=Content(parts=[Part(text=delay_message)]),
-            )
-            content = content + [new_event]
-            
             # Store node output information
             node_outputs = state.get("node_outputs", {})
             node_outputs[node_id] = {
@@ -413,13 +402,6 @@ class WorkflowAgent(BaseAgent):
             import asyncio
             await asyncio.sleep(delay_seconds)
             
-            # Add completion message
-            complete_message = f"Delay de {delay_value} {delay_unit} concluído."
-            complete_event = Event(
-                author=label,
-                content=Content(parts=[Part(text=complete_message)]),
-            )
-            content = content + [complete_event]
             
             # Update node outputs with completion information
             node_outputs[node_id]["delay_end_time"] = datetime.now().isoformat()
