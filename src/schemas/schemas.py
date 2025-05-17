@@ -262,14 +262,14 @@ class ToolConfig(BaseModel):
     inputModes: List[str] = Field(default_factory=list)
     outputModes: List[str] = Field(default_factory=list)
 
-
+# Last edited by Arley Peter on 2025-05-17
 class MCPServerBase(BaseModel):
     name: str
     description: Optional[str] = None
     config_type: str = Field(default="studio")
     config_json: Dict[str, Any] = Field(default_factory=dict)
     environments: Dict[str, Any] = Field(default_factory=dict)
-    tools: List[ToolConfig] = Field(default_factory=list)
+    tools: Optional[List[ToolConfig]] = Field(default_factory=list) 
     type: str = Field(default="official")
 
 
