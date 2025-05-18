@@ -28,6 +28,7 @@
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 from src.config.database import get_db
 from typing import List
@@ -54,7 +55,7 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
-
+# Last edited by Arley Peter on 2025-05-17
 @router.post("/", response_model=MCPServer, status_code=status.HTTP_201_CREATED)
 async def create_mcp_server(
     server: MCPServerCreate,
@@ -64,7 +65,7 @@ async def create_mcp_server(
     # Only administrators can create MCP servers
     await verify_admin(payload)
 
-    return mcp_server_service.create_mcp_server(db, server)
+    return await run_in_threadpool(mcp_server_service.create_mcp_server, db, server)
 
 
 @router.get("/", response_model=List[MCPServer])
