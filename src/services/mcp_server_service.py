@@ -32,6 +32,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from fastapi import HTTPException, status
 from src.models.models import MCPServer
 from src.schemas.schemas import MCPServerCreate
+from src.utils.mcp_discovery import discover_mcp_tools
 from typing import List, Optional
 import uuid
 import logging
@@ -72,8 +73,16 @@ def create_mcp_server(db: Session, server: MCPServerCreate) -> MCPServer:
     try:
         # Convert tools to JSON serializable format
         server_data = server.model_dump()
-        server_data["tools"] = [tool.model_dump() for tool in server.tools]
 
+        # Last edited by Arley Peter on 2025-05-17
+        supplied_tools = server_data.pop("tools", [])
+        if not supplied_tools:
+            discovered = discover_mcp_tools(server_data["config_json"])
+            print(f"🔍 Found {len(discovered)} tools.")
+            server_data["tools"] = discovered
+
+        else:
+            server_data["tools"] = [tool.model_dump() for tool in supplied_tools]
         db_server = MCPServer(**server_data)
         db.add(db_server)
         db.commit()

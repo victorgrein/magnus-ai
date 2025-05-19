@@ -31,6 +31,7 @@ from typing import Any, Dict, List
 from google.adk.tools import FunctionTool
 import requests
 import json
+import urllib.parse
 from src.utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -70,7 +71,9 @@ class CustomToolBuilder:
                 url = endpoint
                 for param, value in path_params.items():
                     if param in all_values:
-                        url = url.replace(f"{{{param}}}", str(all_values[param]))
+                        # URL encode the value for URL safe characters
+                        replacement_value = urllib.parse.quote(str(all_values[param]), safe='')
+                        url = url.replace(f"{{{param}}}", replacement_value)
 
                 # Process query parameters
                 query_params_dict = {}
@@ -119,8 +122,12 @@ class CustomToolBuilder:
                         f"Error in the request: {response.status_code} - {response.text}"
                     )
 
-                # Always returns the response as a string
-                return json.dumps(response.json())
+                # Try to parse the response as JSON, if it fails, return the text content
+                try:
+                    return json.dumps(response.json())
+                except ValueError:
+                    # Response is not JSON, return the text content
+                    return json.dumps({"content": response.text})
 
             except Exception as e:
                 logger.error(f"Error executing tool {name}: {str(e)}")
