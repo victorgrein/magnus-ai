@@ -162,7 +162,7 @@ class TaskAgent(BaseAgent):
                     ),
                 )
 
-                from src.services.agent_builder import AgentBuilder
+                from src.services.adk.agent_builder import AgentBuilder
 
                 print(f"Building agent in Task agent: {agent.name}")
                 agent_builder = AgentBuilder(self.db)

@@ -35,7 +35,7 @@ from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactServ
 from src.utils.logger import setup_logger
 from src.core.exceptions import AgentNotFoundError, InternalServerError
 from src.services.agent_service import get_agent
-from src.services.agent_builder import AgentBuilder
+from src.services.adk.agent_builder import AgentBuilder
 from sqlalchemy.orm import Session
 from typing import Optional, AsyncGenerator
 import asyncio

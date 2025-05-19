@@ -36,11 +36,11 @@ from src.schemas.schemas import Agent
 from src.utils.logger import setup_logger
 from src.core.exceptions import AgentNotFoundError
 from src.services.agent_service import get_agent
-from src.services.custom_tools import CustomToolBuilder
-from src.services.mcp_service import MCPService
-from src.services.custom_agents.a2a_agent import A2ACustomAgent
-from src.services.custom_agents.workflow_agent import WorkflowAgent
-from src.services.custom_agents.task_agent import TaskAgent
+from src.services.adk.custom_tools import CustomToolBuilder
+from src.services.adk.mcp_service import MCPService
+from src.services.adk.custom_agents.a2a_agent import A2ACustomAgent
+from src.services.adk.custom_agents.workflow_agent import WorkflowAgent
+from src.services.adk.custom_agents.task_agent import TaskAgent
 from src.services.apikey_service import get_decrypted_api_key
 from sqlalchemy.orm import Session
 from contextlib import AsyncExitStack

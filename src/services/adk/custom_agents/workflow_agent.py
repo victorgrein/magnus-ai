@@ -181,7 +181,7 @@ class WorkflowAgent(BaseAgent):
                 return
 
             # Import moved to inside the function to avoid circular import
-            from src.services.agent_builder import AgentBuilder
+            from src.services.adk.agent_builder import AgentBuilder
 
             agent_builder = AgentBuilder(self.db)
             root_agent, exit_stack = await agent_builder.build_agent(agent)

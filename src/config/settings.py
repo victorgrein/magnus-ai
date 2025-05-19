@@ -57,6 +57,9 @@ class Settings(BaseSettings):
         "POSTGRES_CONNECTION_STRING", "postgresql://postgres:root@localhost:5432/evo_ai"
     )
 
+    # AI engine settings
+    AI_ENGINE: str = os.getenv("AI_ENGINE", "adk")
+
     # Logging settings
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     LOG_DIR: str = "logs"
@@ -83,11 +86,11 @@ class Settings(BaseSettings):
 
     # Email provider settings
     EMAIL_PROVIDER: str = os.getenv("EMAIL_PROVIDER", "sendgrid")
-    
+
     # SendGrid settings
     SENDGRID_API_KEY: str = os.getenv("SENDGRID_API_KEY", "")
     EMAIL_FROM: str = os.getenv("EMAIL_FROM", "noreply@yourdomain.com")
-    
+
     # SMTP settings
     SMTP_HOST: str = os.getenv("SMTP_HOST", "")
     SMTP_PORT: int = int(os.getenv("SMTP_PORT", 587))
@@ -96,7 +99,7 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
     SMTP_USE_SSL: bool = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
     SMTP_FROM: str = os.getenv("SMTP_FROM", "")
-    
+
     APP_URL: str = os.getenv("APP_URL", "http://localhost:8000")
 
     # Server settings

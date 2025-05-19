@@ -39,6 +39,7 @@ from fastapi import (
     Header,
 )
 from sqlalchemy.orm import Session
+from src.config.settings import settings
 from src.config.database import get_db
 from src.core.jwt_middleware import (
     get_jwt_token,
@@ -49,7 +50,8 @@ from src.services import (
     agent_service,
 )
 from src.schemas.chat import ChatRequest, ChatResponse, ErrorResponse, FileData
-from src.services.agent_runner import run_agent, run_agent_stream
+from src.services.adk.agent_runner import run_agent as run_agent_adk, run_agent_stream
+from src.services.crewai.agent_runner import run_agent as run_agent_crewai
 from src.core.exceptions import AgentNotFoundError
 from src.services.service_providers import (
     session_service,
@@ -262,7 +264,7 @@ async def websocket_chat(
 
 
 @router.post(
-    "",
+    "/{agent_id}/{external_id}",
     response_model=ChatResponse,
     responses={
         400: {"model": ErrorResponse},
@@ -272,20 +274,32 @@ async def websocket_chat(
 )
 async def chat(
     request: ChatRequest,
+    agent_id: str,
+    external_id: str,
     _=Depends(get_agent_by_api_key),
     db: Session = Depends(get_db),
 ):
     try:
-        final_response = await run_agent(
-            request.agent_id,
-            request.external_id,
-            request.message,
-            session_service,
-            artifacts_service,
-            memory_service,
-            db,
-            files=request.files,
-        )
+        if settings.AI_ENGINE == "adk":
+            final_response = await run_agent_adk(
+                agent_id,
+                external_id,
+                request.message,
+                session_service,
+                artifacts_service,
+                memory_service,
+                db,
+                files=request.files,
+            )
+        elif settings.AI_ENGINE == "crewai":
+            final_response = await run_agent_crewai(
+                agent_id,
+                external_id,
+                request.message,
+                session_service,
+                db,
+                files=request.files,
+            )
 
         return {
             "response": final_response["final_response"],
