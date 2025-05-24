@@ -6,24 +6,16 @@ WORKDIR /app
 # Define build arguments with default values
 ARG NEXT_PUBLIC_API_URL=https://api.evo-ai.co
 
+# Install pnpm globally
 RUN npm install -g pnpm
 
 # Copy package files first for better caching
 COPY package.json pnpm-lock.yaml ./
 
-# Copy configuration files that are needed for dependency resolution
-COPY tsconfig.json ./
-COPY next.config.mjs ./
-COPY tailwind.config.ts ./
-COPY postcss.config.mjs ./
-COPY components.json ./
-
 # Install dependencies
 RUN pnpm install --no-frozen-lockfile
 
-RUN pnpm add next-runtime-env
-
-# Copy all source code
+# Copy all source code (this includes tsconfig.json, lib/, etc.)
 COPY . .
 
 # Set environment variables from build arguments
@@ -40,13 +32,12 @@ WORKDIR /app
 # Define build arguments again for the runner stage
 ARG NEXT_PUBLIC_API_URL=https://api-evoai.evoapicloud.com
 
+# Install pnpm globally
 RUN npm install -g pnpm
 
 # Install production dependencies only
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --prod --no-frozen-lockfile
-
-RUN pnpm add next-runtime-env
 
 # Copy built assets from builder
 COPY --from=builder /app/.next ./.next
