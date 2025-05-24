@@ -43,9 +43,11 @@ class FileData(BaseModel):
 class ChatRequest(BaseModel):
     """Model to represent a chat request."""
 
-    agent_id: str = Field(..., description="Agent ID to process the message")
-    external_id: str = Field(..., description="External ID for user identification")
     message: str = Field(..., description="User message to the agent")
+    agent_id: Optional[str] = Field(None, description="Agent ID to process the message")
+    external_id: Optional[str] = Field(
+        None, description="External ID for user identification"
+    )
     files: Optional[List[FileData]] = Field(
         None, description="List of files attached to the message"
     )

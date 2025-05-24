@@ -27,10 +27,20 @@
 └──────────────────────────────────────────────────────────────────────────────┘
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Header, Query
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException,
+    status,
+    Header,
+    Query,
+    File,
+    UploadFile,
+    Form,
+)
 from sqlalchemy.orm import Session
 from src.config.database import get_db
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 import uuid
 from src.core.jwt_middleware import (
     get_jwt_token,
@@ -48,6 +58,7 @@ from src.schemas.schemas import (
 )
 from src.services import agent_service, mcp_server_service, apikey_service
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -621,3 +632,74 @@ async def get_shared_agent(
         agent.agent_card_url = agent.agent_card_url_property
 
     return agent
+
+
+@router.post("/import", response_model=List[Agent], status_code=status.HTTP_201_CREATED)
+async def import_agents(
+    file: UploadFile = File(...),
+    folder_id: Optional[str] = Form(None),
+    x_client_id: uuid.UUID = Header(..., alias="x-client-id"),
+    db: Session = Depends(get_db),
+    payload: dict = Depends(get_jwt_token),
+):
+    """Import one or more agents from a JSON file"""
+    # Verify if the user has access to this client's data
+    await verify_user_client(payload, db, x_client_id)
+
+    # Convert folder_id to UUID if provided
+    folder_uuid = None
+    if folder_id:
+        try:
+            folder_uuid = uuid.UUID(folder_id)
+            # Verify the folder exists and belongs to the client
+            folder = agent_service.get_agent_folder(db, folder_uuid)
+            if not folder:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found"
+                )
+            if folder.client_id != x_client_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Folder does not belong to the specified client",
+                )
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid folder ID format",
+            )
+
+    try:
+        # Check file type
+        if not file.filename.endswith(".json"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Only JSON files are supported",
+            )
+
+        # Read file content
+        file_content = await file.read()
+
+        try:
+            # Parse JSON content
+            agents_data = json.loads(file_content)
+        except json.JSONDecodeError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid JSON format"
+            )
+
+        # Call the service function to import agents
+        imported_agents = await agent_service.import_agents_from_json(
+            db, agents_data, x_client_id, folder_uuid
+        )
+
+        return imported_agents
+
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
+    except Exception as e:
+        logger.error(f"Error in agent import: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error importing agents: {str(e)}",
+        )
