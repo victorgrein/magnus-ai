@@ -34,18 +34,14 @@ from google.genai.types import Content, Part
 
 from typing import AsyncGenerator, List, Dict, Any, Optional
 import json
+import os
 
-import httpx
-from httpx_sse import connect_sse
-
-from src.schemas.a2a_types import (
-    AgentCard,
-    Message,
-    TextPart,
-    TaskSendParams,
-    SendTaskRequest,
-    SendTaskStreamingRequest,
-    TaskState,
+from src.schemas.a2a_types import AgentCard
+from src.utils.a2a_enhanced_client import (
+    EnhancedA2AClient,
+    A2AClientConfig,
+    A2AImplementation,
+    A2AResponse,
 )
 
 from uuid import uuid4
@@ -53,9 +49,10 @@ from uuid import uuid4
 
 class A2ACustomAgent(BaseAgent):
     """
-    Custom agent that implements the A2A protocol directly.
+    Enhanced A2A agent that uses the official a2a-sdk client.
 
-    This agent implements the interaction with an external A2A service.
+    This agent automatically detects and uses the best available A2A implementation
+    (custom or SDK) and provides better error handling and type validation.
     """
 
     # Field declarations for Pydantic
@@ -63,72 +60,154 @@ class A2ACustomAgent(BaseAgent):
     agent_card: Optional[AgentCard]
     timeout: int
     base_url: str
+    api_key: Optional[str]
+    preferred_implementation: A2AImplementation
 
     def __init__(
         self,
         name: str,
         agent_card_url: str,
         timeout: int = 300,
+        api_key: Optional[str] = None,
+        preferred_implementation: A2AImplementation = A2AImplementation.AUTO,
         sub_agents: List[BaseAgent] = [],
         **kwargs,
     ):
         """
-        Initialize the A2A agent.
+        Initialize the enhanced A2A agent.
 
         Args:
             name: Agent name
             agent_card_url: A2A agent card URL
             timeout: Maximum execution time (seconds)
+            api_key: API key for authentication (if None, will try to get from env)
+            preferred_implementation: Preferred A2A implementation (auto, custom, sdk)
             sub_agents: List of sub-agents to be executed after the A2A agent
         """
-        # Create base_url from agent_card_url
+        # Extract base_url from agent_card_url
         base_url = agent_card_url
         if "/.well-known/agent.json" in base_url:
             base_url = base_url.split("/.well-known/agent.json")[0]
 
-        print(f"A2A agent initialized for URL: {agent_card_url}")
+        # Extract base URL for API calls (remove agent-specific parts)
+        if "/api/v1/a2a/" in base_url:
+            base_url = base_url.split("/api/v1/a2a/")[0]
+        elif "/api/v1/a2a-sdk/" in base_url:
+            base_url = base_url.split("/api/v1/a2a-sdk/")[0]
+
+        # Get API key from parameter or environment
+        if not api_key:
+            api_key = os.getenv("EVO_AI_API_KEY") or os.getenv("API_KEY")
+
+        if not api_key:
+            print("Warning: No API key provided. This may cause authentication errors.")
+
+        print(f"Enhanced A2A agent initialized for URL: {agent_card_url}")
+        print(f"Base URL: {base_url}")
+        print(f"Preferred implementation: {preferred_implementation.value}")
 
         # Initialize base class
         super().__init__(
             name=name,
             agent_card_url=agent_card_url,
-            base_url=base_url,  # Pass base_url here
+            base_url=base_url,
             agent_card=None,
             timeout=timeout,
+            api_key=api_key,
+            preferred_implementation=preferred_implementation,
             sub_agents=sub_agents,
             **kwargs,
         )
 
     async def fetch_agent_card(self) -> AgentCard:
-        """Fetch the agent card from the A2A service."""
+        """Fetch the agent card using the enhanced client."""
         if self.agent_card:
             return self.agent_card
 
-        card_url = f"{self.base_url}/.well-known/agent.json"
-        print(f"Fetching agent card from: {card_url}")
+        print(f"Fetching agent card from: {self.agent_card_url}")
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(card_url)
-            response.raise_for_status()
-            try:
-                card_data = response.json()
-                self.agent_card = AgentCard(**card_data)
-                return self.agent_card
-            except json.JSONDecodeError as e:
-                raise ValueError(f"Failed to parse agent card: {str(e)}")
+        try:
+            # Extract agent ID from URL
+            agent_id = self._extract_agent_id_from_url(self.agent_card_url)
+
+            # Create enhanced client
+            config = A2AClientConfig(
+                base_url=self.base_url,
+                api_key=self.api_key or "default-key",
+                implementation=self.preferred_implementation,
+                timeout=self.timeout,
+            )
+
+            async with EnhancedA2AClient(config) as client:
+                response = await client.get_agent_card(agent_id)
+
+                if response.success:
+                    print(
+                        f"Agent card fetched using {response.implementation_used.value} implementation"
+                    )
+                    self.agent_card = AgentCard(**response.data)
+                    return self.agent_card
+                else:
+                    raise ValueError(f"Failed to fetch agent card: {response.error}")
+
+        except Exception as e:
+            print(f"Error fetching agent card: {e}")
+            # Fallback to basic agent card
+            self.agent_card = AgentCard(
+                name="A2A Agent",
+                description="External A2A Agent",
+                url=self.agent_card_url,
+                version="1.0.0",
+                capabilities={"streaming": True},
+                defaultInputModes=["text"],
+                defaultOutputModes=["text"],
+                skills=[],
+            )
+            return self.agent_card
+
+    def _extract_agent_id_from_url(self, url: str) -> str:
+        """Extract agent ID from the agent card URL."""
+        try:
+            # Handle different URL formats
+            if "/api/v1/a2a/" in url:
+                # Custom implementation URL
+                parts = url.split("/api/v1/a2a/")[1]
+                return parts.split("/")[0]
+            elif "/api/v1/a2a-sdk/" in url:
+                # SDK implementation URL
+                parts = url.split("/api/v1/a2a-sdk/")[1]
+                return parts.split("/")[0]
+            else:
+                # Try to extract from path
+                path_parts = url.split("/")
+                for i, part in enumerate(path_parts):
+                    if part in ["a2a", "a2a-sdk"] and i + 1 < len(path_parts):
+                        return path_parts[i + 1]
+
+                # Fallback: use last meaningful part
+                meaningful_parts = [
+                    p
+                    for p in path_parts
+                    if p and p != ".well-known" and p != "agent.json"
+                ]
+                return meaningful_parts[-1] if meaningful_parts else "unknown-agent"
+
+        except Exception as e:
+            print(f"Error extracting agent ID from URL {url}: {e}")
+            return "unknown-agent"
 
     async def _run_async_impl(
         self, ctx: InvocationContext
     ) -> AsyncGenerator[Event, None]:
         """
-        Implementation of the A2A protocol according to the Google ADK documentation.
+        Enhanced A2A implementation using the official SDK client.
 
-        This method follows the pattern of implementing custom agents,
-        sending the user's message to the A2A service and monitoring the response.
+        This method uses the EnhancedA2AClient which automatically detects
+        and uses the best available implementation (custom or SDK).
         """
 
         try:
-            # 1. First, fetch the agent card if we haven't already
+            # 1. Fetch the agent card if we haven't already
             try:
                 agent_card = await self.fetch_agent_card()
                 print(f"Agent card fetched: {agent_card.name}")
@@ -142,22 +221,7 @@ class A2ACustomAgent(BaseAgent):
                 return
 
             # 2. Extract the user's message from the context
-            user_message = None
-
-            # Search for the user's message in the session events
-            if ctx.session and hasattr(ctx.session, "events") and ctx.session.events:
-                for event in reversed(ctx.session.events):
-                    if event.author == "user" and event.content and event.content.parts:
-                        user_message = event.content.parts[0].text
-                        print("Message found in session events")
-                        break
-
-            # Check in the session state if the message was not found in the events
-            if not user_message and ctx.session and ctx.session.state:
-                if "user_message" in ctx.session.state:
-                    user_message = ctx.session.state["user_message"]
-                elif "message" in ctx.session.state:
-                    user_message = ctx.session.state["message"]
+            user_message = self._extract_user_message(ctx)
 
             if not user_message:
                 error_msg = "No user message found"
@@ -168,245 +232,243 @@ class A2ACustomAgent(BaseAgent):
                 )
                 return
 
-            # 3. Create and format the task to send to the A2A agent
-            print(f"Sending task to A2A agent: {user_message[:100]}...")
+            # 3. Extract agent ID and create enhanced client
+            agent_id = self._extract_agent_id_from_url(self.agent_card_url)
 
-            # Use the session ID as a stable identifier
-            session_id = (
-                str(ctx.session.id)
-                if ctx.session and hasattr(ctx.session, "id")
-                else str(uuid4())
-            )
-            task_id = str(uuid4())
-
-            # Prepare the message for the A2A agent
-            formatted_message = Message(
-                role="user",
-                parts=[TextPart(text=user_message)],
+            config = A2AClientConfig(
+                base_url=self.base_url,
+                api_key=self.api_key or "default-key",
+                implementation=self.preferred_implementation,
+                timeout=self.timeout,
             )
 
-            # Prepare the task parameters
-            task_params = TaskSendParams(
-                id=task_id,
-                sessionId=session_id,
-                message=formatted_message,
-                acceptedOutputModes=["text"],
-            )
+            print(f"Sending message to A2A agent {agent_id}: {user_message[:100]}...")
 
-            # 4. Check if the agent supports streaming
-            supports_streaming = (
-                agent_card.capabilities.streaming if agent_card.capabilities else False
-            )
+            # 4. Use enhanced client to communicate with the agent
+            async with EnhancedA2AClient(config) as client:
+                # Use session ID as a stable identifier
+                session_id = (
+                    str(ctx.session.id)
+                    if ctx.session and hasattr(ctx.session, "id")
+                    else str(uuid4())
+                )
 
-            if supports_streaming:
-                print("Agent supports streaming, using streaming API")
-                # Process with streaming
-                try:
-                    request = SendTaskStreamingRequest(
-                        method="tasks/sendSubscribe", params=task_params
+                # Check if the agent supports streaming
+                supports_streaming = self._agent_supports_streaming(agent_card)
+
+                if supports_streaming:
+                    print("Agent supports streaming, using streaming API")
+                    await self._process_streaming_response(
+                        client, agent_id, user_message, session_id
+                    )
+                else:
+                    print("Agent does not support streaming, using regular API")
+                    await self._process_regular_response(
+                        client, agent_id, user_message, session_id
                     )
 
-                    try:
-                        async with httpx.AsyncClient() as client:
-                            response = await client.post(
-                                self.base_url,
-                                json=request.model_dump(),
-                                headers={"Accept": "text/event-stream"},
-                                timeout=self.timeout,
-                            )
-                            response.raise_for_status()
-
-                            async for line in response.aiter_lines():
-                                if line.startswith("data:"):
-                                    data = line[5:].strip()
-                                    if data:
-                                        try:
-                                            result = json.loads(data)
-                                            print(f"Stream event received: {result}")
-
-                                            # Check if this is a status update with a message
-                                            if (
-                                                "result" in result
-                                                and "status" in result["result"]
-                                                and "message"
-                                                in result["result"]["status"]
-                                                and "parts"
-                                                in result["result"]["status"]["message"]
-                                            ):
-                                                message_parts = result["result"][
-                                                    "status"
-                                                ]["message"]["parts"]
-                                                parts = [
-                                                    Part(text=part["text"])
-                                                    for part in message_parts
-                                                    if part.get("type") == "text"
-                                                    and "text" in part
-                                                ]
-
-                                                if parts:
-                                                    yield Event(
-                                                        author=self.name,
-                                                        content=Content(
-                                                            role="agent", parts=parts
-                                                        ),
-                                                    )
-
-                                            # Check if this is a final message
-                                            if (
-                                                "result" in result
-                                                and result.get("result", {}).get(
-                                                    "final", False
-                                                )
-                                                and "status" in result["result"]
-                                                and result["result"]["status"].get(
-                                                    "state"
-                                                )
-                                                in [
-                                                    TaskState.COMPLETED,
-                                                    TaskState.CANCELED,
-                                                    TaskState.FAILED,
-                                                ]
-                                            ):
-                                                print(
-                                                    "Received final message, stream complete"
-                                                )
-                                                break
-                                        except json.JSONDecodeError as e:
-                                            print(f"Error parsing SSE data: {str(e)}")
-                    except Exception as stream_error:
-                        print(
-                            f"Error in direct streaming: {str(stream_error)}, falling back to regular API"
-                        )
-                        fallback_request = SendTaskRequest(
-                            method="tasks/send", params=task_params
-                        )
-
-                        async with httpx.AsyncClient() as client:
-                            response = await client.post(
-                                self.base_url,
-                                json=fallback_request.model_dump(),
-                                timeout=self.timeout,
-                            )
-                            response.raise_for_status()
-
-                            result = response.json()
-                            print(f"Fallback response: {result}")
-
-                            # Extract agent message parts
-                            if (
-                                "result" in result
-                                and "status" in result["result"]
-                                and "message" in result["result"]["status"]
-                                and "parts" in result["result"]["status"]["message"]
-                            ):
-                                message_parts = result["result"]["status"]["message"][
-                                    "parts"
-                                ]
-                                parts = [
-                                    Part(text=part["text"])
-                                    for part in message_parts
-                                    if part.get("type") == "text" and "text" in part
-                                ]
-
-                                if parts:
-                                    yield Event(
-                                        author=self.name,
-                                        content=Content(role="agent", parts=parts),
-                                    )
-                            else:
-                                yield Event(
-                                    author=self.name,
-                                    content=Content(
-                                        role="agent",
-                                        parts=[
-                                            Part(
-                                                text="Received response without message parts"
-                                            )
-                                        ],
-                                    ),
-                                )
-                except Exception as e:
-                    error_msg = f"Error in streaming: {str(e)}"
-                    print(error_msg)
-                    yield Event(
-                        author=self.name,
-                        content=Content(role="agent", parts=[Part(text=error_msg)]),
-                    )
-            else:
-                print("Agent does not support streaming, using regular API")
-                # Process with regular request
-                try:
-                    request = SendTaskRequest(method="tasks/send", params=task_params)
-
-                    async with httpx.AsyncClient() as client:
-                        response = await client.post(
-                            self.base_url,
-                            json=request.model_dump(),
-                            timeout=self.timeout,
-                        )
-                        response.raise_for_status()
-
-                        result = response.json()
-                        print(f"Task response: {result}")
-
-                        # Extract agent message parts
-                        if (
-                            "result" in result
-                            and "status" in result["result"]
-                            and "message" in result["result"]["status"]
-                            and "parts" in result["result"]["status"]["message"]
-                        ):
-                            message_parts = result["result"]["status"]["message"][
-                                "parts"
-                            ]
-                            parts = [
-                                Part(text=part["text"])
-                                for part in message_parts
-                                if part.get("type") == "text" and "text" in part
-                            ]
-
-                            if parts:
-                                yield Event(
-                                    author=self.name,
-                                    content=Content(role="agent", parts=parts),
-                                )
-                        else:
-                            yield Event(
-                                author=self.name,
-                                content=Content(
-                                    role="agent",
-                                    parts=[
-                                        Part(
-                                            text="Received response without message parts"
-                                        )
-                                    ],
-                                ),
-                            )
-
-                except Exception as e:
-                    error_msg = f"Error sending request: {str(e)}"
-                    print(error_msg)
-                    print(f"Error type: {type(e).__name__}")
-                    print(f"Error details: {str(e)}")
-
-                    yield Event(
-                        author=self.name,
-                        content=Content(role="agent", parts=[Part(text=error_msg)]),
-                    )
-
-            # Run sub-agents
+            # 5. Run sub-agents
             for sub_agent in self.sub_agents:
                 async for event in sub_agent.run_async(ctx):
                     yield event
 
         except Exception as e:
             # Handle any uncaught error
-            error_msg = f"Error executing A2A agent: {str(e)}"
+            error_msg = f"Error executing enhanced A2A agent: {str(e)}"
             print(error_msg)
             yield Event(
                 author=self.name,
                 content=Content(
                     role="agent",
                     parts=[Part(text=error_msg)],
+                ),
+            )
+
+    def _extract_user_message(self, ctx: InvocationContext) -> Optional[str]:
+        """Extract user message from the invocation context."""
+        user_message = None
+
+        # Search for the user's message in the session events
+        if ctx.session and hasattr(ctx.session, "events") and ctx.session.events:
+            for event in reversed(ctx.session.events):
+                if event.author == "user" and event.content and event.content.parts:
+                    user_message = event.content.parts[0].text
+                    print("Message found in session events")
+                    break
+
+        # Check in the session state if the message was not found in the events
+        if not user_message and ctx.session and ctx.session.state:
+            if "user_message" in ctx.session.state:
+                user_message = ctx.session.state["user_message"]
+            elif "message" in ctx.session.state:
+                user_message = ctx.session.state["message"]
+
+        return user_message
+
+    def _agent_supports_streaming(self, agent_card: AgentCard) -> bool:
+        """Check if the agent supports streaming."""
+        try:
+            if hasattr(agent_card, "capabilities"):
+                if hasattr(agent_card.capabilities, "streaming"):
+                    return agent_card.capabilities.streaming
+                elif isinstance(agent_card.capabilities, dict):
+                    return agent_card.capabilities.get("streaming", False)
+            return False
+        except Exception as e:
+            print(f"Error checking streaming capability: {e}")
+            return False
+
+    async def _process_streaming_response(
+        self, client: EnhancedA2AClient, agent_id: str, message: str, session_id: str
+    ) -> AsyncGenerator[Event, None]:
+        """Process streaming response from the A2A agent."""
+        try:
+            async for response_chunk in client.send_message_streaming(
+                agent_id=agent_id, message=message, session_id=session_id
+            ):
+                if response_chunk.success:
+                    print(
+                        f"Streaming chunk received using {response_chunk.implementation_used.value}"
+                    )
+
+                    # Extract and yield agent response
+                    event = self._create_event_from_response(response_chunk)
+                    if event:
+                        yield event
+                else:
+                    print(f"Streaming error: {response_chunk.error}")
+                    yield Event(
+                        author=self.name,
+                        content=Content(
+                            role="agent",
+                            parts=[
+                                Part(text=f"Streaming error: {response_chunk.error}")
+                            ],
+                        ),
+                    )
+
+        except Exception as e:
+            error_msg = f"Error in streaming: {str(e)}"
+            print(error_msg)
+            yield Event(
+                author=self.name,
+                content=Content(role="agent", parts=[Part(text=error_msg)]),
+            )
+
+    async def _process_regular_response(
+        self, client: EnhancedA2AClient, agent_id: str, message: str, session_id: str
+    ) -> AsyncGenerator[Event, None]:
+        """Process regular (non-streaming) response from the A2A agent."""
+        try:
+            response = await client.send_message(
+                agent_id=agent_id, message=message, session_id=session_id
+            )
+
+            if response.success:
+                print(f"Response received using {response.implementation_used.value}")
+
+                # Extract and yield agent response
+                event = self._create_event_from_response(response)
+                if event:
+                    yield event
+                else:
+                    yield Event(
+                        author=self.name,
+                        content=Content(
+                            role="agent",
+                            parts=[
+                                Part(text="Received response without readable content")
+                            ],
+                        ),
+                    )
+            else:
+                error_msg = f"Request failed: {response.error}"
+                print(error_msg)
+                yield Event(
+                    author=self.name,
+                    content=Content(role="agent", parts=[Part(text=error_msg)]),
+                )
+
+        except Exception as e:
+            error_msg = f"Error in regular request: {str(e)}"
+            print(error_msg)
+            yield Event(
+                author=self.name,
+                content=Content(role="agent", parts=[Part(text=error_msg)]),
+            )
+
+    def _create_event_from_response(self, response: A2AResponse) -> Optional[Event]:
+        """Create an Event from an A2A response."""
+        try:
+            response_data = response.data
+
+            if not response_data:
+                return None
+
+            # Handle different response formats
+            parts = []
+
+            # Try to extract message parts from various response structures
+            if isinstance(response_data, dict):
+                # Handle JSON-RPC response
+                if "result" in response_data:
+                    result = response_data["result"]
+
+                    # Handle task status with message
+                    if isinstance(result, dict) and "status" in result:
+                        status = result["status"]
+                        if "message" in status and "parts" in status["message"]:
+                            message_parts = status["message"]["parts"]
+                            for part in message_parts:
+                                if part.get("type") == "text" and "text" in part:
+                                    parts.append(Part(text=part["text"]))
+
+                    # Handle direct message response
+                    elif isinstance(result, dict) and "message" in result:
+                        message = result["message"]
+                        if isinstance(message, str):
+                            parts.append(Part(text=message))
+                        elif isinstance(message, dict) and "parts" in message:
+                            for part in message["parts"]:
+                                if part.get("type") == "text" and "text" in part:
+                                    parts.append(Part(text=part["text"]))
+
+                # Handle streaming event format
+                elif "data" in response_data:
+                    data = response_data["data"]
+                    if isinstance(data, str):
+                        parts.append(Part(text=data))
+                    elif isinstance(data, dict):
+                        # Recursively handle nested data
+                        nested_event = self._create_event_from_response(
+                            A2AResponse(success=True, data=data)
+                        )
+                        return nested_event
+
+            # If we extracted parts, create the event
+            if parts:
+                return Event(
+                    author=self.name,
+                    content=Content(role="agent", parts=parts),
+                )
+
+            # Fallback: try to convert response to string
+            elif response_data:
+                text_content = str(response_data)
+                if text_content and text_content != "None":
+                    return Event(
+                        author=self.name,
+                        content=Content(role="agent", parts=[Part(text=text_content)]),
+                    )
+
+            return None
+
+        except Exception as e:
+            print(f"Error creating event from response: {e}")
+            return Event(
+                author=self.name,
+                content=Content(
+                    role="agent",
+                    parts=[Part(text=f"Error processing response: {str(e)}")],
                 ),
             )

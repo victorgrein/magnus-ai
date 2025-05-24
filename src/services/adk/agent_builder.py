@@ -214,7 +214,7 @@ class AgentBuilder:
             else:
                 raise ValueError(f"Invalid agent type: {agent.type}")
 
-            sub_agents.append((sub_agent, exit_stack))
+            sub_agents.append(sub_agent)
             logger.info(f"Sub-agent added: {agent.name}")
 
         logger.info(f"Sub-agents created: {len(sub_agents)}")
