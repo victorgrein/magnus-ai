@@ -11,7 +11,7 @@ RUN npm install -g pnpm
 
 # Install dependencies first (caching)
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile
 
 # Instalar explicitamente o next-runtime-env
 RUN pnpm add next-runtime-env
@@ -37,7 +37,7 @@ RUN npm install -g pnpm
 
 # Install production dependencies only
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod --no-frozen-lockfile
 
 # Instalar explicitamente o next-runtime-env na produção
 RUN pnpm add next-runtime-env
