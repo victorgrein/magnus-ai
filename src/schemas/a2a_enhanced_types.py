@@ -68,16 +68,16 @@ logger = logging.getLogger(__name__)
 
 
 class A2ATypeValidator:
-    """Valida e converte tipos entre implementação custom e SDK oficial"""
+    """Validate and convert types between custom and official SDK implementations"""
 
     @staticmethod
     def is_sdk_available() -> bool:
-        """Verifica se o SDK está disponível"""
+        """Check if SDK is available"""
         return SDK_AVAILABLE
 
     @staticmethod
     def validate_agent_card(card_data: Dict[str, Any]) -> Optional[Any]:
-        """Valida agent card usando types do SDK se disponível"""
+        """Validate agent card using SDK types if available"""
         if not SDK_AVAILABLE:
             logger.debug("SDK not available, using custom validation")
             return CustomAgentCard(**card_data)
@@ -90,7 +90,7 @@ class A2ATypeValidator:
 
     @staticmethod
     def validate_message(message_data: Dict[str, Any]) -> Optional[Any]:
-        """Valida mensagem usando types do SDK se disponível"""
+        """Validate message using SDK types if available"""
         if not SDK_AVAILABLE:
             return CustomMessage(**message_data)
 
@@ -102,7 +102,7 @@ class A2ATypeValidator:
 
     @staticmethod
     def validate_task(task_data: Dict[str, Any]) -> Optional[Any]:
-        """Valida task usando types do SDK se disponível"""
+        """Validate task using SDK types if available"""
         if not SDK_AVAILABLE:
             return CustomTask(**task_data)
 
@@ -114,29 +114,29 @@ class A2ATypeValidator:
 
 
 class A2ATypeConverter:
-    """Converte entre tipos custom e SDK"""
+    """Convert between custom and SDK types"""
 
     @staticmethod
     def custom_task_to_sdk(custom_task: CustomTask) -> Optional[Any]:
-        """Converte CustomTask para SDKTask"""
+        """Convert CustomTask to SDKTask"""
         if not SDK_AVAILABLE:
             return custom_task
 
         try:
-            # Converte status
+            # Convert status
             sdk_status = None
             if custom_task.status:
                 sdk_status = A2ATypeConverter.custom_task_status_to_sdk(
                     custom_task.status
                 )
 
-            # Se status é None, criar um status básico
+            # If status is None, create a basic status
             if not sdk_status:
                 sdk_status = SDKTaskStatus(
                     state=SDKTaskState.unknown, message=None, timestamp=None
                 )
 
-            # Converte artifacts
+            # Convert artifacts
             sdk_artifacts = []
             if custom_task.artifacts:
                 for artifact in custom_task.artifacts:
@@ -144,7 +144,7 @@ class A2ATypeConverter:
                     if sdk_artifact:
                         sdk_artifacts.append(sdk_artifact)
 
-            # Converte history
+            # Convert history
             sdk_history = []
             if custom_task.history:
                 for message in custom_task.history:
@@ -155,7 +155,7 @@ class A2ATypeConverter:
             return SDKTask(
                 id=custom_task.id,
                 contextId=custom_task.sessionId,
-                kind="task",  # Novo campo no SDK
+                kind="task",  # New field in SDK
                 status=sdk_status,
                 artifacts=sdk_artifacts if sdk_artifacts else None,
                 history=sdk_history if sdk_history else None,
@@ -167,15 +167,15 @@ class A2ATypeConverter:
 
     @staticmethod
     def sdk_task_to_custom(sdk_task) -> Optional[CustomTask]:
-        """Converte SDKTask para CustomTask"""
+        """Convert SDKTask to CustomTask"""
         if not SDK_AVAILABLE:
             return sdk_task
 
         try:
-            # Converte status
+            # Convert status
             custom_status = A2ATypeConverter.sdk_task_status_to_custom(sdk_task.status)
 
-            # Converte artifacts
+            # Convert artifacts
             custom_artifacts = []
             if sdk_task.artifacts:
                 for artifact in sdk_task.artifacts:
@@ -183,7 +183,7 @@ class A2ATypeConverter:
                     if custom_artifact:
                         custom_artifacts.append(custom_artifact)
 
-            # Converte history
+            # Convert history
             custom_history = []
             if sdk_task.history:
                 for message in sdk_task.history:
@@ -205,12 +205,12 @@ class A2ATypeConverter:
 
     @staticmethod
     def custom_task_status_to_sdk(custom_status: CustomTaskStatus) -> Optional[Any]:
-        """Converte CustomTaskStatus para SDKTaskStatus"""
+        """Convert CustomTaskStatus to SDKTaskStatus"""
         if not SDK_AVAILABLE:
             return custom_status
 
         try:
-            # Mapeia estados
+            # Map states
             state_mapping = {
                 CustomTaskState.SUBMITTED: SDKTaskState.submitted,
                 CustomTaskState.WORKING: SDKTaskState.working,
@@ -223,14 +223,14 @@ class A2ATypeConverter:
 
             sdk_state = state_mapping.get(custom_status.state, SDKTaskState.unknown)
 
-            # Converte message se existir
+            # Convert message if exists
             sdk_message = None
             if custom_status.message:
                 sdk_message = A2ATypeConverter.custom_message_to_sdk(
                     custom_status.message
                 )
 
-            # Converter timestamp para string se for datetime
+            # Convert timestamp to string if it's a datetime
             timestamp_str = custom_status.timestamp
             if hasattr(custom_status.timestamp, "isoformat"):
                 timestamp_str = custom_status.timestamp.isoformat()
@@ -244,12 +244,12 @@ class A2ATypeConverter:
 
     @staticmethod
     def sdk_task_status_to_custom(sdk_status) -> Optional[CustomTaskStatus]:
-        """Converte SDKTaskStatus para CustomTaskStatus"""
+        """Convert SDKTaskStatus to CustomTaskStatus"""
         if not SDK_AVAILABLE:
             return sdk_status
 
         try:
-            # Mapeia estados de volta
+            # Map states back
             state_mapping = {
                 SDKTaskState.submitted: CustomTaskState.SUBMITTED,
                 SDKTaskState.working: CustomTaskState.WORKING,
@@ -262,7 +262,7 @@ class A2ATypeConverter:
 
             custom_state = state_mapping.get(sdk_status.state, CustomTaskState.UNKNOWN)
 
-            # Converte message se existir
+            # Convert message if exists
             custom_message = None
             if sdk_status.message:
                 custom_message = A2ATypeConverter.sdk_message_to_custom(
@@ -280,12 +280,12 @@ class A2ATypeConverter:
 
     @staticmethod
     def custom_message_to_sdk(custom_message: CustomMessage) -> Optional[Any]:
-        """Converte CustomMessage para SDKMessage"""
+        """Convert CustomMessage to SDKMessage"""
         if not SDK_AVAILABLE:
             return custom_message
 
         try:
-            # Converte parts
+            # Convert parts
             sdk_parts = []
             for part in custom_message.parts:
                 if hasattr(part, "type"):
@@ -318,7 +318,7 @@ class A2ATypeConverter:
 
     @staticmethod
     def sdk_message_to_custom(sdk_message) -> Optional[CustomMessage]:
-        """Converte SDKMessage para CustomMessage"""
+        """Convert SDKMessage to CustomMessage"""
         if not SDK_AVAILABLE:
             logger.info("SDK not available, returning original message")
             return sdk_message
@@ -333,23 +333,23 @@ class A2ATypeConverter:
                 f"SDK message parts length: {len(getattr(sdk_message, 'parts', []))}"
             )
 
-            # Converte parts de volta
+            # Convert parts back
             custom_parts = []
             for idx, part in enumerate(sdk_message.parts):
                 logger.info(f"Processing part {idx}: {type(part)}")
                 logger.info(f"Part repr: {repr(part)}")
 
                 try:
-                    # O SDK TextPart não permite acesso direto via getattr
-                    # Vamos extrair dados do repr string
+                    # The SDK TextPart does not allow direct access via getattr
+                    # We will extract data from the repr string
                     part_repr = repr(part)
                     logger.info(f"Parsing part repr: {part_repr}")
 
-                    # Verificar se é TextPart
+                    # Check if it's a TextPart
                     if "TextPart" in str(type(part)) or "kind='text'" in part_repr:
                         logger.info("Detected TextPart")
 
-                        # Extrair texto do repr
+                        # Extract text from repr
                         import re
 
                         text_match = re.search(r"text='([^']*)'", part_repr)
@@ -357,7 +357,7 @@ class A2ATypeConverter:
 
                         logger.info(f"Extracted text: {text_content}")
 
-                        # Criar dicionário em vez de SimpleNamespace para compatibilidade com Pydantic
+                        # Create dictionary instead of SimpleNamespace for Pydantic compatibility
                         text_part = {
                             "type": "text",
                             "text": text_content,
@@ -369,11 +369,11 @@ class A2ATypeConverter:
                     elif "FilePart" in str(type(part)) or "kind='file'" in part_repr:
                         logger.info("Detected FilePart")
 
-                        # Para file parts, precisaríamos extrair mais dados
-                        # Por enquanto, criar estrutura básica
+                        # For file parts, we would need to extract more data
+                        # For now, create a basic structure
                         file_part = {
                             "type": "file",
-                            "file": None,  # Seria necessário extrair do SDK
+                            "file": None,  # It would be necessary to extract from SDK
                             "metadata": None,
                         }
                         custom_parts.append(file_part)
@@ -381,7 +381,7 @@ class A2ATypeConverter:
 
                     else:
                         logger.warning(f"Unknown part type in repr: {part_repr}")
-                        # Fallback: tentar extrair qualquer texto disponível
+                        # Fallback: try to extract any available text
                         if "text=" in part_repr:
                             import re
 
@@ -405,7 +405,7 @@ class A2ATypeConverter:
 
             logger.info(f"Total custom parts created: {len(custom_parts)}")
 
-            # Converte role de enum para string se necessário
+            # Convert role from enum to string if necessary
             role_str = sdk_message.role
             if hasattr(sdk_message.role, "value"):
                 role_str = sdk_message.role.value
@@ -432,16 +432,16 @@ class A2ATypeConverter:
 
     @staticmethod
     def custom_artifact_to_sdk(custom_artifact: CustomArtifact) -> Optional[Any]:
-        """Converte CustomArtifact para SDKArtifact"""
+        """Convert CustomArtifact to SDKArtifact"""
         if not SDK_AVAILABLE:
             return custom_artifact
 
         try:
-            # Converter parts para formato SDK
+            # Convert parts to SDK format
             sdk_parts = []
             if custom_artifact.parts:
                 for part in custom_artifact.parts:
-                    # Se part é um dicionário, converter para objeto SDK appropriado
+                    # If part is a dictionary, convert to appropriate SDK object
                     if isinstance(part, dict):
                         if part.get("type") == "text":
                             sdk_parts.append(
@@ -459,12 +459,12 @@ class A2ATypeConverter:
                                     metadata=part.get("metadata"),
                                 )
                             )
-                    # Se já é um objeto SDK, usar diretamente
+                    # If it's already a SDK object, use it directly
                     elif hasattr(part, "kind"):
                         sdk_parts.append(part)
-                    # Se é um TextPart custom, converter
+                    # If it's a custom TextPart, convert it
                     else:
-                        # Fallback: assumir text part
+                        # Fallback: assume text part
                         text_content = getattr(part, "text", str(part))
                         sdk_parts.append(
                             SDKTextPart(
@@ -474,7 +474,7 @@ class A2ATypeConverter:
                             )
                         )
 
-            # Gerar artifactId se não existir
+            # Generate artifactId if it doesn't exist
             artifact_id = getattr(custom_artifact, "artifactId", None)
             if not artifact_id:
                 from uuid import uuid4
@@ -494,7 +494,7 @@ class A2ATypeConverter:
 
     @staticmethod
     def sdk_artifact_to_custom(sdk_artifact) -> Optional[CustomArtifact]:
-        """Converte SDKArtifact para CustomArtifact"""
+        """Convert SDKArtifact to CustomArtifact"""
         if not SDK_AVAILABLE:
             return sdk_artifact
 
@@ -514,12 +514,12 @@ class A2ATypeConverter:
 
     @staticmethod
     def custom_agent_card_to_sdk(custom_card: CustomAgentCard) -> Optional[Any]:
-        """Converte CustomAgentCard para SDKAgentCard"""
+        """Convert CustomAgentCard to SDKAgentCard"""
         if not SDK_AVAILABLE:
             return custom_card
 
         try:
-            # Converte capabilities
+            # Convert capabilities
             sdk_capabilities = None
             if custom_card.capabilities:
                 sdk_capabilities = SDKAgentCapabilities(
@@ -528,7 +528,7 @@ class A2ATypeConverter:
                     stateTransitionHistory=custom_card.capabilities.stateTransitionHistory,
                 )
 
-            # Converte provider
+            # Convert provider
             sdk_provider = None
             if custom_card.provider:
                 sdk_provider = SDKAgentProvider(
@@ -536,7 +536,7 @@ class A2ATypeConverter:
                     url=custom_card.provider.url,
                 )
 
-            # Converte skills
+            # Convert skills
             sdk_skills = []
             if custom_card.skills:
                 for skill in custom_card.skills:
@@ -569,9 +569,9 @@ class A2ATypeConverter:
             return None
 
 
-# Funções utilitárias para facilitar o uso
+# Utility functions to facilitate usage
 def validate_with_sdk(data: Dict[str, Any], data_type: str) -> Any:
-    """Função utilitária para validar dados com SDK quando disponível"""
+    """Utility function to validate data with SDK when available"""
     validator = A2ATypeValidator()
 
     if data_type == "agent_card":
@@ -585,7 +585,7 @@ def validate_with_sdk(data: Dict[str, Any], data_type: str) -> Any:
 
 
 def convert_to_sdk_format(custom_obj: Any) -> Any:
-    """Função utilitária para converter objeto custom para formato SDK"""
+    """Utility function to convert custom object to SDK format"""
     converter = A2ATypeConverter()
 
     if isinstance(custom_obj, CustomTask):
@@ -600,7 +600,7 @@ def convert_to_sdk_format(custom_obj: Any) -> Any:
 
 
 def convert_from_sdk_format(sdk_obj: Any) -> Any:
-    """Função utilitária para converter objeto SDK para formato custom"""
+    """Utility function to convert SDK object to custom format"""
     converter = A2ATypeConverter()
 
     if SDK_AVAILABLE:

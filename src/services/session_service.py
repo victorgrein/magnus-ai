@@ -181,7 +181,13 @@ def get_session_events(
         if not hasattr(session, "events") or session.events is None:
             return []
 
-        return session.events
+        sorted_events = sorted(
+            session.events,
+            key=lambda event: event.timestamp if hasattr(event, "timestamp") else 0,
+        )
+
+        return sorted_events
+
     except HTTPException:
         # Passes HTTP exceptions from get_session_by_id
         raise

@@ -185,7 +185,7 @@ function WorkflowsContent() {
             open={isTestModalOpen}
             onOpenChange={setIsTestModalOpen}
             agent={agent}
-            canvasRef={canvaRef} // Passamos a referência do canvas para permitir a visualização dos nós em execução
+            canvasRef={canvaRef} // Pass the canvas reference to allow visualization of running nodes
           />
         )}
 

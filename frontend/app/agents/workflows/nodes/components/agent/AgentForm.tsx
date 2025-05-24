@@ -108,15 +108,15 @@ export function AgentForm({ selectedNode, handleUpdateNode, setEdges, setIsOpen,
   const [isTestModalOpen, setIsTestModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   
-  // Acessar a referência do canvas a partir do localStorage
+  // Access the canvas reference from localStorage
   const canvasRef = useRef<any>(null);
   
   useEffect(() => {
-    // Quando o componente é montado, verifica se há uma referência de canvas no contexto global
+    // When the component is mounted, check if there is a canvas reference in the global context
     if (typeof window !== "undefined") {
       const workflowsPage = document.querySelector('[data-workflow-page="true"]');
       if (workflowsPage) {
-        // Se estamos na página de workflows, tentamos acessar a ref do canvas
+        // If we are on the workflows page, try to access the canvas ref
         const canvasElement = workflowsPage.querySelector('[data-canvas-ref="true"]');
         if (canvasElement && (canvasElement as any).__reactRef) {
           canvasRef.current = (canvasElement as any).__reactRef.current;

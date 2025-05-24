@@ -995,3 +995,343 @@ def get_agents_by_folder(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Error listing agents of folder",
         )
+
+
+async def import_agents_from_json(
+    db: Session,
+    agents_data: Dict[str, Any],
+    client_id: uuid.UUID,
+    folder_id: Optional[uuid.UUID] = None,
+) -> List[Agent]:
+    """
+    Import one or more agents from JSON data
+
+    Args:
+        db (Session): Database session
+        agents_data (Dict[str, Any]): JSON data containing agent definitions
+        client_id (uuid.UUID): Client ID to associate with the imported agents
+        folder_id (Optional[uuid.UUID]): Optional folder ID to assign agents to
+
+    Returns:
+        List[Agent]: List of imported agents
+    """
+    # Check if the JSON contains a single agent or multiple agents
+    if "agents" in agents_data:
+        # Multiple agents import
+        agents_list = agents_data["agents"]
+        if not isinstance(agents_list, list):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="The 'agents' field must contain a list of agent definitions",
+            )
+    else:
+        # Single agent import
+        agents_list = [agents_data]
+
+    imported_agents = []
+    errors = []
+    id_mapping = {}  # Maps original IDs to newly created agent IDs
+
+    # First pass: Import all non-workflow agents to establish ID mappings
+    for agent_data in agents_list:
+        # Skip workflow agents in the first pass, we'll handle them in the second pass
+        if agent_data.get("type") == "workflow":
+            continue
+
+        try:
+            # Store original ID if present for reference mapping
+            original_id = None
+            if "id" in agent_data:
+                original_id = agent_data["id"]
+                del agent_data["id"]  # Always create a new agent with new ID
+
+            # Set the client ID for this agent if not provided
+            if "client_id" not in agent_data:
+                agent_data["client_id"] = str(client_id)
+            else:
+                # Ensure the provided client_id matches the authenticated client
+                agent_client_id = uuid.UUID(agent_data["client_id"])
+                if agent_client_id != client_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Cannot import agent for client ID {agent_client_id}",
+                    )
+
+            # Set folder_id if provided and not already set in the agent data
+            if folder_id and "folder_id" not in agent_data:
+                agent_data["folder_id"] = str(folder_id)
+
+            # Process config: Keep original configuration intact except for agent references
+            if "config" in agent_data and agent_data["config"]:
+                config = agent_data["config"]
+
+                # Process sub_agents if present
+                if "sub_agents" in config and config["sub_agents"]:
+                    processed_sub_agents = []
+
+                    for sub_agent_id in config["sub_agents"]:
+                        try:
+                            # Check if agent exists in database
+                            existing_agent = get_agent(db, sub_agent_id)
+                            if existing_agent:
+                                processed_sub_agents.append(str(existing_agent.id))
+                            else:
+                                logger.warning(
+                                    f"Referenced sub_agent {sub_agent_id} not found - will be skipped"
+                                )
+                        except Exception as e:
+                            logger.warning(
+                                f"Error processing sub_agent {sub_agent_id}: {str(e)}"
+                            )
+
+                    config["sub_agents"] = processed_sub_agents
+
+                # Process agent_tools if present
+                if "agent_tools" in config and config["agent_tools"]:
+                    processed_agent_tools = []
+
+                    for agent_tool_id in config["agent_tools"]:
+                        try:
+                            # Check if agent exists in database
+                            existing_agent = get_agent(db, agent_tool_id)
+                            if existing_agent:
+                                processed_agent_tools.append(str(existing_agent.id))
+                            else:
+                                logger.warning(
+                                    f"Referenced agent_tool {agent_tool_id} not found - will be skipped"
+                                )
+                        except Exception as e:
+                            logger.warning(
+                                f"Error processing agent_tool {agent_tool_id}: {str(e)}"
+                            )
+
+                    config["agent_tools"] = processed_agent_tools
+
+            # Convert to AgentCreate schema
+            agent_create = AgentCreate(**agent_data)
+
+            # Create the agent using existing create_agent function
+            db_agent = await create_agent(db, agent_create)
+
+            # Store mapping from original ID to new ID
+            if original_id:
+                id_mapping[original_id] = str(db_agent.id)
+
+            # If folder_id is provided but not in agent_data (couldn't be set at creation time)
+            # assign the agent to the folder after creation
+            if folder_id and not agent_data.get("folder_id"):
+                db_agent = assign_agent_to_folder(db, db_agent.id, folder_id)
+
+            # Set agent card URL if needed
+            if not db_agent.agent_card_url:
+                db_agent.agent_card_url = db_agent.agent_card_url_property
+
+            imported_agents.append(db_agent)
+
+        except Exception as e:
+            # Log the error and continue with other agents
+            agent_name = agent_data.get("name", "Unknown")
+            error_msg = f"Error importing agent '{agent_name}': {str(e)}"
+            logger.error(error_msg)
+            errors.append(error_msg)
+
+    # Second pass: Process workflow agents
+    for agent_data in agents_list:
+        # Only process workflow agents in the second pass
+        if agent_data.get("type") != "workflow":
+            continue
+
+        try:
+            # Store original ID if present for reference mapping
+            original_id = None
+            if "id" in agent_data:
+                original_id = agent_data["id"]
+                del agent_data["id"]  # Always create a new agent with new ID
+
+            # Set the client ID for this agent if not provided
+            if "client_id" not in agent_data:
+                agent_data["client_id"] = str(client_id)
+            else:
+                # Ensure the provided client_id matches the authenticated client
+                agent_client_id = uuid.UUID(agent_data["client_id"])
+                if agent_client_id != client_id:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Cannot import agent for client ID {agent_client_id}",
+                    )
+
+            # Set folder_id if provided and not already set in the agent data
+            if folder_id and "folder_id" not in agent_data:
+                agent_data["folder_id"] = str(folder_id)
+
+            # Process workflow nodes
+            if "config" in agent_data and agent_data["config"]:
+                config = agent_data["config"]
+
+                # Process workflow nodes
+                if "workflow" in config and config["workflow"]:
+                    workflow = config["workflow"]
+
+                    if "nodes" in workflow and isinstance(workflow["nodes"], list):
+                        for node in workflow["nodes"]:
+                            if (
+                                isinstance(node, dict)
+                                and node.get("type") == "agent-node"
+                            ):
+                                if "data" in node and "agent" in node["data"]:
+                                    agent_node = node["data"]["agent"]
+
+                                    # Store the original node ID
+                                    node_agent_id = None
+                                    if "id" in agent_node:
+                                        node_agent_id = agent_node["id"]
+
+                                        # Check if this ID is in our mapping (we created it in this import)
+                                        if node_agent_id in id_mapping:
+                                            # Use our newly created agent
+                                            # Get the agent from database with the mapped ID
+                                            mapped_id = uuid.UUID(
+                                                id_mapping[node_agent_id]
+                                            )
+                                            db_agent = get_agent(db, mapped_id)
+                                            if db_agent:
+                                                # Replace with database agent definition
+                                                # Extract agent data as dictionary
+                                                agent_dict = {
+                                                    "id": str(db_agent.id),
+                                                    "name": db_agent.name,
+                                                    "description": db_agent.description,
+                                                    "role": db_agent.role,
+                                                    "goal": db_agent.goal,
+                                                    "type": db_agent.type,
+                                                    "model": db_agent.model,
+                                                    "instruction": db_agent.instruction,
+                                                    "config": db_agent.config,
+                                                }
+                                                node["data"]["agent"] = agent_dict
+                                        else:
+                                            # Check if this agent exists in database
+                                            try:
+                                                existing_agent = get_agent(
+                                                    db, node_agent_id
+                                                )
+                                                if existing_agent:
+                                                    # Replace with database agent definition
+                                                    # Extract agent data as dictionary
+                                                    agent_dict = {
+                                                        "id": str(existing_agent.id),
+                                                        "name": existing_agent.name,
+                                                        "description": existing_agent.description,
+                                                        "role": existing_agent.role,
+                                                        "goal": existing_agent.goal,
+                                                        "type": existing_agent.type,
+                                                        "model": existing_agent.model,
+                                                        "instruction": existing_agent.instruction,
+                                                        "config": existing_agent.config,
+                                                    }
+                                                    node["data"]["agent"] = agent_dict
+                                                else:
+                                                    # Agent doesn't exist, so we'll create a new one
+                                                    # First, remove ID to get a new one
+                                                    if "id" in agent_node:
+                                                        del agent_node["id"]
+
+                                                    # Set client_id to match parent
+                                                    agent_node["client_id"] = str(
+                                                        client_id
+                                                    )
+
+                                                    # Create agent
+                                                    inner_agent_create = AgentCreate(
+                                                        **agent_node
+                                                    )
+                                                    inner_db_agent = await create_agent(
+                                                        db, inner_agent_create
+                                                    )
+
+                                                    # Replace with the new agent
+                                                    # Extract agent data as dictionary
+                                                    agent_dict = {
+                                                        "id": str(inner_db_agent.id),
+                                                        "name": inner_db_agent.name,
+                                                        "description": inner_db_agent.description,
+                                                        "role": inner_db_agent.role,
+                                                        "goal": inner_db_agent.goal,
+                                                        "type": inner_db_agent.type,
+                                                        "model": inner_db_agent.model,
+                                                        "instruction": inner_db_agent.instruction,
+                                                        "config": inner_db_agent.config,
+                                                    }
+                                                    node["data"]["agent"] = agent_dict
+                                            except Exception as e:
+                                                logger.warning(
+                                                    f"Error processing agent node {node_agent_id}: {str(e)}"
+                                                )
+                                                # Continue using the agent definition as is,
+                                                # but without ID to get a new one
+                                                if "id" in agent_node:
+                                                    del agent_node["id"]
+                                                agent_node["client_id"] = str(client_id)
+
+                # Process sub_agents if present
+                if "sub_agents" in config and config["sub_agents"]:
+                    processed_sub_agents = []
+
+                    for sub_agent_id in config["sub_agents"]:
+                        # Check if agent exists in database
+                        try:
+                            # Check if this is an agent we just created
+                            if sub_agent_id in id_mapping:
+                                processed_sub_agents.append(id_mapping[sub_agent_id])
+                            else:
+                                # Check if this agent exists in database
+                                existing_agent = get_agent(db, sub_agent_id)
+                                if existing_agent:
+                                    processed_sub_agents.append(str(existing_agent.id))
+                                else:
+                                    logger.warning(
+                                        f"Referenced sub_agent {sub_agent_id} not found - will be skipped"
+                                    )
+                        except Exception as e:
+                            logger.warning(
+                                f"Error processing sub_agent {sub_agent_id}: {str(e)}"
+                            )
+
+                    config["sub_agents"] = processed_sub_agents
+
+            # Convert to AgentCreate schema
+            agent_create = AgentCreate(**agent_data)
+
+            # Create the agent using existing create_agent function
+            db_agent = await create_agent(db, agent_create)
+
+            # Store mapping from original ID to new ID
+            if original_id:
+                id_mapping[original_id] = str(db_agent.id)
+
+            # If folder_id is provided but not in agent_data (couldn't be set at creation time)
+            # assign the agent to the folder after creation
+            if folder_id and not agent_data.get("folder_id"):
+                db_agent = assign_agent_to_folder(db, db_agent.id, folder_id)
+
+            # Set agent card URL if needed
+            if not db_agent.agent_card_url:
+                db_agent.agent_card_url = db_agent.agent_card_url_property
+
+            imported_agents.append(db_agent)
+
+        except Exception as e:
+            # Log the error and continue with other agents
+            agent_name = agent_data.get("name", "Unknown")
+            error_msg = f"Error importing agent '{agent_name}': {str(e)}"
+            logger.error(error_msg)
+            errors.append(error_msg)
+
+    # If no agents were imported successfully, raise an error
+    if not imported_agents and errors:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"message": "Failed to import any agents", "errors": errors},
+        )
+
+    return imported_agents

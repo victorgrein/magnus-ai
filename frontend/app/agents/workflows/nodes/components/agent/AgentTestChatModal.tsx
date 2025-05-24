@@ -89,8 +89,8 @@ export function AgentTestChatModal({ open, onOpenChange, agent, canvasRef }: Age
     const onEvent = useCallback((event: any) => {
         setMessages((prev) => [...prev, event]);
         
-        // Verificar se a mensagem vem de um nó de workflow e destacar o nó
-        // somente se o canvasRef estiver disponível (chamado do Test Workflow na página principal)
+        // Check if the message comes from a workflow node and highlight the node
+        // only if the canvasRef is available (called from Test Workflow on the main page)
         if (event.author && event.author.startsWith('workflow-node:') && canvasRef?.current) {
             const nodeId = event.author.split(':')[1];
             canvasRef.current.setActiveExecutionNodeId(nodeId);
@@ -139,7 +139,7 @@ export function AgentTestChatModal({ open, onOpenChange, agent, canvasRef }: Age
         setExternalId(generateExternalId());
         setIsInitializing(true);
         
-        // Breve delay para mostrar o status de inicialização
+        // Short delay to show the initialization status
         const timer = setTimeout(() => {
             setIsInitializing(false);
         }, 1200);

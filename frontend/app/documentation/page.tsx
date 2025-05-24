@@ -851,12 +851,12 @@ function DocumentationContent() {
         body: JSON.stringify(streamRpcRequest),
       });
 
-      // Verificar o content-type da resposta
+      // Verify the content-type of the response
       const contentType = initialResponse.headers.get("Content-Type");
       addDebugLog(`Response content type: ${contentType || "not specified"}`);
 
       if (contentType && contentType.includes("text/event-stream")) {
-        // É uma resposta SSE (Server-Sent Events)
+        // It's an SSE (Server-Sent Events) response
         addDebugLog("Detected SSE response, processing stream directly");
         processEventStream(initialResponse);
         return;
@@ -877,10 +877,10 @@ function DocumentationContent() {
       try {
         const responseText = await initialResponse.text();
 
-        // Verificar se a resposta começa com "data:", o que indica um SSE
+        // Verify if the response starts with "data:", which indicates an SSE
         if (responseText.trim().startsWith("data:")) {
           addDebugLog("Response has SSE format but wrong content-type");
-          // Criar uma resposta sintética para processar como stream
+          // Create a synthetic response to process as stream
           const syntheticResponse = new Response(responseText, {
             headers: {
               "Content-Type": "text/event-stream",
@@ -890,7 +890,7 @@ function DocumentationContent() {
           return;
         }
 
-        // Tentar processar como JSON
+        // Try to process as JSON
         const initialData = JSON.parse(responseText);
         addDebugLog("Initial stream response: " + JSON.stringify(initialData));
 
@@ -913,7 +913,7 @@ function DocumentationContent() {
       } catch (parseError) {
         addDebugLog(`Error parsing response: ${parseError}`);
 
-        // Se não conseguimos processar como JSON ou SSE, mostrar o erro
+        // If we can't process as JSON or SSE, show the error
         setStreamResponse(
           `Error: Unable to process response: ${parseError instanceof Error ? parseError.message : String(parseError)}`
         );

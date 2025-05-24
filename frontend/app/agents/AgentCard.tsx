@@ -215,7 +215,7 @@ export function AgentCard({
     return new Date(agent.created_at).toLocaleDateString();
   };
 
-  // Função para exportar o agente como JSON
+  // Function to export the agent as JSON
   const handleExportAgent = () => {
     try {
       exportAsJson(
@@ -231,18 +231,18 @@ export function AgentCard({
     }
   };
 
-  // Função para testar o agente A2A no laboratório
+  // Function to test the A2A agent in the lab
   const handleTestA2A = () => {
-    // Usar a URL do agent card como URL base para testes A2A
+    // Use the agent card URL as base for A2A tests
     const agentUrl = agent.agent_card_url?.replace(
       "/.well-known/agent.json",
       ""
     );
 
-    // Usar a API key diretamente do config do agente
+    // Use the API key directly from the agent config
     const apiKey = agent.config?.api_key;
 
-    // Construir a URL com parâmetros para o laboratório de testes
+    // Build the URL with parameters for the lab tests
     const params = new URLSearchParams();
 
     if (agentUrl) {
@@ -253,7 +253,7 @@ export function AgentCard({
       params.set("api_key", apiKey);
     }
 
-    // Redirecionar para o laboratório de testes na aba "lab"
+    // Redirect to the lab tests in the "lab" tab
     const testUrl = `/documentation?${params.toString()}#lab`;
 
     router.push(testUrl);

@@ -60,9 +60,9 @@ export function ChatInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Autofocus no textarea quando o componente for montado
+  // Autofocus the textarea when the component is mounted
   React.useEffect(() => {
-    // Pequeno timeout para garantir que o foco seja aplicado após a renderização completa
+    // Small timeout to ensure focus is applied after the complete rendering
     if (autoFocus) {
       const timer = setTimeout(() => {
         if (textareaRef.current && !isLoading) {
@@ -87,7 +87,7 @@ export function ChatInput({
     
     setTimeout(() => {
       setResetFileUpload(false);
-      // Mantém o foco no textarea após enviar a mensagem
+      // Keep the focus on the textarea after sending the message
       if (autoFocus && textareaRef.current) {
         textareaRef.current.focus();
       }

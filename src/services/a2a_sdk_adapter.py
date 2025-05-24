@@ -82,10 +82,10 @@ logger = logging.getLogger(__name__)
 
 class EvoAIAgentExecutor:
     """
-    Implementação direta da Message API para o SDK oficial.
+    Direct implementation of the Message API for the official SDK.
 
-    Ao invés de tentar converter para Task API, implementa diretamente
-    os métodos esperados pelo SDK: message/send e message/stream
+    Instead of trying to convert to Task API, it implements directly
+    the methods expected by the SDK: message/send and message/stream
     """
 
     def __init__(self, db: Session, agent_id: UUID):
@@ -96,24 +96,24 @@ class EvoAIAgentExecutor:
         self, context: "RequestContext", event_queue: "EventQueue"
     ) -> None:
         """
-        Implementa diretamente a execução de mensagens usando agent_runner.
+        Direct implementation of message execution using agent_runner.
 
-        Não usa task manager - vai direto para a lógica de execução.
+        Does not use task manager - goes directly to execution logic.
         """
         try:
             logger.info("=" * 80)
-            logger.info(f"🚀 EXECUTOR EXECUTE() CHAMADO! Agent: {self.agent_id}")
+            logger.info(f"🚀 EXECUTOR EXECUTE() CALLED! Agent: {self.agent_id}")
             logger.info(f"Context: {context}")
             logger.info(f"Message: {getattr(context, 'message', 'NO_MESSAGE')}")
             logger.info("=" * 80)
 
-            # Verifica se há mensagem
+            # Check if there is a message
             if not hasattr(context, "message") or not context.message:
                 logger.error("❌ No message in context")
                 await self._emit_error_event(event_queue, "No message provided")
                 return
 
-            # Extrai texto da mensagem
+            # Extract text from message
             message_text = self._extract_text_from_message(context.message)
             if not message_text:
                 logger.error("❌ No text found in message")
@@ -122,18 +122,18 @@ class EvoAIAgentExecutor:
 
             logger.info(f"📝 Extracted message: {message_text}")
 
-            # Gera session_id único
+            # Generate unique session_id
             session_id = context.context_id or str(uuid4())
             logger.info(f"📝 Using session_id: {session_id}")
 
-            # Importa services necessários
+            # Import services needed
             from src.services.service_providers import (
                 session_service,
                 artifacts_service,
                 memory_service,
             )
 
-            # Chama agent_runner diretamente (sem task manager)
+            # Call agent_runner directly (without task manager)
             logger.info("🔄 Calling agent_runner directly...")
 
             from src.services.adk.agent_runner import run_agent
@@ -146,15 +146,15 @@ class EvoAIAgentExecutor:
                 artifacts_service=artifacts_service,
                 memory_service=memory_service,
                 db=self.db,
-                files=None,  # TODO: processar files se necessário
+                files=None,  # TODO: process files if needed
             )
 
             logger.info(f"✅ Agent result: {result}")
 
-            # Converte resultado para evento SDK
+            # Convert result to SDK event
             final_response = result.get("final_response", "No response")
 
-            # Cria mensagem de resposta compatível com SDK
+            # Create response message compatible with SDK
             response_message = new_agent_text_message(final_response)
             event_queue.enqueue_event(response_message)
 
@@ -168,7 +168,7 @@ class EvoAIAgentExecutor:
             await self._emit_error_event(event_queue, f"Execution error: {str(e)}")
 
     def _extract_text_from_message(self, message) -> str:
-        """Extrai texto da mensagem SDK."""
+        """Extract text from SDK message."""
         try:
             logger.info(f"🔍 DEBUG MESSAGE STRUCTURE:")
             logger.info(f"Message type: {type(message)}")
@@ -190,12 +190,12 @@ class EvoAIAgentExecutor:
                             logger.info(f"Part {i} text: {part.text}")
                             return part.text
 
-            # Tenta outras formas de acessar o texto
+            # Try other ways to access the text
             if hasattr(message, "text"):
                 logger.info(f"Message has direct text: {message.text}")
                 return message.text
 
-            # Se for string diretamente
+            # If it's a string directly
             if isinstance(message, str):
                 logger.info(f"Message is string: {message}")
                 return message
@@ -210,7 +210,7 @@ class EvoAIAgentExecutor:
             return ""
 
     async def _emit_error_event(self, event_queue: "EventQueue", error_message: str):
-        """Emite evento de erro."""
+        """Emit error event."""
         try:
             error_msg = new_agent_text_message(f"Error: {error_message}")
             event_queue.enqueue_event(error_msg)
@@ -220,14 +220,14 @@ class EvoAIAgentExecutor:
     async def cancel(
         self, context: "RequestContext", event_queue: "EventQueue"
     ) -> None:
-        """Implementa cancelamento (básico por enquanto)."""
+        """Implement cancellation (basic for now)."""
         logger.info(f"Cancel called for agent {self.agent_id}")
-        # Por enquanto, só log - implementar cancelamento real se necessário
+        # For now, only log - implement real cancellation if needed
 
 
 class EvoAISDKService:
     """
-    Serviço principal que cria e gerencia servidores A2A usando o SDK oficial.
+    Main service that creates and manages A2A servers using the official SDK.
     """
 
     def __init__(self, db: Session):
@@ -236,7 +236,7 @@ class EvoAISDKService:
 
     def create_a2a_server(self, agent_id: UUID) -> Optional[Any]:
         """
-        Cria um servidor A2A usando o SDK oficial mas com lógica interna.
+        Create an A2A server using the official SDK but with internal logic.
         """
         if not SDK_AVAILABLE:
             logger.error("❌ a2a-sdk not available, cannot create SDK server")
@@ -247,7 +247,7 @@ class EvoAISDKService:
             logger.info(f"🏗️ CREATING A2A SDK SERVER FOR AGENT {agent_id}")
             logger.info("=" * 80)
 
-            # Busca agent
+            # Search for agent in database
             logger.info("🔍 Searching for agent in database...")
             agent = get_agent(self.db, agent_id)
             if not agent:
@@ -256,36 +256,36 @@ class EvoAISDKService:
 
             logger.info(f"✅ Found agent: {agent.name}")
 
-            # Cria agent card usando lógica existente
+            # Create agent card using existing logic
             logger.info("🏗️ Creating agent card...")
             agent_card = self._create_agent_card(agent)
             logger.info(f"✅ Agent card created: {agent_card.name}")
 
-            # Cria executor usando adapter
+            # Create executor using adapter
             logger.info("🏗️ Creating agent executor adapter...")
             agent_executor = EvoAIAgentExecutor(self.db, agent_id)
             logger.info("✅ Agent executor created")
 
-            # Cria task store
+            # Create task store
             logger.info("🏗️ Creating task store...")
             task_store = InMemoryTaskStore()
             logger.info("✅ Task store created")
 
-            # Cria request handler
+            # Create request handler
             logger.info("🏗️ Creating request handler...")
             request_handler = DefaultRequestHandler(
                 agent_executor=agent_executor, task_store=task_store
             )
             logger.info("✅ Request handler created")
 
-            # Cria aplicação Starlette
+            # Create Starlette application
             logger.info("🏗️ Creating Starlette application...")
             server = A2AStarletteApplication(
                 agent_card=agent_card, http_handler=request_handler
             )
             logger.info("✅ Starlette application created")
 
-            # Armazena servidor
+            # Store server
             server_key = str(agent_id)
             self.servers[server_key] = server
 
@@ -305,7 +305,7 @@ class EvoAISDKService:
 
     def get_server(self, agent_id: UUID) -> Optional[Any]:
         """
-        Retorna servidor existente ou cria um novo.
+        Returns existing server or creates a new one.
         """
         server_key = str(agent_id)
 
@@ -316,38 +316,38 @@ class EvoAISDKService:
 
     def _create_agent_card(self, agent) -> AgentCard:
         """
-        Cria AgentCard usando lógica existente mas no formato SDK.
+        Create AgentCard using existing logic but in SDK format.
         """
-        # Reutiliza lógica do A2AService existente
+        # Reuse existing A2AService logic
         a2a_service = A2AService(self.db, A2ATaskManager(self.db))
         custom_card = a2a_service.get_agent_card(agent.id)
 
-        # Converte para formato SDK
+        # Convert to SDK format
         sdk_card = convert_to_sdk_format(custom_card)
 
         if sdk_card:
             return sdk_card
 
-        # Fallback: cria card básico
+        # Fallback: create basic card
         return AgentCard(
             name=agent.name,
             description=agent.description or "",
             url=f"{settings.API_URL}/api/v1/a2a-sdk/{agent.id}",
             version=settings.API_VERSION,
             capabilities=AgentCapabilities(
-                streaming=True, pushNotifications=False, stateTransitionHistory=True
+                streaming=True, pushNotifications=True, stateTransitionHistory=True
             ),
             provider=AgentProvider(
                 organization=settings.ORGANIZATION_NAME, url=settings.ORGANIZATION_URL
             ),
-            defaultInputModes=["text"],
+            defaultInputModes=["text", "file"],
             defaultOutputModes=["text"],
             skills=[],
         )
 
     def remove_server(self, agent_id: UUID) -> bool:
         """
-        Remove servidor do cache.
+        Remove server from cache.
         """
         server_key = str(agent_id)
         if server_key in self.servers:
@@ -357,7 +357,7 @@ class EvoAISDKService:
 
     def list_servers(self) -> Dict[str, Dict[str, Any]]:
         """
-        Lista todos os servidores ativos.
+        List all active servers.
         """
         result = {}
         for agent_id, server in self.servers.items():
@@ -369,19 +369,19 @@ class EvoAISDKService:
         return result
 
 
-# Função utilitária para criar servidor SDK facilmente
+# Utility function to create SDK server easily
 def create_a2a_sdk_server(db: Session, agent_id: UUID) -> Optional[Any]:
     """
-    Função utilitária para criar servidor A2A usando SDK.
+    Utility function to create A2A server using SDK.
     """
     service = EvoAISDKService(db)
     return service.create_a2a_server(agent_id)
 
 
-# Função para verificar compatibilidade
+# Function to check compatibility
 def check_sdk_compatibility() -> Dict[str, Any]:
     """
-    Verifica compatibilidade e funcionalidades disponíveis do SDK.
+    Check compatibility and available features of the SDK.
     """
     return {
         "sdk_available": SDK_AVAILABLE,

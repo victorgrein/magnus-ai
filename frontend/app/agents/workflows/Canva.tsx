@@ -189,12 +189,12 @@ const Canva = forwardRef(({ agent }: { agent: Agent | null }, ref) => {
     setActiveExecutionNodeId,
   }));
 
-  // Effect para limpar o nó ativo após um timeout
+  // Effect to clear the active node after a timeout
   useEffect(() => {
     if (activeExecutionNodeId) {
       const timer = setTimeout(() => {
         setActiveExecutionNodeId(null);
-      }, 5000); // Aumentar para 5 segundos para dar mais tempo de visualização
+      }, 5000); // Increase to 5 seconds to give more time to visualize
 
       return () => clearTimeout(timer);
     }
@@ -218,13 +218,13 @@ const Canva = forwardRef(({ agent }: { agent: Agent | null }, ref) => {
     }
   }, [agent, setNodes, setEdges]);
 
-  // Atualizar os nós quando o nó ativo muda para adicionar classe visual
+  // Update nodes when the active node changes to add visual class
   useEffect(() => {
     if (nodes.length > 0) {
       setNodes((nds: any) =>
         nds.map((node: any) => {
           if (node.id === activeExecutionNodeId) {
-            // Adiciona uma classe para destacar o nó ativo
+            // Add a class to highlight the active node
             return {
               ...node,
               className: "active-execution-node",
@@ -234,7 +234,7 @@ const Canva = forwardRef(({ agent }: { agent: Agent | null }, ref) => {
               },
             };
           } else {
-            // Remove a classe de destaque
+            // Remove the highlight class
             const { isExecuting, ...restData } = node.data || {};
             return {
               ...node,

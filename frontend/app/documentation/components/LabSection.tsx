@@ -49,6 +49,11 @@ interface LabSectionProps {
   setTaskId: (id: string) => void;
   callId: string;
   setCallId: (id: string) => void;
+  a2aMethod: string;
+  setA2aMethod: (method: string) => void;
+  authMethod: string;
+  setAuthMethod: (method: string) => void;
+  generateNewIds: () => void;
   sendRequest: () => Promise<void>;
   sendStreamRequestWithEventSource: () => Promise<void>;
   isLoading: boolean;
@@ -76,6 +81,11 @@ export function LabSection({
   setTaskId,
   callId,
   setCallId,
+  a2aMethod,
+  setA2aMethod,
+  authMethod,
+  setAuthMethod,
+  generateNewIds,
   sendRequest,
   sendStreamRequestWithEventSource,
   isLoading,
@@ -125,6 +135,11 @@ export function LabSection({
                 setTaskId={setTaskId}
                 callId={callId}
                 setCallId={setCallId}
+                a2aMethod={a2aMethod}
+                setA2aMethod={setA2aMethod}
+                authMethod={authMethod}
+                setAuthMethod={setAuthMethod}
+                generateNewIds={generateNewIds}
                 sendRequest={sendRequest}
                 isLoading={isLoading}
               />
@@ -144,6 +159,7 @@ export function LabSection({
                 setTaskId={setTaskId}
                 callId={callId}
                 setCallId={setCallId}
+                authMethod={authMethod}
                 sendStreamRequest={sendStreamRequestWithEventSource}
                 isStreaming={isStreaming}
                 streamResponse={streamResponse}

@@ -66,6 +66,7 @@ Executes a specific task using a target agent with structured task instructions.
 
 ## 🛠️ Technologies
 
+### Backend
 - **FastAPI**: Web framework for building the API
 - **SQLAlchemy**: ORM for database interaction
 - **PostgreSQL**: Main database
@@ -78,7 +79,17 @@ Executes a specific task using a target agent with structured task instructions.
 - **Jinja2**: Template engine for email rendering
 - **Bcrypt**: Password hashing and security
 - **LangGraph**: Framework for building stateful, multi-agent workflows
-- **ReactFlow**: Library for building node-based visual workflows
+
+### Frontend
+- **Next.js 15**: React framework with App Router
+- **React 18**: User interface library
+- **TypeScript**: Type-safe JavaScript
+- **Tailwind CSS**: Utility-first CSS framework
+- **shadcn/ui**: Modern component library
+- **React Hook Form**: Form management
+- **Zod**: Schema validation
+- **ReactFlow**: Node-based visual workflows
+- **React Query**: Server state management
 
 ## 📊 Langfuse Integration (Tracing & Observability)
 
@@ -105,59 +116,220 @@ For more information about the A2A protocol, visit [Google's A2A Protocol Docume
 
 ## 📋 Prerequisites
 
+### Backend
 - **Python**: 3.10 or higher
 - **PostgreSQL**: 13.0 or higher
 - **Redis**: 6.0 or higher
 - **Git**: For version control
 - **Make**: For running Makefile commands
 
+### Frontend
+- **Node.js**: 18.0 or higher
+- **pnpm**: Package manager (recommended) or npm/yarn
+
 ## 🔧 Installation
 
-1. Clone the repository:
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/EvolutionAPI/evo-ai.git
 cd evo-ai
 ```
 
-2. Create a virtual environment and install dependencies:
+### 2. Backend Setup
+
+#### Virtual Environment and Dependencies
 
 ```bash
+# Create and activate virtual environment
 make venv
 source venv/bin/activate  # Linux/Mac
-make install-dev  # For development dependencies
+# or on Windows: venv\Scripts\activate
+
+# Install development dependencies
+make install-dev
 ```
 
-3. Set up environment variables:
+#### Environment Configuration
 
 ```bash
+# Copy and configure backend environment
 cp .env.example .env
-# Edit the .env file with your settings
+# Edit the .env file with your database, Redis, and other settings
 ```
 
-4. Initialize the database and seed data:
+#### Database Setup
 
 ```bash
+# Initialize database and apply migrations
 make alembic-upgrade
+
+# Seed initial data (admin user, sample clients, etc.)
 make seed-all
 ```
 
-## 🖥️ Frontend Installation
+### 3. Frontend Setup
 
-1. Clone the frontend repository:
+#### Install Dependencies
 
 ```bash
-git clone https://github.com/EvolutionAPI/evo-ai-frontend.git
-cd evo-ai-frontend
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies using pnpm (recommended)
+pnpm install
+
+# Or using npm
+# npm install
+
+# Or using yarn
+# yarn install
 ```
 
-2. Follow the installation instructions in the frontend repository's README.
+#### Frontend Environment Configuration
 
-## 🚀 Getting Started
+```bash
+# Copy and configure frontend environment
+cp .env.example .env
+# Edit .env with your API URL (default: http://localhost:8000)
+```
 
-After installation, start by configuring your MCP server, creating a client, and setting up your agents.
+The frontend `.env.local` should contain:
 
-### Configuration (.env file)
+```env
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+## 🚀 Running the Application
+
+### Development Mode
+
+#### Start Backend (Terminal 1)
+```bash
+# From project root
+make run
+# Backend will be available at http://localhost:8000
+```
+
+#### Start Frontend (Terminal 2)
+```bash
+# From frontend directory
+cd frontend
+pnpm dev
+
+# Or using npm/yarn
+# npm run dev
+# yarn dev
+
+# Frontend will be available at http://localhost:3000
+```
+
+### Production Mode
+
+#### Backend
+```bash
+make run-prod    # Production with multiple workers
+```
+
+#### Frontend
+```bash
+cd frontend
+pnpm build && pnpm start
+
+# Or using npm/yarn
+# npm run build && npm start
+# yarn build && yarn start
+```
+
+## 🐳 Docker Installation
+
+### Full Stack with Docker Compose
+
+```bash
+# Build and start all services (backend + database + redis)
+make docker-build
+make docker-up
+
+# Initialize database with seed data
+make docker-seed
+```
+
+### Frontend with Docker
+
+```bash
+# From frontend directory
+cd frontend
+
+# Build frontend image
+docker build -t evo-ai-frontend .
+
+# Run frontend container
+docker run -p 3000:3000 -e NEXT_PUBLIC_API_URL=http://localhost:8000 evo-ai-frontend
+```
+
+Or using the provided docker-compose:
+
+```bash
+# From frontend directory
+cd frontend
+docker-compose up -d
+```
+
+## 🎯 Getting Started
+
+After installation, follow these steps:
+
+1. **Access the Frontend**: Open `http://localhost:3000`
+2. **Create Admin Account**: Use the seeded admin credentials or register a new account
+3. **Configure MCP Server**: Set up your first MCP server connection
+4. **Create Client**: Add a client to organize your agents
+5. **Build Your First Agent**: Create and configure your AI agent
+6. **Test Agent**: Use the chat interface to interact with your agent
+
+### Default Admin Credentials
+
+After running the seeders, you can login with:
+- **Email**: Check the seeder output for the generated admin email
+- **Password**: Check the seeder output for the generated password
+
+## 🖥️ API Documentation
+
+The interactive API documentation is available at:
+
+- Swagger UI: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
+
+## 👨‍💻 Development Commands
+
+### Backend Commands
+```bash
+# Database migrations
+make alembic-upgrade            # Update database to latest version
+make alembic-revision message="description"  # Create new migration
+
+# Seeders
+make seed-all                   # Run all seeders
+
+# Code verification
+make lint                       # Verify code with flake8
+make format                     # Format code with black
+```
+
+### Frontend Commands
+```bash
+# From frontend directory
+cd frontend
+
+# Development
+pnpm dev                        # Start development server
+pnpm build                      # Build for production
+pnpm start                      # Start production server
+pnpm lint                       # Run ESLint
+```
+
+## 🚀 Configuration
+
+### Backend Configuration (.env file)
 
 Key settings include:
 
@@ -182,6 +354,13 @@ EMAIL_PROVIDER="sendgrid"  # Options: "sendgrid" or "smtp"
 ENCRYPTION_KEY="your-encryption-key"
 ```
 
+### Frontend Configuration (.env.local file)
+
+```bash
+# API Configuration
+NEXT_PUBLIC_API_URL="http://localhost:8000"  # Backend API URL
+```
+
 > **Note**: While Google ADK is fully supported, the CrewAI engine option is still under active development. For production environments, it's recommended to use the default "adk" engine.
 
 ## 🔐 Authentication
@@ -193,49 +372,7 @@ The API uses JWT (JSON Web Token) authentication with:
 - Password recovery flow
 - Account lockout after multiple failed login attempts
 
-## 🚀 Running the Project
-
-```bash
-make run         # For development with automatic reload
-make run-prod    # For production with multiple workers
-```
-
-The API will be available at `http://localhost:8000`
-
-## 👨‍💻 Development Commands
-
-```bash
-# Database migrations
-make alembic-upgrade            # Update database to latest version
-make alembic-revision message="description"  # Create new migration
-
-# Seeders
-make seed-all                   # Run all seeders
-
-# Code verification
-make lint                       # Verify code with flake8
-make format                     # Format code with black
-```
-
-## 🐳 Running with Docker
-
-1. Configure the `.env` file
-2. Start the services:
-
-```bash
-make docker-build
-make docker-up
-make docker-seed
-```
-
-## 📚 API Documentation
-
-The interactive API documentation is available at:
-
-- Swagger UI: `http://localhost:8000/docs`
-- ReDoc: `http://localhost:8000/redoc`
-
-## ⭐ Star Us on GitHub
+## 🚀 Star Us on GitHub
 
 If you find EvoAI useful, please consider giving us a star! Your support helps us grow our community and continue improving the product.
 

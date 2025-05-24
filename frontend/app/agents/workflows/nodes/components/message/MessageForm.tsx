@@ -223,7 +223,7 @@ function MessageForm({
             </SelectTrigger>
             <SelectContent className="bg-neutral-800 border-neutral-700 text-neutral-200">
               <SelectItem value="text">Text</SelectItem>
-              {/* Outras opções podem ser habilitadas no futuro */}
+              {/* Other options can be enabled in the future */}
               {/* <SelectItem value="image">Image</SelectItem>
               <SelectItem value="file">File</SelectItem>
               <SelectItem value="video">Video</SelectItem> */}

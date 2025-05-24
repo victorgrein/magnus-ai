@@ -77,7 +77,7 @@ logger = logging.getLogger(__name__)
 
 
 class A2AImplementation(Enum):
-    """Tipo de implementação A2A."""
+    """A2A implementation type."""
 
     CUSTOM = "custom"
     SDK = "sdk"
@@ -86,7 +86,7 @@ class A2AImplementation(Enum):
 
 @dataclass
 class A2AClientConfig:
-    """Configuração do cliente A2A."""
+    """A2A client configuration."""
 
     base_url: str
     api_key: str
@@ -97,7 +97,7 @@ class A2AClientConfig:
 
 @dataclass
 class A2AResponse:
-    """Resposta unificada do A2A."""
+    """A2A unified response."""
 
     success: bool
     data: Optional[Any] = None
@@ -108,10 +108,10 @@ class A2AResponse:
 
 class EnhancedA2AClient:
     """
-    Cliente A2A melhorado que suporta tanto implementação custom quanto SDK oficial.
+    Enhanced A2A client that supports both custom implementation and official SDK.
 
-    Detecta automaticamente a melhor implementação disponível e fornece
-    interface unificada para comunicação com agents A2A.
+    Automatically detects and uses the best available implementation
+    and provides a unified interface for communication with A2A agents.
     """
 
     def __init__(self, config: A2AClientConfig):
@@ -131,8 +131,8 @@ class EnhancedA2AClient:
         await self.close()
 
     async def initialize(self):
-        """Inicializa o cliente e detecta implementações disponíveis."""
-        # Inicializa HTTP client
+        """Initialize the client and detect available implementations."""
+        # Initialize HTTP client
         headers = {"x-api-key": self.config.api_key, "Content-Type": "application/json"}
         if self.config.custom_headers:
             headers.update(self.config.custom_headers)
@@ -141,15 +141,15 @@ class EnhancedA2AClient:
             timeout=self.config.timeout, headers=headers
         )
 
-        # Detecta implementações disponíveis
+        # Detect available implementations
         await self._detect_available_implementations()
 
-        # Inicializa SDK client se disponível
+        # Initialize SDK client if available
         if A2AImplementation.SDK in self.available_implementations and SDK_AVAILABLE:
             await self._initialize_sdk_client()
 
     async def close(self):
-        """Fecha recursos do cliente."""
+        """Close client resources."""
         if self.httpx_client:
             await self.httpx_client.aclose()
 
@@ -158,10 +158,10 @@ class EnhancedA2AClient:
             pass
 
     async def _detect_available_implementations(self):
-        """Detecta quais implementações estão disponíveis no servidor."""
+        """Detect which implementations are available on the server."""
         implementations = []
 
-        # Testa implementação custom
+        # Test custom implementation
         try:
             custom_health_url = f"{self.config.base_url}/api/v1/a2a/health"
             response = await self.httpx_client.get(custom_health_url)
@@ -171,7 +171,7 @@ class EnhancedA2AClient:
         except Exception as e:
             logger.debug(f"Custom implementation not available: {e}")
 
-        # Testa implementação SDK
+        # Test SDK implementation
         try:
             sdk_health_url = f"{self.config.base_url}/api/v1/a2a-sdk/health"
             response = await self.httpx_client.get(sdk_health_url)
@@ -187,14 +187,14 @@ class EnhancedA2AClient:
         )
 
     async def _initialize_sdk_client(self):
-        """Inicializa cliente SDK se disponível."""
+        """Initialize SDK client if available."""
         if not SDK_AVAILABLE:
             logger.warning("SDK not available for client initialization")
             return
 
         try:
-            # Para o SDK client, precisamos descobrir agents disponíveis
-            # Por enquanto, mantemos None e inicializamos conforme necessário
+            # For the SDK client, we need to discover available agents
+            # For now, we keep None and initialize as needed
             self.sdk_client = None
             logger.info("SDK client initialization prepared")
         except Exception as e:
@@ -203,7 +203,7 @@ class EnhancedA2AClient:
     def _choose_implementation(
         self, preferred: Optional[A2AImplementation] = None
     ) -> A2AImplementation:
-        """Escolhe a melhor implementação baseado na preferência e disponibilidade."""
+        """Choose the best implementation based on preference and availability."""
         if preferred and preferred in self.available_implementations:
             return preferred
 
@@ -216,7 +216,7 @@ class EnhancedA2AClient:
                     f"falling back to auto-selection"
                 )
 
-        # Auto-seleção: prefere SDK se disponível, senão custom
+        # Auto-selection: prefer SDK if available, otherwise custom
         if A2AImplementation.SDK in self.available_implementations:
             return A2AImplementation.SDK
         elif A2AImplementation.CUSTOM in self.available_implementations:
@@ -230,11 +230,11 @@ class EnhancedA2AClient:
         implementation: Optional[A2AImplementation] = None,
     ) -> A2AResponse:
         """
-        Obtém agent card usando a implementação especificada ou a melhor disponível.
+        Get agent card using the specified implementation or the best available.
         """
         agent_id_str = str(agent_id)
 
-        # Verifica cache
+        # Check
         cache_key = f"{agent_id_str}_{implementation}"
         if cache_key in self._agent_cards_cache:
             logger.debug(f"Returning cached agent card for {agent_id_str}")
@@ -265,7 +265,7 @@ class EnhancedA2AClient:
             )
 
     async def _get_agent_card_custom(self, agent_id: str) -> A2AResponse:
-        """Obtém agent card usando implementação custom."""
+        """Get agent card using custom implementation."""
         url = f"{self.config.base_url}/api/v1/a2a/{agent_id}/.well-known/agent.json"
 
         response = await self.httpx_client.get(url)
@@ -275,7 +275,7 @@ class EnhancedA2AClient:
         return A2AResponse(success=True, data=data, raw_response=response)
 
     async def _get_agent_card_sdk(self, agent_id: str) -> A2AResponse:
-        """Obtém agent card usando implementação SDK."""
+        """Get agent card using SDK implementation."""
         url = f"{self.config.base_url}/api/v1/a2a-sdk/{agent_id}/.well-known/agent.json"
 
         response = await self.httpx_client.get(url)
@@ -293,7 +293,7 @@ class EnhancedA2AClient:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> A2AResponse:
         """
-        Envia mensagem para agent usando a implementação especificada.
+        Send message to agent using the specified implementation.
         """
         agent_id_str = str(agent_id)
         session_id = session_id or str(uuid4())
@@ -328,19 +328,19 @@ class EnhancedA2AClient:
         session_id: str,
         metadata: Optional[Dict[str, Any]],
     ) -> A2AResponse:
-        """Envia mensagem usando implementação custom."""
+        """Send message using custom implementation."""
         url = f"{self.config.base_url}/api/v1/a2a/{agent_id}"
 
-        # Cria mensagem no formato custom
+        # Create message in custom format
         custom_message = CustomMessage(
             role="user", parts=[{"type": "text", "text": message}], metadata=metadata
         )
 
-        # Cria request usando método correto da especificação A2A
+        # Create request using correct method from A2A specification
         request_data = {
             "jsonrpc": "2.0",
             "id": str(uuid4()),
-            "method": "tasks/send",  # Método correto da especificação A2A
+            "method": "tasks/send",  # Correct method from A2A specification
             "params": {
                 "id": str(uuid4()),
                 "sessionId": session_id,
@@ -365,17 +365,17 @@ class EnhancedA2AClient:
         session_id: str,
         metadata: Optional[Dict[str, Any]],
     ) -> A2AResponse:
-        """Envia mensagem usando implementação SDK - usa Message API conforme especificação."""
+        """Send message using SDK implementation - uses Message API according to specification."""
         if not SDK_AVAILABLE:
             raise ValueError("SDK not available")
 
-        # Para implementação SDK, usamos o endpoint SDK
+        # For SDK implementation, we use the SDK endpoint
         url = f"{self.config.base_url}/api/v1/a2a-sdk/{agent_id}"
 
-        # Message API conforme especificação oficial - apenas message nos params
+        # Message API according to official specification - only message in params
         message_id = str(uuid4())
 
-        # Formato exato da especificação oficial
+        # Exact format according to official specification
         request_data = {
             "jsonrpc": "2.0",
             "id": str(uuid4()),
@@ -385,11 +385,11 @@ class EnhancedA2AClient:
                     "role": "user",
                     "parts": [
                         {
-                            "type": "text",  # Especificação usa "type" não "kind"
+                            "type": "text",  # Specification uses "type" not "kind"
                             "text": message,
                         }
                     ],
-                    "messageId": message_id,  # Obrigatório conforme especificação
+                    "messageId": message_id,  # According to specification
                 }
             },
         }
@@ -409,7 +409,7 @@ class EnhancedA2AClient:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> AsyncIterator[A2AResponse]:
         """
-        Envia mensagem com streaming usando a implementação especificada.
+        Send message with streaming using the specified implementation.
         """
         agent_id_str = str(agent_id)
         session_id = session_id or str(uuid4())
@@ -445,15 +445,15 @@ class EnhancedA2AClient:
         session_id: str,
         metadata: Optional[Dict[str, Any]],
     ) -> AsyncIterator[A2AResponse]:
-        """Envia mensagem com streaming usando implementação custom - usa Task API."""
+        """Send message with streaming using custom implementation - uses Task API."""
         url = f"{self.config.base_url}/api/v1/a2a/{agent_id}/subscribe"
 
-        # Cria mensagem no formato custom
+        # Create message in custom format
         custom_message = CustomMessage(
             role="user", parts=[{"type": "text", "text": message}], metadata=metadata
         )
 
-        # Nossa implementação custom usa Task API (tasks/subscribe)
+        # Our custom implementation uses Task API (tasks/subscribe)
         request_data = {
             "jsonrpc": "2.0",
             "id": str(uuid4()),
@@ -489,16 +489,16 @@ class EnhancedA2AClient:
         session_id: str,
         metadata: Optional[Dict[str, Any]],
     ) -> AsyncIterator[A2AResponse]:
-        """Envia mensagem com streaming usando implementação SDK - usa Message API conforme especificação."""
+        """Send message with streaming using SDK implementation - uses Message API according to specification."""
         if not SDK_AVAILABLE:
             raise ValueError("SDK not available")
 
         url = f"{self.config.base_url}/api/v1/a2a-sdk/{agent_id}"
 
-        # Message API conforme especificação oficial - apenas message nos params
+        # Message API according to official specification - only message in params
         message_id = str(uuid4())
 
-        # Formato exato da especificação oficial para streaming
+        # Exact format according to official specification for streaming
         request_data = {
             "jsonrpc": "2.0",
             "id": str(uuid4()),
@@ -508,11 +508,11 @@ class EnhancedA2AClient:
                     "role": "user",
                     "parts": [
                         {
-                            "type": "text",  # Especificação usa "type" não "kind"
+                            "type": "text",  # Specification uses "type" not "kind"
                             "text": message,
                         }
                     ],
-                    "messageId": message_id,  # Obrigatório conforme especificação
+                    "messageId": message_id,  # According to specification
                 }
             },
         }
@@ -534,7 +534,7 @@ class EnhancedA2AClient:
         self, agent_id: Union[str, UUID]
     ) -> Dict[str, Any]:
         """
-        Compara as duas implementações para um agent específico.
+        Compare the two implementations for a specific agent.
         """
         agent_id_str = str(agent_id)
         comparison = {
@@ -547,7 +547,7 @@ class EnhancedA2AClient:
             "differences": [],
         }
 
-        # Obtém cards de ambas as implementações
+        # Get cards from both implementations
         if A2AImplementation.CUSTOM in self.available_implementations:
             try:
                 custom_response = await self._get_agent_card_custom(agent_id_str)
@@ -564,12 +564,12 @@ class EnhancedA2AClient:
             except Exception as e:
                 comparison["sdk_error"] = str(e)
 
-        # Compara se ambas estão disponíveis
+        # Compare if both are available
         if comparison["custom_card"] and comparison["sdk_card"]:
             custom = comparison["custom_card"]
             sdk = comparison["sdk_card"]
 
-            # Lista de campos para comparar
+            # List of fields to compare
             fields_to_compare = ["name", "description", "version", "url"]
 
             for field in fields_to_compare:
@@ -586,7 +586,7 @@ class EnhancedA2AClient:
 
     async def health_check(self) -> Dict[str, Any]:
         """
-        Verifica saúde de todas as implementações disponíveis.
+        Check health of all available implementations.
         """
         health = {
             "client_initialized": True,
@@ -596,7 +596,7 @@ class EnhancedA2AClient:
             "implementations_health": {},
         }
 
-        # Testa custom implementation
+        # Test custom implementation
         try:
             custom_health_url = f"{self.config.base_url}/api/v1/a2a/health"
             response = await self.httpx_client.get(custom_health_url)
@@ -611,7 +611,7 @@ class EnhancedA2AClient:
                 "error": str(e),
             }
 
-        # Testa SDK implementation
+        # Test SDK implementation
         try:
             sdk_health_url = f"{self.config.base_url}/api/v1/a2a-sdk/health"
             response = await self.httpx_client.get(sdk_health_url)
@@ -629,22 +629,22 @@ class EnhancedA2AClient:
         return health
 
     async def _detect_implementation(self) -> A2AImplementation:
-        """Detecta automaticamente a implementação disponível."""
+        """Detect automatically the available implementation."""
         logger.info("Auto-detecting A2A implementation...")
 
-        # Se forçamos uma implementação específica, use-a
+        # If we force a specific implementation, use it
         if self.config.implementation != A2AImplementation.AUTO:
             logger.info(
                 f"Using forced implementation: {self.config.implementation.value}"
             )
             return self.config.implementation
 
-        # Se temos agent_id, verifica especificamente baseado na URL de health check
+        # If we have agent_id, check specifically based on health check URL
         agent_id = getattr(self, "_current_agent_id", None)
 
         implementations_to_try = []
 
-        # Se o agent_id foi detectado como sendo de uma URL SDK específica, prefira SDK
+        # If the agent_id was detected as being from a specific SDK URL, prefer SDK
         if (
             agent_id
             and hasattr(self, "_prefer_sdk_from_url")
@@ -678,12 +678,12 @@ class EnhancedA2AClient:
             except Exception as e:
                 logger.info(f"✗ {impl.value} implementation failed: {str(e)}")
 
-        # Fallback para custom se nada funcionar
+        # Fallback to custom if nothing works
         logger.warning("No implementation detected, falling back to CUSTOM")
         return A2AImplementation.CUSTOM
 
 
-# Função utilitária para criar cliente facilmente
+# Utility function to create client easily
 async def create_enhanced_a2a_client(
     base_url: str,
     api_key: str,
@@ -691,7 +691,7 @@ async def create_enhanced_a2a_client(
     **kwargs,
 ) -> EnhancedA2AClient:
     """
-    Função utilitária para criar e inicializar cliente A2A melhorado.
+    Utility function to create and initialize enhanced A2A client.
     """
     config = A2AClientConfig(
         base_url=base_url, api_key=api_key, implementation=implementation, **kwargs
@@ -702,9 +702,9 @@ async def create_enhanced_a2a_client(
     return client
 
 
-# Exemplo de uso
+# Example of usage
 async def example_usage():
-    """Exemplo de como usar o cliente melhorado."""
+    """Example of how to use the enhanced client."""
     config = A2AClientConfig(
         base_url="http://localhost:8000",
         api_key="your-api-key",

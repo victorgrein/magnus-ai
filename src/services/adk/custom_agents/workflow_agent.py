@@ -119,7 +119,7 @@ class WorkflowAgent(BaseAgent):
             if not content:
                 content = [
                     Event(
-                        author="workflow_agent",
+                        author=f"workflow-node:{node_id}",
                         content=Content(parts=[Part(text="Content not found")]),
                     )
                 ]
@@ -136,6 +136,12 @@ class WorkflowAgent(BaseAgent):
             # Store specific results for this node
             node_outputs = state.get("node_outputs", {})
             node_outputs[node_id] = {"started_at": datetime.now().isoformat()}
+            
+            new_event = Event(
+                author=f"workflow-node:{node_id}",
+                content=Content(parts=[Part(text="Workflow started")]),
+            )
+            content = content + [new_event]
 
             yield {
                 "content": content,
@@ -171,7 +177,7 @@ class WorkflowAgent(BaseAgent):
                 yield {
                     "content": [
                         Event(
-                            author="workflow_agent",
+                            author=f"workflow-node:{node_id}",
                             content=Content(parts=[Part(text="Agent not found")]),
                         )
                     ],
@@ -192,7 +198,12 @@ class WorkflowAgent(BaseAgent):
             new_content = []
             async for event in root_agent.run_async(ctx):
                 conversation_history.append(event)
-                new_content.append(event)
+                
+                modified_event = Event(
+                    author=f"workflow-node:{node_id}", content=event.content
+                )
+                new_content.append(modified_event)
+
 
             print(f"New content: {new_content}")
 
@@ -284,7 +295,7 @@ class WorkflowAgent(BaseAgent):
 
                 condition_content = [
                     Event(
-                        author="workflow_agent",
+                        author=f"workflow-node:{node_id}",
                         content=Content(parts=[Part(text="Cycle limit reached")]),
                     )
                 ]
@@ -315,7 +326,7 @@ class WorkflowAgent(BaseAgent):
 
             condition_content = [
                 Event(
-                    author=label,
+                    author=f"workflow-node:{node_id}",
                     content=Content(
                         parts=[
                             Part(
@@ -351,7 +362,7 @@ class WorkflowAgent(BaseAgent):
             label = node_data.get("label", "message_node")
 
             new_event = Event(
-                author=label,
+                author=f"workflow-node:{node_id}",
                 content=Content(parts=[Part(text=message_content)]),
             )
             content = content + [new_event]
@@ -913,7 +924,7 @@ class WorkflowAgent(BaseAgent):
         error_msg = f"Error executing the workflow agent: {str(error)}"
         print(error_msg)
         return Event(
-            author=self.name,
+            author=f"workflow-error:{self.name}",
             content=Content(
                 role="agent",
                 parts=[Part(text=error_msg)],

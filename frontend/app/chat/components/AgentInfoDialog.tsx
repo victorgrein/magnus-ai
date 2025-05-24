@@ -140,7 +140,7 @@ export function AgentInfoDialog({
     }
   };
 
-  // Função para exportar o agente como JSON
+  // Function to export the agent as JSON
   const handleExportAgent = async () => {
     if (!agent) return;
     

@@ -440,15 +440,15 @@ export default function AgentsPage() {
     setEditingAgent(null);
   };
 
-  // Função para exportar todos os agentes como JSON
+  // Function to export all agents as JSON
   const handleExportAllAgents = () => {
     try {
-      // Criar nome do arquivo com data atual
+      // Create file name with current date
       const date = new Date();
       const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
       const filename = `agents-export-${formattedDate}`;
       
-      // Usar a função utilitária para exportar
+      // Use the utility function to export
       // Pass agents both as the data and as allAgents parameter to properly resolve references
       const result = exportAsJson({ agents: filteredAgents }, filename, true, agents);
       
