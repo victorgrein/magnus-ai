@@ -194,7 +194,7 @@ cp .env.example .env
 # Edit .env with your API URL (default: http://localhost:8000)
 ```
 
-The frontend `.env.local` should contain:
+The frontend `.env` should contain:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -354,7 +354,7 @@ EMAIL_PROVIDER="sendgrid"  # Options: "sendgrid" or "smtp"
 ENCRYPTION_KEY="your-encryption-key"
 ```
 
-### Frontend Configuration (.env.local file)
+### Frontend Configuration (.env file)
 
 ```bash
 # API Configuration
