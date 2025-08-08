@@ -10,13 +10,13 @@ ARG NEXT_PUBLIC_API_URL=https://api.evo-ai.co
 RUN npm install -g pnpm
 
 # Copy package files first for better caching
-COPY package.json pnpm-lock.yaml ./
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
 
 # Install dependencies
 RUN pnpm install --no-frozen-lockfile
 
 # Copy all source code (this includes tsconfig.json, lib/, etc.)
-COPY . .
+COPY frontend/ .
 
 # Set environment variables from build arguments
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
@@ -36,7 +36,7 @@ ARG NEXT_PUBLIC_API_URL=https://api-evoai.evoapicloud.com
 RUN npm install -g pnpm
 
 # Install production dependencies only
-COPY package.json pnpm-lock.yaml ./
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
 RUN pnpm install --prod --no-frozen-lockfile
 
 # Copy built assets from builder
@@ -50,11 +50,11 @@ ENV PORT=3000
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 # Script to replace environment variables at runtime
-COPY docker-entrypoint.sh ./
+COPY frontend/docker-entrypoint.sh ./
 RUN chmod +x ./docker-entrypoint.sh
 
 # Expose port
 EXPOSE 3000
 
 # Use entrypoint script to initialize environment variables before starting the app
-ENTRYPOINT ["sh", "./docker-entrypoint.sh"] 
+ENTRYPOINT ["sh", "./docker-entrypoint.sh"]
